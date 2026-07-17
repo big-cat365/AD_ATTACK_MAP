@@ -7,13 +7,14 @@ Entra 同意・Device Code フィッシング等）の追加を反映済み。
 
 ## 使い方
 
-`ad-attack-map.html` をブラウザで開くだけ（`file://` で直接ダブルクリック可）。
-サーバ・ネット接続・ビルド不要。
+`index.html` をブラウザで開くだけ（`file://` で直接ダブルクリック可）。  
+サーバ・ネット接続・ビルド不要。  
+https://big-cat365.github.io/AD_ATTACK_MAP/ でもOK  
 
 ## ファイル構成
 
 ```
-ad-attack-map.html      … HTML本体（マークアップ＋各CSS/JSの読み込みのみ）
+index.html      … HTML本体（マークアップ＋各CSS/JSの読み込みのみ）
 css/
   styles.css            … 全スタイル（デザイントークン→レイアウト→コンポーネント→図→モーダル）
 js/
