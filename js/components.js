@@ -34,6 +34,7 @@ window.AD = window.AD || {};
       red: "<p>" + mw(a.how) + "</p>" + metaRow("Tools", a.tools),
       blue:
         '<p><b class="hl-def">' + u.detectLabel + "</b> " + mw(a.detect) + "</p>" +
+        (a.triage ? '<p class="triage"><b class="hl-tri">' + u.triageLabel + "</b> " + mw(a.triage) + "</p>" : "") +
         '<p><b class="hl-def">' + u.mitigateLabel + "</b> " + mw(a.mitigate) + "</p>" +
         metaRow("Event ID", a.events)
     };

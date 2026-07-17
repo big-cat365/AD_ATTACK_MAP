@@ -251,6 +251,8 @@
   .lane.def .lane-head { color: var(--defense); }
   .lane-head .ic { width: 15px; height: 15px; display: inline-flex; }
   .hl-def { color: var(--defense); }
+  .hl-tri { color: var(--defense); }
+  .triage { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 5px; padding: 7px 9px; }
   .lane p { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
   .lane p:last-child { margin-bottom: 0; }
   .lane .meta { display: block; margin-top: 8px; }
