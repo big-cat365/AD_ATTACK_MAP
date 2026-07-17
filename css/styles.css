@@ -253,6 +253,32 @@
   .hl-def { color: var(--defense); }
   .hl-tri { color: var(--defense); }
   .triage { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 5px; padding: 7px 9px; }
+  /* Advanced Hunting (KQL) collapsible block — shared by card + modal lanes */
+  .hunt { margin: 0 0 8px; border: 1px solid var(--defense-line); border-radius: 5px; background: var(--panel-2); overflow: hidden; }
+  .hunt > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; padding: 7px 9px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--defense); user-select: none; }
+  .hunt > summary::-webkit-details-marker { display: none; }
+  .hunt > summary::before { content: "\25B8"; font-size: 10px; color: var(--faint); transition: transform .15s; }
+  .hunt[open] > summary::before { transform: rotate(90deg); }
+  .hunt > summary:hover { color: var(--defense-dim); }
+  .hunt .hq-n { margin-left: auto; font-size: 10px; color: var(--faint); background: var(--panel); border: 1px solid var(--line-soft); border-radius: 999px; padding: 1px 7px; }
+  .hunt-hint { margin: 0 9px 8px !important; font-size: 11px !important; color: var(--muted) !important; font-style: italic; }
+  .hunt .hq { margin: 0 9px 9px; }
+  .hunt .hq-cap { font-size: 11.5px; color: var(--ink-2); margin-bottom: 4px; line-height: 1.45; }
+  .hunt .hq-plat { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; padding: 1px 5px; border-radius: 4px; }
+  .plat-mde { background: #6ea8fe; color: #05173a; }
+  .plat-mdi { background: var(--defense); color: #06222a; }
+  .plat-sentinel { background: #b98cff; color: #12071f; }
+  .plat-entra { background: #f2c14e; color: #2a1f00; }
+  /* CrowdStrike Falcon block (distinct red accent) + dialect badges */
+  .hunt.cs { border-color: rgba(226, 74, 74, 0.34); }
+  .hunt.cs > summary { color: #e2685a; }
+  .hunt.cs > summary:hover { color: #c9483c; }
+  .plat-event-search { background: #e2685a; color: #2a0808; }
+  .plat-logscale { background: #f2955a; color: #2a1400; }
+  .plat-identity-protection { background: #e2b85a; color: #2a1f00; }
+  .plat-falcon { background: #e2685a; color: #2a0808; }
+  .hunt pre.kql { margin: 0; padding: 9px 10px; background: var(--ground-2); border: 1px solid var(--line-soft); border-radius: 5px; overflow-x: auto; }
+  .hunt pre.kql code { display: block; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--ink); white-space: pre; background: none; border: 0; padding: 0; border-radius: 0; }
   .lane p { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
   .lane p:last-child { margin-bottom: 0; }
   .lane .meta { display: block; margin-top: 8px; }
