@@ -18,21 +18,22 @@
     <div class="spacer"></div>
     <span class="search">
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="q" type="search" aria-label="手法名・MITRE ID・ツール名で検索" placeholder="手法 / MITRE / ツール…" autocomplete="off" />
+      <input id="q" type="search" aria-label="手法名・MITRE ID・ツール名で検索" placeholder="手法 / MITRE / ツール…" data-t-al="searchAl" data-t-ph="searchPh" autocomplete="off" />
     </span>
-    <div class="segmented" role="group" aria-label="表示視点（強調するレーンを切替）">
-      <button data-view="red" aria-pressed="false" title="攻撃(Red)側を強調表示">Red</button>
-      <button data-view="purple" aria-pressed="false" title="攻撃・防御の両方を表示">Purple</button>
-      <button data-view="blue" aria-pressed="false" title="防御(Blue)側を強調表示">Blue</button>
+    <div class="segmented" role="group" aria-label="表示視点（強調するレーンを切替）" data-t-al="viewGroupAl">
+      <button data-view="red" aria-pressed="false" title="攻撃(Red)側を強調表示" data-t-ti="viewRedTi">Red</button>
+      <button data-view="purple" aria-pressed="false" title="攻撃・防御の両方を表示" data-t-ti="viewPurpleTi">Purple</button>
+      <button data-view="blue" aria-pressed="false" title="防御(Blue)側を強調表示" data-t-ti="viewBlueTi">Blue</button>
     </div>
-    <button class="iconbtn" id="themeBtn" aria-label="配色テーマを切替（ダーク／ライト）">◐ theme</button>
+    <button class="iconbtn" id="langBtn" aria-label="言語を切替 / Switch language" data-t-al="langAl">EN</button>
+    <button class="iconbtn" id="themeBtn" aria-label="配色テーマを切替（ダーク／ライト）" data-t-al="themeAl">◐ theme</button>
   </div>
   <div class="topbar-filters">
     <span class="fl">Severity</span>
     <button class="chip crit" data-sev="Critical" aria-pressed="false">Critical</button>
     <button class="chip" data-sev="High" aria-pressed="false">High</button>
     <button class="chip" data-sev="Medium" aria-pressed="false">Medium</button>
-    <button class="clearbtn" id="clearFilters" hidden>× 絞り込み解除</button>
+    <button class="clearbtn" id="clearFilters" data-t="clearFilter" hidden>× 絞り込み解除</button>
     <span class="rescount" id="rescount" role="status" aria-live="polite"><b>218</b> techniques</span>
   </div>
 </header>
@@ -41,54 +42,54 @@
   <section class="hero" aria-label="概要">
     <p class="eyebrow">Active Directory · <span class="rt">Red</span> / <span class="bt">Blue</span> · Kill-Chain</p>
     <h1 class="title">Adversary Techniques</h1>
-    <p class="lede">攻撃（<b style="color:var(--offense)">Red</b>）と防御（<b style="color:var(--defense)">Blue</b>）を対にした Active Directory 攻撃技術のリファレンス。キルチェーン7フェーズ・<b>218手法</b>、各手法に登場人物フロー図を収録。</p>
+    <p class="lede" data-t-html="lede">攻撃（<b style="color:var(--offense)">Red</b>）と防御（<b style="color:var(--defense)">Blue</b>）を対にした Active Directory 攻撃技術のリファレンス。キルチェーン7フェーズ・<b>218手法</b>、各手法に登場人物フロー図を収録。</p>
 
     <div class="stats" id="stats"></div>
 
     <div class="legend">
-      <span class="k"><span class="sw off"></span> RedTeam / 攻撃</span>
-      <span class="k"><span class="sw def"></span> BlueTeam / 防御</span>
-      <span class="k"><span class="sw pur"></span> Purple / 両視点</span>
-      <span class="k"><span class="diamond">▌</span> 重大度: <span style="color:var(--sev-crit)">Critical</span> · <span style="color:var(--sev-high)">High</span> · <span style="color:var(--sev-med)">Medium</span></span>
+      <span class="k"><span class="sw off"></span> <span data-t="legRed">RedTeam / 攻撃</span></span>
+      <span class="k"><span class="sw def"></span> <span data-t="legBlue">BlueTeam / 防御</span></span>
+      <span class="k"><span class="sw pur"></span> <span data-t="legPurple">Purple / 両視点</span></span>
+      <span class="k" data-t-html="legSev"><span class="diamond">▌</span> 重大度: <span style="color:var(--sev-crit)">Critical</span> · <span style="color:var(--sev-high)">High</span> · <span style="color:var(--sev-med)">Medium</span></span>
     </div>
 
     <div class="legend flow">
       <span class="k" style="color:var(--faint);font-family:var(--mono);font-size:11px;letter-spacing:.1em">FLOW</span>
-      <span class="k"><i class="ln k-attack"></i>攻撃操作</span>
-      <span class="k"><i class="ln k-auth"></i>正規認証</span>
-      <span class="k"><i class="ln k-data"></i>資格情報/データ取得</span>
-      <span class="k"><i class="ln k-move"></i>横展開/実行</span>
-      <span class="k"><i class="ln k-defense"></i>防御の検知点</span>
-      <span class="k" style="color:var(--muted)">— 図をクリック／Enterで拡大</span>
+      <span class="k"><i class="ln k-attack"></i><span data-t="flowAttack">攻撃操作</span></span>
+      <span class="k"><i class="ln k-auth"></i><span data-t="flowAuth">正規認証</span></span>
+      <span class="k"><i class="ln k-data"></i><span data-t="flowData">資格情報/データ取得</span></span>
+      <span class="k"><i class="ln k-move"></i><span data-t="flowMove">横展開/実行</span></span>
+      <span class="k"><i class="ln k-defense"></i><span data-t="flowDefense">防御の検知点</span></span>
+      <span class="k" style="color:var(--muted)" data-t="flowHint">— 図をクリック／Enterで拡大</span>
     </div>
   </section>
 
   <nav class="spine-sec" aria-label="キルチェーン（フェーズへ移動）">
-    <p class="spine-title">▸ Attack Kill-Chain — フェーズをクリックで移動</p>
+    <p class="spine-title" data-t="spineTitle">▸ Attack Kill-Chain — フェーズをクリックで移動</p>
     <div class="spine" id="spine"></div>
   </nav>
 
   <main id="main"></main>
-  <div class="noresult" id="noresult">// 条件に一致する技術がありません — <button class="clearbtn" id="clearFilters2">絞り込みを解除</button></div>
+  <div class="noresult" id="noresult" data-t-html="noresult">// 条件に一致する技術がありません — <button class="clearbtn" id="clearFilters2">絞り込みを解除</button></div>
 
   <footer>
     <div class="fgrid">
       <div>
-        <h4>視点の使い方</h4>
-        Red = 攻撃手順・前提・ツール。Blue = 検知シグナル・イベントID・緩和策。Purple で左右（上下）を同時表示。カードにホバーすると、絞り込み中でも反対側の視点が一時的に復帰します。
+        <h4 data-t="footerUseH">視点の使い方</h4>
+        <p data-t="footerUse">Red = 攻撃手順・前提・ツール。Blue = 検知シグナル・イベントID・緩和策。Purple で左右（上下）を同時表示。カードにホバー／フォーカスすると、絞り込み中でも反対側の視点が一時的に復帰します。</p>
       </div>
       <div>
-        <h4>主要リファレンス</h4>
-        <a href="https://attack.mitre.org/" target="_blank" rel="noopener">MITRE ATT&amp;CK</a> · MITRE ID をタグに併記<br>
+        <h4 data-t="footerRefsH">主要リファレンス</h4>
+        <a href="https://attack.mitre.org/" target="_blank" rel="noopener">MITRE ATT&amp;CK</a><br>
         <a href="https://www.thehacker.recipes/" target="_blank" rel="noopener">The Hacker Recipes</a><br>
         <a href="https://adsecurity.org/" target="_blank" rel="noopener">ADSecurity.org</a> · <a href="https://bloodhound.specterops.io/" target="_blank" rel="noopener">BloodHound</a>
       </div>
       <div>
-        <h4>凡例メモ</h4>
-        イベントIDは主に Windows セキュリティログ。多くの検知は「単発イベント」ではなく相関・ベースライン逸脱で成立します。ツール名は代表例で、悪用可否は環境設定に依存します。
+        <h4 data-t="footerNoteH">凡例メモ</h4>
+        <p data-t="footerNote">イベントIDは主に Windows セキュリティログ。多くの検知は「単発イベント」ではなく相関・ベースライン逸脱で成立します。ツール名は代表例で、悪用可否は環境設定に依存します。</p>
       </div>
     </div>
-    <p class="disc">教育・防御・認可されたセキュリティ検証を目的とした参考資料です。実際のツール実行やコマンドは、書面による許可のある環境（自組織・ラボ・ペネトレーション契約・CTF）でのみ行ってください。無認可のシステムに対する使用は法令で禁止されています。</p>
+    <p class="disc" data-t="disclaimer">教育・防御・認可されたセキュリティ検証を目的とした参考資料です。実際のツール実行やコマンドは、書面による許可のある環境（自組織・ラボ・ペネトレーション契約・CTF）でのみ行ってください。無認可のシステムに対する使用は法令で禁止されています。</p>
   </footer>
 </div>
 
@@ -99,9 +100,12 @@
     <div class="modal-body" id="modal-body"></div>
   </div>
 </div>
+<script src="js/data/ui.js"></script>
 <script src="js/data/phases.js"></script>
 <script src="js/data/attacks.js"></script>
+<script src="js/data/attacks.en.js"></script>
 <script src="js/data/scenarios.js"></script>
+<script src="js/data/scenarios.en.js"></script>
 <script src="js/util.js"></script>
 <script src="js/components.js"></script>
 <script src="js/diagram.js"></script>

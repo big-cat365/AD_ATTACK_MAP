@@ -20,12 +20,13 @@ window.AD = window.AD || {};
     var sev = { Critical: 0, High: 0, Medium: 0 };
     AD.ATTACKS.forEach(function (a) { if (sev[a.sev] != null) sev[a.sev]++; });
     var cats = new Set(AD.ATTACKS.map(function (a) { return a.group; })).size;
+    var u = AD.UI;
     var tiles = [
-      { n: AD.ATTACKS.length, l: "収録テクニック", c: "" },
-      { n: AD.PHASES.length, l: "キルチェーン フェーズ", c: "" },
-      { n: cats, l: "攻撃カテゴリ", c: "" },
-      { n: sev.Critical, l: "Critical 重大度", c: "crit" },
-      { n: sev.High, l: "High 重大度", c: "" }
+      { n: AD.ATTACKS.length, l: u.statTotal, c: "" },
+      { n: AD.PHASES.length, l: u.statPhases, c: "" },
+      { n: cats, l: u.statCats, c: "" },
+      { n: sev.Critical, l: u.statCrit, c: "crit" },
+      { n: sev.High, l: u.statHigh, c: "" }
     ];
     document.getElementById("stats").innerHTML = tiles.map(function (s) {
       return '<div class="stat ' + s.c + '"><div class="n">' + s.n + '</div><div class="l">' + s.l + "</div></div>";
@@ -47,6 +48,7 @@ window.AD = window.AD || {};
   }
 
   function card(a) {
+    var u = AD.UI;
     var lanes = AD.lanes(a);
     var searchTxt = esc([a.name, a.aka, a.mitre, a.cve, a.summary, a.how, a.detect, a.tools].join(" ").toLowerCase());
     var sev = SEV[a.sev] ? a.sev : "Medium";
@@ -62,14 +64,14 @@ window.AD = window.AD || {};
         '<p class="summary">' + mw(a.summary) + "</p>" +
         '<div class="tags">' + AD.tags(a) + "</div>" +
       "</div>" +
-      '<div class="diagram" data-scn="' + nameEsc + '" title="クリックで拡大">' +
-        '<div class="diagram-head"><span class="dl">ATTACK FLOW <b>登場人物と手順</b></span>' +
-          '<button class="expand" data-expand="' + nameEsc + '" aria-label="' + nameEsc + ' の攻撃フロー図を拡大">⤢ 拡大</button></div>' +
+      '<div class="diagram" data-scn="' + nameEsc + '" title="' + esc(u.expand) + '">' +
+        '<div class="diagram-head"><span class="dl">' + u.flowHead + "</span>" +
+          '<button class="expand" data-expand="' + nameEsc + '" aria-label="' + esc(u.expandAl.replace("{name}", a.name)) + '">' + esc(u.expand) + "</button></div>" +
         '<div class="dscroll">' + svg + "</div>" +
       "</div>" +
       '<div class="split">' +
-        '<div class="lane off"><div class="lane-head">' + ICONS.sword + " Red · 攻撃</div>" + lanes.red + "</div>" +
-        '<div class="lane def"><div class="lane-head">' + ICONS.shield + " Blue · 防御</div>" + lanes.blue + "</div>" +
+        '<div class="lane off"><div class="lane-head">' + ICONS.sword + " " + esc(u.cardRed) + "</div>" + lanes.red + "</div>" +
+        '<div class="lane def"><div class="lane-head">' + ICONS.shield + " " + esc(u.cardBlue) + "</div>" + lanes.blue + "</div>" +
       "</div></article>";
   }
 

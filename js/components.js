@@ -29,11 +29,12 @@ window.AD = window.AD || {};
    * own containers (.lane vs .m-lane) while sharing identical content.
    */
   AD.lanes = function (a) {
+    var u = AD.UI;
     return {
       red: "<p>" + mw(a.how) + "</p>" + metaRow("Tools", a.tools),
       blue:
-        '<p><b class="hl-def">検知:</b> ' + mw(a.detect) + "</p>" +
-        '<p><b class="hl-def">対策:</b> ' + mw(a.mitigate) + "</p>" +
+        '<p><b class="hl-def">' + u.detectLabel + "</b> " + mw(a.detect) + "</p>" +
+        '<p><b class="hl-def">' + u.mitigateLabel + "</b> " + mw(a.mitigate) + "</p>" +
         metaRow("Event ID", a.events)
     };
   };

@@ -1,5 +1,6 @@
 window.AD = window.AD || {};
-AD.ATTACKS = [
+AD.I18N = AD.I18N || { ja: {}, en: {} };
+AD.I18N.ja.attacks = [
   {
     "name": "BloodHound / SharpHound Collection",
     "aka": "SharpHound.exe, AzureHound, RustHound, BloodHound CE, bloodhound-python",

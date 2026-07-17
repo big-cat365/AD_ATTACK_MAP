@@ -34,17 +34,19 @@ window.AD = window.AD || {};
     admin:       { g: "g-pur", ic: '<circle cx="10" cy="8" r="3.3"/><path d="M4 20c0-3.4 3-5.3 6-5.3"/><path d="m17.5 12.5.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3Z"/>' }
   };
 
-  // Step kinds → legend labels (colour comes from the .k-* CSS classes).
+  // Step kinds → UI label key (colour comes from the .k-* CSS classes).
   var KINDS = [
-    { k: "attack", t: "攻撃操作" },
-    { k: "auth", t: "正規認証" },
-    { k: "data", t: "資格情報/データ取得" },
-    { k: "move", t: "横展開/実行" },
-    { k: "defense", t: "防御の検知点" }
+    { k: "attack", u: "flowAttack" },
+    { k: "auth", u: "flowAuth" },
+    { k: "data", u: "flowData" },
+    { k: "move", u: "flowMove" },
+    { k: "defense", u: "flowDefense" }
   ];
-  var KIND_LEGEND = KINDS.map(function (x) {
-    return '<span><i class="ln k-' + x.k + '"></i>' + x.t + "</span>";
-  }).join("");
+  function kindLegend() {
+    return KINDS.map(function (x) {
+      return '<span><i class="ln k-' + x.k + '"></i>' + AD.UI[x.u] + "</span>";
+    }).join("");
+  }
 
   /** Wrap a string into up to `maxLines` lines of `maxChars`, ellipsising overflow. */
   function wrapText(t, maxChars, maxLines) {
@@ -79,8 +81,8 @@ window.AD = window.AD || {};
     var cx = function (i) { return CONFIG.padX + m.colW * i + m.colW / 2; };
     var idx = {};
     actors.forEach(function (a, i) { idx[a.id] = i; });
-    var alabel = '攻撃フロー図。登場人物: ' + actors.map(function (a) { return a.label; }).join('、') +
-      '。手順: ' + steps.map(function (st, i) { return (i + 1) + '. ' + st.label; }).join('; ');
+    var alabel = AD.UI.svgActors + actors.map(function (a) { return a.label; }).join(', ') +
+      AD.UI.svgSteps + steps.map(function (st, i) { return (i + 1) + '. ' + st.label; }).join('; ');
 
     var s = '<svg class="seq" role="img" aria-label="' + esc(alabel) + '" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '" xmlns="http://www.w3.org/2000/svg">';
 
@@ -131,5 +133,5 @@ window.AD = window.AD || {};
     return AD.SCENARIOS[AD.scnNorm(name)] || null;
   }
 
-  AD.diagram = { renderSeq: renderSeq, getScenario: getScenario, KINDS: KINDS, KIND_LEGEND: KIND_LEGEND };
+  AD.diagram = { renderSeq: renderSeq, getScenario: getScenario, KINDS: KINDS, kindLegend: kindLegend };
 })(window.AD);

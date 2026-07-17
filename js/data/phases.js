@@ -1,5 +1,6 @@
 window.AD = window.AD || {};
-AD.PHASES = [
+AD.I18N = AD.I18N || { ja: {}, en: {} };
+AD.I18N.ja.phases = [
     { id: "recon",     idx: "01", name: "偵察・列挙",           en: "Recon / Enum",           desc: "ドメインの構造・ユーザー・権限関係・攻撃経路を、正規プロトコル（LDAP/Kerberos/SMB）を使って合法的に近い形で収集する段階。ここでの静けさが後段の成否を分ける。" },
     { id: "credaccess",idx: "02", name: "資格情報アクセス",     en: "Credential Access",      desc: "Kerberos やホスト上のメモリ・ディスクから、パスワードハッシュ・チケット・平文・鍵を奪う。AD 侵害の心臓部。" },
     { id: "coercion",  idx: "03", name: "中間者・強制認証",     en: "Coercion / Relay",       desc: "名前解決のポイズニングや認証の強制（Coercion）で NTLM/Kerberos 認証を奪い、リレーして権限を得る。設定不備（署名なし等）を突く。" },
@@ -8,3 +9,4 @@ AD.PHASES = [
     { id: "dominance", idx: "06", name: "ドメイン支配・永続化", en: "Dominance / Persist",    desc: "KRBTGT やCA鍵などの“最上位の秘密”を奪い、任意チケット偽造・複製・永続的バックドアでドメインを恒久支配する。" },
     { id: "trust",     idx: "07", name: "トラスト/フォレスト間", en: "Trust / Forest",         desc: "ドメイン/フォレスト間の信頼関係、SID History、クラウド連携(Entra)を悪用し、境界を越えて支配を拡張する。" },
   ];
+AD.I18N.en.phases = [{"id":"recon","idx":"01","name":"Reconnaissance","en":"Recon / Enum","desc":"Collect the domain's structure, users, permission relationships, and attack paths using legitimate protocols (LDAP/Kerberos/SMB). Staying quiet here often decides later success."},{"id":"credaccess","idx":"02","name":"Credential Access","en":"Credential Access","desc":"Steal password hashes, tickets, plaintext, and keys from Kerberos or from host memory and disk. The heart of AD compromise."},{"id":"coercion","idx":"03","name":"Coercion & Relay","en":"Coercion / Relay","desc":"Poison name resolution or coerce authentication, then relay NTLM/Kerberos to gain privileges. Exploits misconfiguration such as missing signing."},{"id":"privesc","idx":"04","name":"Privilege Escalation","en":"Privilege Escalation","desc":"Abuse delegation, ACLs, AD CS, and known CVEs to climb from a normal user toward Domain Admin. Where AD's design weaknesses cluster."},{"id":"lateral","idx":"05","name":"Lateral Movement","en":"Lateral Movement","desc":"Use stolen credentials and tickets to move host to host and widen the foothold. PtH/PtT plus various remote execution."},{"id":"dominance","idx":"06","name":"Dominance & Persistence","en":"Dominance / Persist","desc":"Steal the top-level secrets (KRBTGT, CA keys) to forge tickets, replicate, and plant persistent backdoors for lasting control of the domain."},{"id":"trust","idx":"07","name":"Trust / Forest","en":"Trust / Forest","desc":"Abuse inter-domain and forest trusts, SID History, and cloud federation (Entra) to extend control across boundaries."}];

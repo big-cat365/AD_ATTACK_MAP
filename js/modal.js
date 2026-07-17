@@ -20,7 +20,7 @@ window.AD = window.AD || {};
     var scn = AD.diagram.getScenario(a.name);
     var svg = scn
       ? AD.diagram.renderSeq(scn, { compact: false })
-      : '<div style="color:var(--muted);font-family:var(--mono);padding:16px">図データなし</div>';
+      : '<div style="color:var(--muted);font-family:var(--mono);padding:16px">' + esc(AD.UI.noFlow) + "</div>";
     var phase = AD.PHASES.filter(function (p) { return p.id === a.phase; })[0];
     var lanes = AD.lanes(a);
     return (
@@ -31,10 +31,10 @@ window.AD = window.AD || {};
       '<div class="m-tags">' + AD.tags(a, true) + "</div>" +
       '<p class="m-summary">' + mw(a.summary) + "</p>" +
       '<div class="m-diagram">' + svg + "</div>" +
-      '<div class="m-seqlegend">' + AD.diagram.KIND_LEGEND + "</div>" +
+      '<div class="m-seqlegend">' + AD.diagram.kindLegend() + "</div>" +
       '<div class="m-lanes">' +
-        '<div class="m-lane off"><h3>' + ICONS.sword + " RedTeam · 攻撃</h3>" + lanes.red + "</div>" +
-        '<div class="m-lane def"><h3>' + ICONS.shield + " BlueTeam · 防御</h3>" + lanes.blue + "</div>" +
+        '<div class="m-lane off"><h3>' + ICONS.sword + " " + esc(AD.UI.modalRed) + "</h3>" + lanes.red + "</div>" +
+        '<div class="m-lane def"><h3>' + ICONS.shield + " " + esc(AD.UI.modalBlue) + "</h3>" + lanes.blue + "</div>" +
       "</div>"
     );
   }

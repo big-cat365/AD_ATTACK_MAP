@@ -1,6 +1,6 @@
 /*
- * app.js — interaction layer + bootstrap. Owns transient UI state (active
- * view, severity filter, search) and wires DOM events to AD.views / AD.modal.
+ * app.js — interaction layer + bootstrap. Owns transient UI state (language,
+ * active view, severity filter, search) and wires DOM events to the modules.
  * Loaded last, after the DOM and all other modules.
  */
 window.AD = window.AD || {};
@@ -8,6 +8,32 @@ window.AD = window.AD || {};
   "use strict";
 
   var TOTAL = 0;
+  var lang = "ja";
+  var activeSev = new Set();
+
+  /* ---- language ---- */
+  function applyUiStrings() {
+    var u = AD.UI;
+    document.querySelectorAll("[data-t]").forEach(function (el) { el.textContent = u[el.getAttribute("data-t")]; });
+    document.querySelectorAll("[data-t-html]").forEach(function (el) { el.innerHTML = u[el.getAttribute("data-t-html")]; });
+    document.querySelectorAll("[data-t-ph]").forEach(function (el) { el.setAttribute("placeholder", u[el.getAttribute("data-t-ph")]); });
+    document.querySelectorAll("[data-t-al]").forEach(function (el) { el.setAttribute("aria-label", u[el.getAttribute("data-t-al")]); });
+    document.querySelectorAll("[data-t-ti]").forEach(function (el) { el.setAttribute("title", u[el.getAttribute("data-t-ti")]); });
+  }
+
+  function setLang(l) {
+    if (!AD.I18N[l]) l = "ja";
+    lang = l;
+    var d = AD.I18N[l];
+    AD.ATTACKS = d.attacks; AD.SCENARIOS = d.scenarios; AD.PHASES = d.phases; AD.GROUP_ORDER = d.groupOrder; AD.UI = d.ui;
+    TOTAL = AD.ATTACKS.length;
+    document.documentElement.lang = l;
+    var lb = document.getElementById("langBtn");
+    if (lb) lb.textContent = (l === "ja" ? "EN" : "日本語");
+    applyUiStrings();
+    AD.views.render();
+    applyFilter();
+  }
 
   /* ---- Red / Purple / Blue view ---- */
   function setView(v) {
@@ -20,8 +46,6 @@ window.AD = window.AD || {};
   }
 
   /* ---- search + severity filtering ---- */
-  var activeSev = new Set();
-
   function applyFilter() {
     var q = document.getElementById("q").value.trim().toLowerCase();
     var filtering = q !== "" || activeSev.size > 0;
@@ -35,7 +59,6 @@ window.AD = window.AD || {};
       if (show) visible++;
     });
 
-    // per-phase + per-group counts, spine sync, empty-phase hiding
     document.querySelectorAll(".phase-block").forEach(function (pb) {
       var pv = pb.querySelectorAll(".card:not(.hide)").length;
       pb.classList.toggle("hide", pv === 0);
@@ -50,7 +73,6 @@ window.AD = window.AD || {};
           if (gc) gc.textContent = gv;
         }
       });
-      // sync spine node for this phase
       var phase = pb.getAttribute("data-phase");
       var node = document.querySelector('.phase-node[data-phase="' + phase + '"]');
       if (node) {
@@ -82,12 +104,9 @@ window.AD = window.AD || {};
     document.documentElement.setAttribute("data-theme", now === "dark" ? "light" : "dark");
   }
 
-  function debounce(fn, ms) {
-    var t;
-    return function () { clearTimeout(t); t = setTimeout(fn, ms); };
-  }
+  function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
 
-  /* ---- event wiring ---- */
+  /* ---- event wiring (bound once; survives re-render/lang-switch) ---- */
   function wire() {
     document.querySelectorAll(".segmented button").forEach(function (b) {
       b.addEventListener("click", function () { setView(b.dataset.view); });
@@ -102,14 +121,11 @@ window.AD = window.AD || {};
       });
     });
     document.getElementById("themeBtn").addEventListener("click", toggleTheme);
-    document.querySelectorAll("#clearFilters, #clearFilters2").forEach(function (b) {
-      b.addEventListener("click", clearFilters);
-    });
+    document.getElementById("langBtn").addEventListener("click", function () { setLang(lang === "ja" ? "en" : "ja"); });
 
-    // open the detail modal from a card's diagram / expand button; close controls
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-close]")) { AD.modal.close(); return; }
-      if (e.target.closest("#clearFilters, #clearFilters2")) return;
+      if (e.target.closest("#clearFilters, #clearFilters2")) { clearFilters(); return; }
       var ex = e.target.closest("[data-expand]");
       if (ex) { AD.modal.open(ex.getAttribute("data-expand")); return; }
       var dg = e.target.closest(".diagram");
@@ -121,10 +137,9 @@ window.AD = window.AD || {};
   }
 
   function init() {
-    TOTAL = AD.ATTACKS.length;
-    setView("purple");
-    AD.views.render();
     wire();
+    setLang("ja");
+    setView("purple");
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

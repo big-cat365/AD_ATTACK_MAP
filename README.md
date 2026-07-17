@@ -1,34 +1,45 @@
 # AD Attack Map — Red / Blue
 
 Active Directory 攻撃 218手法を、キルチェーン7フェーズ × Red/Blue 両視点 × 登場人物フロー図で
-まとめたローカル完結の静的サイト。専門レビューによる正確性修正（MITRE ID・hashcatモード・
-イベントID・CVE帰属・機序の是正）と、収録漏れ（RODC / SCCMサイトテイクオーバー / Windows LAPS /
-Entra 同意・Device Code フィッシング等）の追加を反映済み。
+まとめたローカル完結の静的サイト。**日本語がデフォルト、ヘッダーの言語ボタンで英語に切替**（i18n）。
+専門レビューによる正確性修正（MITRE ID・hashcatモード・イベントID・CVE帰属・機序の是正）と、
+収録漏れ（RODC / SCCMサイトテイクオーバー / Windows LAPS / Entra 同意・Device Code フィッシング等）の
+追加を反映済み。
 
 ## 使い方
 
-`index.html` をブラウザで開くだけ（`file://` で直接ダブルクリック可）。  
-サーバ・ネット接続・ビルド不要。  
-https://big-cat365.github.io/AD_ATTACK_MAP/ でもOK  
+`index.html` をブラウザで開くだけ（`file://` で直接ダブルクリック可）。
+サーバ・ネット接続・ビルド不要。GitHub Pages でもそのまま公開できます。
 
 ## ファイル構成
 
 ```
-index.html      … HTML本体（マークアップ＋各CSS/JSの読み込みのみ）
+index.html              … HTML本体（マークアップ＋各CSS/JSの読み込みのみ）
 css/
   styles.css            … 全スタイル（デザイントークン→レイアウト→コンポーネント→図→モーダル）
 js/
   data/
-    phases.js           … AD.PHASES      キルチェーン7フェーズ定義
-    attacks.js          … AD.ATTACKS     218手法の本文データ（Red/Blue）
-    scenarios.js        … AD.SCENARIOS   218手法のフロー図データ / AD.GROUP_ORDER
+    ui.js               … AD.I18N.{ja,en}.ui   画面文言（言語別）
+    phases.js           … AD.I18N.{ja,en}.phases  キルチェーン7フェーズ定義
+    attacks.js          … AD.I18N.ja.attacks   218手法の本文（日本語）
+    attacks.en.js       … AD.I18N.en.attacks   218手法の本文（英語）
+    scenarios.js        … AD.I18N.ja.scenarios / groupOrder（日本語）
+    scenarios.en.js     … AD.I18N.en.scenarios / groupOrder（英語）
   util.js               … AD.esc / monoWrap / scnNorm / ICONS
   components.js         … AD.tags / AD.lanes（カードとモーダルで共有する描画片）
   diagram.js            … AD.diagram    シーケンス図レンダラ（CONFIG / ROLES / renderSeq）
   modal.js              … AD.modal      詳細モーダル（拡大図＋全文）
   views.js              … AD.views      stat/spine/カードグリッド生成＋段階描画
-  app.js                … 画面操作（視点トグル・検索・重大度フィルタ・テーマ）＋初期化
+  app.js                … setLang(言語切替)/視点トグル・検索・フィルタ・テーマ＋初期化
 ```
+
+## 多言語（i18n）
+
+- 言語ごとのデータは `AD.I18N.ja` / `AD.I18N.en`（attacks / scenarios / phases / groupOrder / ui）。
+- `app.js` の `setLang(lang)` が `AD.ATTACKS` 等を切替→`applyUiStrings()`→再描画。既定 `ja`。
+- 画面文言は HTML 要素の `data-t`（textContent）/ `data-t-html`（innerHTML）/ `data-t-ph`（placeholder）/
+  `data-t-al`（aria-label）/ `data-t-ti`（title）属性で対応付け。JS描画部は `AD.UI.<key>` を参照。
+- `name`・`tools`・MITRE/CVE・イベントID は言語共通（翻訳しない）。翻訳は説明系フィールドと図ラベルのみ。
 
 ## 設計メモ
 
