@@ -3249,6 +3249,27 @@ AD.CONCEPTS.ja = [
     ]
   },
   {
+    "id": "overpass",
+    "term": "Overpass-the-Hash / Pass-the-Key",
+    "en": "Overpass-the-Hash / Pass-the-Key",
+    "aka": "OPtH, PtK, NTハッシュ/AES鍵からTGT取得",
+    "cat": "prim",
+    "body": "Overpass-the-Hash（別名 Pass-the-Key）は、窃取したユーザーのNTハッシュまたはAES鍵を用いてKerberosのAS-REQを行い、正規のTGTを取得してKerberos認証へ横滑りする手口。平文パスワードを知らなくてもハッシュ/鍵さえあれば、NTLM（Pass-the-Hash）ではなくKerberosとして振る舞えるため、NTLM制限環境の回避やその後のPass-the-Ticketに繋がる。mimikatz の sekurlsa::pth や Rubeus asktgt（/rc4 か /aes256）で実装され、RC4指定ならNTハッシュそのものが鍵として使える。PtHとPtTの橋渡しとなる基礎概念。",
+    "points": [
+      "NTハッシュ(RC4)またはAES鍵でAS-REQ→正規TGTを取得し、Kerberosへ横滑り",
+      "ツール: mimikatz sekurlsa::pth, Rubeus asktgt /rc4|/aes256",
+      "RC4要求は 4768 の Ticket Encryption Type 0x17 として現れ、AES運用環境ではダウングレードの兆候",
+      "MITRE ATT&CK T1550.002(Pass the Hash)周辺、後続は Pass-the-Ticket (T1550.003)"
+    ],
+    "related": [
+      "pth",
+      "ptt",
+      "nthash",
+      "etype",
+      "kerberoast"
+    ]
+  },
+  {
     "id": "ptt",
     "term": "Pass-the-Ticket (PtT)",
     "en": "Pass-the-Ticket",
@@ -4135,6 +4156,834 @@ AD.CONCEPTS.ja = [
       "kerbfast",
       "protectedusers",
       "tiermodel"
+    ]
+  },
+  {
+    "id": "motw",
+    "term": "Mark-of-the-Web (MOTW)",
+    "en": "Mark-of-the-Web",
+    "aka": "MOTW, Zone.Identifier, SmartScreen, ダウンロードマーク",
+    "cat": "os",
+    "body": "Mark-of-the-Web (MOTW) は、ブラウザ(Edge/IE 等)やメール、SMB 経由などインターネットゾーンから取得したファイルに Windows が付与する信頼マークで、NTFS の代替データストリーム「Zone.Identifier」として書き込まれる。ストリーム内に ZoneId=3(インターネットゾーン)等が記録され、Office はこれを見て保護ビュー/マクロ既定ブロック(インターネット由来 MOTW 付きはマクロ実行不可)を、Explorer/SmartScreen は実行警告や評価判定を行う。攻撃者は ISO/IMG/VHD マウントや 7z/一部アーカイブなど MOTW を伝播しないコンテナを使ってこのマークを剥がし(MOTW bypass)、警告やマクロブロックを回避することが多い。SOC ではダウンロードファイルの Zone.Identifier 有無や ZoneId 値、SmartScreen ログが実行元・改ざんの手がかりになる。",
+    "points": [
+      "Zone.Identifier ADS に ZoneId を格納(0=ローカルコンピュータ, 1=ローカルイントラネット, 2=信頼済みサイト, 3=インターネット, 4=制限付きサイト)",
+      "Office はインターネット由来 MOTW 付きファイルでマクロを既定ブロックし保護ビューで開く",
+      "SmartScreen/Defender の評価判定に利用される信頼シグナル",
+      "ISO/VHD/一部アーカイブ経由の配布は MOTW を伝播せず回避に悪用される",
+      "MITRE ATT&CK T1553.005 (Subvert Trust Controls: Mark-of-the-Web Bypass)"
+    ],
+    "related": [
+      "ads",
+      "asr",
+      "edr",
+      "lolbin",
+      "procinjection"
+    ]
+  },
+  {
+    "id": "asep",
+    "term": "自動実行ポイント / Run キー",
+    "en": "Autostart Extension Points / Run Keys",
+    "aka": "ASEP, Run/RunOnce, Winlogon Shell/Userinit, Autoruns, startup persistence",
+    "cat": "os",
+    "body": "自動実行ポイント(ASEP: Autostart Extension Points)は、OS 起動時やログオン時に自動的にプログラムを実行させる多数のレジストリ/ファイルシステム上の設定箇所の総称で、マルウェアの永続化(Persistence)の主要な足場となる。代表例は HKLM/HKCU の Run/RunOnce キー、Winlogon の Shell(explorer.exe)/Userinit(userinit.exe)値、スタートアップフォルダ、Active Setup などで、これらを書き換えると再起動やログオンのたびに任意コードが起動する。Sysinternals の Autoruns/autorunsc がこれら数百の ASEP を網羅的に列挙する定番ツールであり、防御側の棚卸しに使われる。SOC では Run キーや Userinit/Shell の変更(Sysmon Event ID 13 等)を監視し、正規外の実行ファイルパスや Base64/LOLBin 起動を検知する。",
+    "points": [
+      "Run/RunOnce: HKLM|HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+      "Winlogon: Shell(explorer.exe)/Userinit(userinit.exe)の改ざんに注意",
+      "Sysinternals Autoruns/autorunsc が網羅的に列挙",
+      "MITRE ATT&CK T1547.001 (Registry Run Keys / Startup Folder)",
+      "Sysmon Event ID 12/13/14 でレジストリ改変を監視"
+    ],
+    "related": [
+      "registry",
+      "ifeo",
+      "schtask",
+      "lolbin",
+      "sysmon"
+    ]
+  },
+  {
+    "id": "ads",
+    "term": "代替データストリーム (ADS)",
+    "en": "Alternate Data Streams",
+    "aka": "NTFS ADS, Zone.Identifier, file:stream, dir /R",
+    "cat": "os",
+    "body": "代替データストリーム(ADS: Alternate Data Streams)は NTFS がサポートするファイル機能で、1つのファイルに主データ($DATA)以外の名前付きストリーム(filename:streamname 形式)を隠して格納できる。エクスプローラのサイズ表示等には現れないため、攻撃者は実行ファイルやスクリプトを ADS に隠して永続化・防御回避に悪用する(例: file.txt:evil.exe)。MOTW の Zone.Identifier も ADS の一種であり、正規用途でも使われる。検出には dir /R、PowerShell の Get-Item -Stream、Sysinternals streams.exe を用い、Sysmon Event ID 15(FileCreateStreamHash)で ADS 生成を監視できる。",
+    "points": [
+      "構文: ファイル名:ストリーム名(例 file.txt:hidden)、主データは ::$DATA",
+      "dir /R, Get-Item -Stream *, streams.exe で列挙",
+      "Zone.Identifier(MOTW)も ADS として格納される",
+      "Sysmon Event ID 15 (FileCreateStreamHash) で監視",
+      "MITRE ATT&CK T1564.004 (Hide Artifacts: NTFS File Attributes)"
+    ],
+    "related": [
+      "motw",
+      "registry",
+      "sysmon",
+      "lolbin",
+      "ifeo"
+    ]
+  },
+  {
+    "id": "ifeo",
+    "term": "Image File Execution Options (IFEO)",
+    "en": "Image File Execution Options",
+    "aka": "IFEO, Debugger value, GlobalFlag, SilentProcessExit, 常駐化",
+    "cat": "os",
+    "body": "Image File Execution Options(IFEO)は、実行ファイル単位でデバッガ起動やヒープ検証等のオプションを指定できる Windows のレジストリ機構で、本来はデバッグ用途だが永続化・実行乗っ取りに悪用される。IFEO キー(HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\<実行ファイル名>)に Debugger 値を設定すると、その実行ファイルの起動時に指定プログラムがデバッガとして代わりに起動する(例: sethc.exe に cmd.exe を割り当てるアクセシビリティ悪用)。もう一つの手口が SilentProcessExit で、GlobalFlag=0x200 と SilentProcessExit\\<対象>\\MonitorProcess を設定すると、対象プロセス終了時に WerFault.exe を親として任意プロセスが起動する。SOC ではこれらキーの生成・変更(Sysmon Event ID 12/13)と WerFault.exe を親とする不審プロセスを監視する。",
+    "points": [
+      "Debugger 値: HKLM\\...\\Image File Execution Options\\<exe> に設定し起動を乗っ取る",
+      "SilentProcessExit: GlobalFlag=0x200 + MonitorProcess で終了時に任意起動、親は WerFault.exe",
+      "アクセシビリティ機能(sethc.exe/utilman.exe)への Debugger 設定が定番の悪用",
+      "MITRE ATT&CK T1546.012 (Image File Execution Options Injection)",
+      "GFlags/gflags.exe や Autoruns で確認可能"
+    ],
+    "related": [
+      "asep",
+      "registry",
+      "process",
+      "sysmon",
+      "procinjection"
+    ]
+  },
+  {
+    "id": "secureboot",
+    "term": "Secure Boot / UEFI",
+    "en": "Secure Boot / UEFI",
+    "aka": "UEFI, Secure Boot, bootkit, DBX, ブートキット",
+    "cat": "os",
+    "body": "Secure Boot は UEFI ファームウェアの機能で、ブートローダやドライバのデジタル署名を検証し、署名が信頼された鍵(PK/KEK と署名 DB である db)に含まれるコードのみを起動させることで、ブートキット/ルートキットによる初期段階の改ざんを防ぐ。失効データベース dbx には既知の脆弱・悪意あるブートローダのハッシュ/署名が登録され、BlackLotus のような UEFI ブートキット対策として Microsoft が dbx 更新を配布する。攻撃者は署名済みだが脆弱なブートローダ(BYOVD 的手法)や dbx 未更新環境を突いて Secure Boot を回避しようとする。防御側は Secure Boot 有効状態、TPM による Measured Boot、dbx の最新化(CVE-2023-24932 の緩和 KB5025885 等)を確認する。",
+    "points": [
+      "鍵階層: PK(Platform Key)→ KEK → db(許可)/ dbx(失効)",
+      "dbx は失効した脆弱ブートローダのハッシュ/署名を登録",
+      "BlackLotus 等 UEFI ブートキットへの対策として dbx 更新が重要",
+      "Measured Boot は TPM の PCR に測定値を記録しリモート認証に利用",
+      "BYOVD 的に署名済み脆弱ブートローダを悪用する回避手法が存在"
+    ],
+    "related": [
+      "byovd",
+      "ppl",
+      "credguard",
+      "wdac",
+      "edr"
+    ]
+  },
+  {
+    "id": "netlogon",
+    "term": "Netlogon セキュアチャネル (MS-NRPC)",
+    "en": "Netlogon Secure Channel (MS-NRPC)",
+    "aka": "Netlogon, MS-NRPC, machine account password, Zerologon CVE-2020-1472",
+    "cat": "auth",
+    "body": "Netlogon セキュアチャネル(MS-NRPC)は、ドメイン参加コンピュータと DC の間で確立される認証済み通信路で、マシンアカウントのパスワードを共有鍵として NTLM パススルー認証やマシンパスワード変更、DC 間の複製認証などに使われる。CVE-2020-1472(Zerologon)は、この認証で AES-CFB8 の初期化ベクトル(IV)が全ゼロ固定になっている実装欠陥を突き、約1/256の確率で全ゼロ平文が全ゼロ暗号文になる性質を利用して認証を回避し、任意のマシンアカウント(DC 自身を含む)のパスワードを空に設定できる致命的な特権昇格脆弱性である。これにより攻撃者は DC を乗っ取り DCSync 等でドメイン全体を侵害できる。SOC では Event ID 4742/5805、脆弱な(署名/封印なし)Netlogon 接続、マシンアカウントの異常なパスワードリセットを監視する。",
+    "points": [
+      "共有鍵はマシンアカウントのパスワード(NTLM ベースのセッション鍵導出)",
+      "CVE-2020-1472 Zerologon: AES-CFB8 の IV 全ゼロ欠陥、約1/256で認証回避",
+      "攻撃はマシン(DC 含む)のパスワードを空文字にリセット→ドメイン乗っ取り",
+      "MITRE ATT&CK T1210/T1068、後続で DCSync (T1003.006)",
+      "監視: Event ID 4742(アカウント変更)/5805、脆弱チャネル接続の強制署名(EnforcementMode)"
+    ],
+    "related": [
+      "machineacct",
+      "dcsync",
+      "ntlm",
+      "dc",
+      "replication"
+    ]
+  },
+  {
+    "id": "kcdattr",
+    "term": "msDS-AllowedToDelegateTo (従来型制約付き委任属性)",
+    "en": "msDS-AllowedToDelegateTo (Classic Constrained Delegation Attribute)",
+    "aka": "KCD, allowedToDelegateTo, SPNリスト",
+    "cat": "auth",
+    "body": "msDS-AllowedToDelegateTo は、従来型(Kerberos)制約付き委任(KCD)を構成する AD 属性で、あるサービスアカウントが「委任を許可される対象サービスの SPN リスト」を保持する。この属性が設定され、かつアカウントの UAC フラグに TrustedToAuthForDelegation(protocol transition)が立つと、そのアカウントは S4U2Self でクライアントのチケットを取得し、S4U2Proxy でリストされた SPN に対して任意ユーザーになりすましてアクセスできる。攻撃者はこの属性への書き込み権(または SPN のサービス種別が S4U2Proxy で検証されない点)を悪用し、例えば HTTP/CIFS SPN 経由で LDAP や HOST 等の他サービスへ横展開する。SOC では特権外アカウントの msDS-AllowedToDelegateTo 設定変更、TrustedToAuthForDelegation の付与、S4U 関連の異常なチケット要求を監視する。",
+    "points": [
+      "委任先 SPN のホワイトリストを保持(従来型 KCD の中核属性)",
+      "TrustedToAuthForDelegation(protocol transition)有効時は S4U2Self+S4U2Proxy で任意ユーザーになりすまし可",
+      "SPN のサービス種別部分は検証されないため CIFS→HOST/LDAP 等へ転用され横展開に悪用",
+      "対比: RBCD は msDS-AllowedToActOnBehalfOfOtherIdentity(委任先=リソース側で設定)",
+      "MITRE ATT&CK T1558/T1550.003(Pass the Ticket)周辺、監視は Event ID 4769(S4U パターン)、BloodHound で委任経路を可視化"
+    ],
+    "related": [
+      "delegation",
+      "s4u",
+      "spn",
+      "uacflags",
+      "rbcdattr"
+    ]
+  },
+  {
+    "id": "crl",
+    "term": "証明書失効 (CRL / OCSP)",
+    "en": "Certificate Revocation (CRL / OCSP)",
+    "aka": "CRL, OCSP, 失効リスト, CDP, AIA",
+    "cat": "pki",
+    "body": "証明書失効(Certificate Revocation)は、有効期限前に危殆化・誤発行された証明書を無効化する仕組みで、CRL(Certificate Revocation List: CA が署名した失効シリアル番号のリスト)と OCSP(Online Certificate Status Protocol: 個別証明書の失効状態をリアルタイム問い合わせ)の2方式がある。検証者は証明書内の CDP 拡張(CRL 配布点 URL)や AIA 拡張(OCSP レスポンダ/上位 CA 証明書の URL)を辿って失効状態を確認する。AD CS 環境では、攻撃者が不正発行した証明書(ESC 系や Golden Certificate)を失効させて封じ込める運用が重要だが、多くのクライアントは失効チェックを厳格に強制しない(ソフトフェイル)ため、失効だけでは即時無効化にならない点に注意が要る。特に Golden Certificate は CA 秘密鍵で偽造され CA の DB に記録されないため、個別失効では対処できず CA 鍵の入れ替えが必要になる。SOC/IR では CA の失効操作、CRL の配布可用性、OCSP レスポンダの応答を監視・確保する。",
+    "points": [
+      "CRL: CA 署名の失効シリアル一覧、CDP 拡張の URL から取得",
+      "OCSP: 個別証明書の状態をリアルタイム問い合わせ、AIA 拡張に URL",
+      "証明書は CDP(CRL) と AIA(OCSP/上位 CA) の拡張で検証経路を指示",
+      "多くのクライアントはソフトフェイル(失効情報取得不可でも許可)で回避余地あり",
+      "AD CS 侵害(ESC/Golden Certificate)対応での封じ込め手段、ただし失効だけでは不十分(Golden Certificate は CA 鍵入れ替えが必要)"
+    ],
+    "related": [
+      "adcs",
+      "ca",
+      "pki",
+      "template",
+      "goldencert"
+    ]
+  },
+  {
+    "id": "enrollep",
+    "term": "証明書登録エンドポイント (Web登録 / NDES / CES-CEP)",
+    "en": "Certificate Enrollment Endpoints (Web Enrollment / NDES / CES-CEP)",
+    "aka": "certsrv, HTTP enrollment, NDES, ESC8, ESC11",
+    "cat": "pki",
+    "body": "AD CS の証明書登録を受け付けるネットワークインターフェース群で、IIS上のWeb登録(certsrv、/certsrv/certfnsh.asp)、NDES(Network Device Enrollment Service、SCEPを実装しネットワーク機器向け登録を代理)、およびMS-WSTEP/MS-XCEPベースのCES-CEP(証明書登録Web Service/証明書登録ポリシーWeb Service)を含む。これらのHTTPおよびRPCエンドポイントが署名/暗号化やEPA(チャネルバインディング)を強制しない場合、ドメイン内のNTLM認証を中継して被害者になりすました証明書を要求できる。Web登録へのHTTPリレーがESC8、ICertPassage(MS-ICPR)RPCインターフェースへのリレーがESC11として知られ、いずれもマシンアカウント等を強制認証させ、発行された証明書でPKINIT/DCSyncへ繋げる攻撃経路となる。",
+    "points": [
+      "ESC8=HTTP Web登録へのNTLMリレー、ESC11=MS-ICPR RPC(ICertPassage)へのリレー",
+      "対策: HTTPS+EPA強制、NTLM無効化、CAのInterfaceFlagsでIF_ENFORCEENCRYPTICERTREQUEST(RPC暗号化)強制",
+      "NDESはSCEPを実装しネットワーク機器向け登録を代理、悪用でテンプレート乱用に繋がる",
+      "ツール: Certipy relay, ntlmrelayx; Defender for Identityが未署名/未暗号化エンドポイントを評価"
+    ],
+    "related": [
+      "adcs",
+      "ca",
+      "template",
+      "ntlmrelay",
+      "coercion"
+    ]
+  },
+  {
+    "id": "entraroles",
+    "term": "Entra ディレクトリロール",
+    "en": "Entra Directory Roles (Global Admin, etc.)",
+    "aka": "Global Administrator, Privileged Role Administrator, Application/User Administrator, directory role",
+    "cat": "cloud",
+    "body": "Microsoft Entra ID(旧Azure AD)のディレクトリロールで、テナント全体のID・アプリ・デバイス管理権限を付与する。最上位のGlobal Administrator(ロールテンプレートID 62e90394-69f5-4237-9190-012177145e10)は全操作が可能で、Privileged Role Administratorはロール割り当てを制御でき、Application/User Administratorなども高権限に該当する。Application Administratorやアプリ所有者は資格情報を追加してサービスプリンシパルになりすませるため、Global Adminへの水平/垂直特権昇格の起点となり、PIMによるJIT化と監視が重要。",
+    "points": [
+      "Global Administrator ロールテンプレートID: 62e90394-69f5-4237-9190-012177145e10",
+      "Privileged Role Administratorはロール付与を操作でき実質GAへ昇格可能",
+      "Application/User Administratorはアプリ資格情報追加やパスワードリセットで悪用可能",
+      "Azure RBAC(リソース権限)とは別レイヤ; PIMでJIT化・PowerShell/Graphで列挙"
+    ],
+    "related": [
+      "entra",
+      "tenant",
+      "azurerbac",
+      "graphapi",
+      "pim"
+    ]
+  },
+  {
+    "id": "azurerbac",
+    "term": "Azure RBAC (リソースロール)",
+    "en": "Azure RBAC (Resource Roles)",
+    "aka": "Owner, Contributor, User Access Administrator, Azure Resource Manager, control plane vs data plane",
+    "cat": "cloud",
+    "body": "Azure Resource Manager(ARM)配下のサブスクリプション/リソースグループ/リソースに対する権限モデルで、ロール定義・スコープ・プリンシパルの3要素からなるロール割り当てで制御する。Ownerは全操作+ロール割り当て、Contributorは管理操作可能だがロール割り当て不可、User Access Administratorは権限付与のみ可能でOwnerへ昇格し得る。コントロールプレーン(ARM API)とデータプレーン(ストレージ/Key Vault等の中身)は別権限で、Entraディレクトリロールとも独立するため、両者を跨いだ横移動やマネージドID悪用が攻撃の焦点となる。",
+    "points": [
+      "Owner=全権+ロール割当、Contributor=ロール割当不可、User Access Administrator=権限付与のみ",
+      "コントロールプレーン(management.azure.com/ARM)とデータプレーンは分離",
+      "Entraディレクトリロールとは別体系; GA→Azure RBACはElevate Accessで奪取可能",
+      "VM実行コマンドやマネージドIDトークン窃取で横移動; azure-hound等で列挙"
+    ],
+    "related": [
+      "entra",
+      "entraroles",
+      "keyvault",
+      "imds",
+      "graphapi"
+    ]
+  },
+  {
+    "id": "graphapi",
+    "term": "Microsoft Graph API / アクセス許可",
+    "en": "Microsoft Graph API / Permissions",
+    "aka": "application vs delegated permissions, RoleManagement.ReadWrite.Directory, Graph scopes, app roles",
+    "cat": "cloud",
+    "body": "Microsoft Graph(graph.microsoft.com)はEntra ID・M365リソースを操作する統一REST APIで、アクセスはOAuth 2.0スコープ(アクセス許可)で制御される。ユーザー委任(delegated、サインインユーザーの権限に制約)とアプリケーション許可(サインイン不要でアプリ自身の広範な権限)があり、後者はテナント管理者の同意を要する。RoleManagement.ReadWrite.DirectoryやAppRoleAssignment.ReadWrite.All、Directory.ReadWrite.All等の危険なアプリ許可を持つサービスプリンシパルは、自身にディレクトリロールやアプリ許可を付与してGlobal Adminへ昇格できるため、アプリ資格情報の追加が主要な攻撃経路となる。",
+    "points": [
+      "委任(delegated)=ユーザー権限に制約、アプリ許可(application)=アプリ自身の権限で強力",
+      "RoleManagement.ReadWrite.Directoryはロール付与可能→GAへ特権昇格",
+      "AppRoleAssignment.ReadWrite.Allは任意の危険なアプリ許可を自付与可能",
+      "app rolesは管理者同意で付与; 不正同意(illicit consent)フィッシングで奪取"
+    ],
+    "related": [
+      "entra",
+      "sp",
+      "oauth",
+      "illicitconsent",
+      "tokens"
+    ]
+  },
+  {
+    "id": "keyvault",
+    "term": "Azure Key Vault",
+    "en": "Azure Key Vault",
+    "aka": "Key Vault, secrets/keys/certificates, access policy, RBAC data plane",
+    "cat": "cloud",
+    "body": "Azure Key Vaultはシークレット・暗号鍵・証明書を保管するクラウドHSM/ソフトウェアストアで、コントロールプレーン(Vault自体の管理はAzure RBAC)とデータプレーン(格納物へのアクセス)が分かれる。データプレーンの認可はレガシーのVaultアクセスポリシーとRBAC(Key Vault Administrator/Key Vault Secrets User等のロール)の2方式があり、アクセスポリシーは細粒度が粗く昇格に悪用されやすい。VMやアプリのマネージドIDがVaultへのGet/List権限を持つ場合、IMDS経由でトークンを得て資格情報・接続文字列を窃取でき、横移動・特権昇格の重要標的となる。",
+    "points": [
+      "2つの認可モデル: Vaultアクセスポリシー(レガシー)とAzure RBAC",
+      "保管対象: secrets/keys/certificates; Key Vault Administratorロールは全操作",
+      "コントロールプレーンでポリシー/RBAC書換→データ窃取が可能",
+      "マネージドID+IMDSトークンでシークレット取得; 診断ログ/監査で検知"
+    ],
+    "related": [
+      "azurerbac",
+      "imds",
+      "dpapi",
+      "tenant",
+      "entra"
+    ]
+  },
+  {
+    "id": "b2bguest",
+    "term": "ゲスト / B2B 外部ID",
+    "en": "Guest / B2B External Identity",
+    "aka": "guest user, B2B collaboration, external identities, #EXT#, cross-tenant access settings",
+    "cat": "cloud",
+    "body": "Entra IDのB2Bコラボレーション機能で招待される外部テナントのユーザーで、ホームテナントで認証しつつ招待先テナントのゲストオブジェクトとして表される。UPNは通常 元メールアドレスの@を_に置換した文字列に #EXT#@<テナント>.onmicrosoft.com を付した形式を取り、既定ではディレクトリの限定的な読み取りが可能だが、設定不備でグループやアプリの過剰な列挙・所有が起きうる。クロステナントアクセス設定(inbound/outbound)や既定のゲスト権限を絞らないと、外部ユーザーによる偵察・アプリ悪用・特権昇格の足がかりとなり、招待とゲスト権限の監査が重要。",
+    "points": [
+      "ゲストUPN形式: <元アドレスの@を_に置換>#EXT#@<tenant>.onmicrosoft.com",
+      "既定ゲスト権限で限定的なディレクトリ読取が可能→偵察に悪用",
+      "クロステナントアクセス設定(inbound/outbound)で信頼範囲を制御",
+      "招待者権限やゲストのアプリ/グループ所有を監査; BloodHound等で列挙"
+    ],
+    "related": [
+      "entra",
+      "tenant",
+      "principal",
+      "condaccess",
+      "graphapi"
+    ]
+  },
+  {
+    "id": "ev4688",
+    "term": "プロセス作成イベント (4688) / コマンドライン監査",
+    "en": "Process Creation (4688) / Command-line Auditing",
+    "aka": "Event ID 4688, Include command line in process creation events, Audit Process Creation",
+    "cat": "logging",
+    "body": "Windowsセキュリティログのイベント4688はプロセス作成を記録し、新規プロセス名・プロセスID・親プロセス情報・トークン昇格種別を含む。既定ではコマンドライン引数は記録されず、GPO「プロセス作成イベントにコマンドラインを含める」(レジストリ ProcessCreationIncludeCmdLine_Enabled)を有効化して初めてコマンドライン監査が可能になる。LOLBinsや難読化PowerShell、横移動の検知に不可欠で、親子プロセス関係と併せてEDR/Sysmon Event ID 1と相補的に用いられSIEMでの脅威ハンティングの基盤となる。",
+    "points": [
+      "Event ID 4688=プロセス作成、4689=プロセス終了; 「監査プロセス作成」を有効化",
+      "コマンドラインはProcessCreationIncludeCmdLine_Enabled(GPO)で有効化が必要",
+      "新プロセス名・親プロセスID・トークン昇格タイプを記録",
+      "Sysmon Event ID 1が親ハッシュ等でより詳細; LOLBin/難読化検知に活用"
+    ],
+    "related": [
+      "eventlog",
+      "auditpolicy",
+      "sysmon",
+      "lolbin",
+      "pslogging"
+    ]
+  },
+  {
+    "id": "authevents",
+    "term": "認証イベント (4768/4769/4771/4776)",
+    "en": "Authentication Events (Kerberos/NTLM)",
+    "aka": "4768 TGT, 4769 service ticket, 4771 pre-auth fail, 4776 NTLM, account logon events",
+    "cat": "logging",
+    "body": "ドメインコントローラの認証イベント群で、4768はKerberos AS-REQ(TGT発行)、4769はTGS-REQ(サービスチケット発行)、4771はKerberos事前認証失敗、4776はNTLM資格情報検証を記録する。4769はチケット暗号化種別0x17(RC4-HMAC)や大量要求でKerberoastingを、4768/4771の失敗連発(失敗コード0x18=KDC_ERR_PREAUTH_FAILED、実質パスワード誤り)でAS-REPロースト試行やパスワードスプレーを検知できる。4776は失敗コード(0xC0000064=不明ユーザー、0xC000006A=不正パスワード)でNTLMブルートフォースを示し、これらの相関分析が資格情報攻撃検知の要となる。",
+    "points": [
+      "4768=TGT(AS-REQ)、4769=サービスチケット(TGS-REQ)、4771=事前認証失敗、4776=NTLM検証",
+      "4769で暗号化種別0x17(RC4)を狙うとKerberoasting検知の指標",
+      "4771失敗コード0x18=KDC_ERR_PREAUTH_FAILED(パスワード誤り)→スプレー/ブルートフォース",
+      "4776失敗: 0xC0000064=不明ユーザー、0xC000006A=不正パスワード"
+    ],
+    "related": [
+      "kerberos",
+      "kdc",
+      "tgt",
+      "kerberoast",
+      "passwordspray"
+    ]
+  },
+  {
+    "id": "shimcache",
+    "term": "AppCompatCache (Shimcache)",
+    "en": "AppCompatCache (Shimcache)",
+    "aka": "Shimcache, AppCompatCache, ShimCacheParser, 実行痕跡",
+    "cat": "logging",
+    "body": "AppCompatCache（通称Shimcache）は、アプリケーション互換性シム機構の一部としてWindowsが記録する実行痕跡アーティファクトで、SYSTEMレジストリハイブの「SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCompatCache」に格納される。各エントリはファイルフルパスと$STANDARD_INFORMATIONの最終更新日時（実行時刻ではない点に注意）を保持し、エントリは概ね最近アクセス・登録された順に並ぶため、フォレンジックでの相対的タイムライン再構成に有用である。キャッシュはメモリ上に保持され原則シャットダウン時にレジストリへ書き出されるため稼働中のメモリ値と差異が生じる。またWin7までは実行を示すInsertFlagがあったが、Win8以降で撤廃され（EZのAppCompatCacheParserでも実行データはNA表示）、Win10/11では単独では実行の証明にならず存在・認識の痕跡として扱う。",
+    "points": [
+      "格納先: SYSTEMハイブ ControlSet...\\Session Manager\\AppCompatCache",
+      "タイムスタンプはファイル最終更新日時であり実行時刻ではない",
+      "原則シャットダウン時にレジストリへ書き出される（生存中はメモリ上）",
+      "Win8以降は実行フラグが撤廃され実行の証明には使えない",
+      "解析: AppCompatCacheParser。シム機構悪用の永続化はT1546.011（それ自体は技術IDでなくDFIR痕跡）"
+    ],
+    "related": [
+      "amcache",
+      "prefetch",
+      "registry",
+      "threathunting",
+      "iocioa"
+    ]
+  },
+  {
+    "id": "amcache",
+    "term": "Amcache",
+    "en": "Amcache",
+    "aka": "Amcache.hve, InventoryApplicationFile, SHA1, 実行痕跡",
+    "cat": "logging",
+    "body": "Amcacheは、システム上に存在・登録された実行ファイルのメタデータをレジストリハイブ形式「C:\\Windows\\AppCompat\\Programs\\Amcache.hve」に記録するフォレンジックアーティファクトである。InventoryApplicationFileキー配下の各サブキーに、ファイルのSHA-1ハッシュ（FileID値=『0000』+40桁hexで、先頭4文字の0000を除去してSHA-1として解釈。先頭31MiBのSHA-1）、フルパス（LowerCaseLongPath）、サイズ、PEヘッダのコンパイル日時（LinkDate）などが保持され、既知マルウェアのハッシュ照合や不審バイナリの特定に極めて有用である。ただしAmcacheはファイルの存在・登録を示すもので実行を確定するものではないため、Prefetch・Shimcache・イベントログと突き合わせて実行有無を確定させるのが定石である。",
+    "points": [
+      "格納先: C:\\Windows\\AppCompat\\Programs\\Amcache.hve",
+      "InventoryApplicationFileにSHA-1・パス・サイズ・LinkDateを記録",
+      "FileID=『0000』+SHA-1、先頭4文字を除去して照合",
+      "解析ツール: AmcacheParser（Eric Zimmerman）",
+      "存在の痕跡であり実行確定には他アーティファクトとの相関が必要"
+    ],
+    "related": [
+      "shimcache",
+      "prefetch",
+      "registry",
+      "threathunting",
+      "iocioa"
+    ]
+  },
+  {
+    "id": "prefetch",
+    "term": "Prefetch",
+    "en": "Prefetch",
+    "aka": "*.pf, Prefetch, run count, last run time, PECmd",
+    "cat": "logging",
+    "body": "Prefetchは、アプリ起動高速化のためWindowsが生成するキャッシュファイル（C:\\Windows\\Prefetch\\<実行ファイル名>-<パスのハッシュ>.pf）で、実行の強力な証拠となる貴重なフォレンジックアーティファクトである。各.pfには実行回数（run count）、直近の実行時刻（Win8以降は最大8回分）、起動時に参照されたファイル・ディレクトリ一覧が含まれ、いつ・何回・どこから実行されたかの再構成に使える。同名バイナリでもパスが異なればハッシュが変わるため別エントリとなり、ファイル数上限はWin8以降で1024、XP〜Win7で128である（Win10/11では.pf自体がMAM圧縮）。ProcessHollowingやLOLBin悪用の調査で実行有無・回数の裏付けに用いられ、解析にはPECmd等を使う。",
+    "points": [
+      "配置: C:\\Windows\\Prefetch\\NAME-HASH.pf、実行の強力な証拠",
+      "実行回数と直近実行時刻（Win8+で最大8件）を保持",
+      "上限ファイル数: Win8+ 1024 / XP〜7 128、Win10/11はMAM圧縮",
+      "ハッシュは実行パスに基づくためパス違いは別.pf",
+      "解析ツール: PECmd（Eric Zimmerman）"
+    ],
+    "related": [
+      "shimcache",
+      "amcache",
+      "threathunting",
+      "iocioa",
+      "lolbin"
+    ]
+  },
+  {
+    "id": "dllhijack",
+    "term": "DLLハイジャック / サイドローディング",
+    "en": "DLL Search-Order Hijacking / Sideloading",
+    "aka": "DLL search-order hijacking, phantom DLL, DLL sideloading, proxy DLL",
+    "cat": "prim",
+    "body": "DLLハイジャック／サイドローディングは、正規プロセスがロードするDLLの検索順序や不在を悪用し、攻撃者のDLLを先に読み込ませて任意コードを正規署名済みプロセスのコンテキストで実行させる手法である。代表的な亜種に、検索順序ハイジャック（DLL search-order hijacking）、本来存在しないDLL名を突く幻DLL（phantom/ghost DLL）、正規の署名済みEXEに攻撃DLLを同梱ディレクトリから読み込ませるサイドローディング、正規DLLへエクスポートを転送するプロキシDLLがある。SafeDllSearchModeやKnownDLLsといった保護があるが、多くのLOLBin/署名バイナリが悪用可能で、EDR回避や永続化に用いられる（MITRE ATT&CK T1574.001/002）。",
+    "points": [
+      "署名済み正規プロセスに悪性DLLを読み込ませ実行・防御回避",
+      "亜種: search-order / phantom(ghost) / sideloading / proxy DLL",
+      "緩和: SafeDllSearchMode、KnownDLLs、完全パス指定ロード",
+      "MITRE ATT&CK: T1574.001（検索順序）/ T1574.002（サイドロード）",
+      "proxy DLLは正規DLLへエクスポートを転送して機能維持"
+    ],
+    "related": [
+      "lolbin",
+      "asep",
+      "procinjection",
+      "motw",
+      "byovd"
+    ]
+  },
+  {
+    "id": "spcredadd",
+    "term": "SPへの資格情報追加 (アプリ乗っ取り)",
+    "en": "Service Principal Credential Abuse",
+    "aka": "Additional Cloud Credentials, addPassword/addKey, app registration hijack, T1098.001",
+    "cat": "prim",
+    "body": "SPへの資格情報追加は、Entra ID（Azure AD）のサービスプリンシパルまたはアプリ登録に、攻撃者が独自のシークレット（パスワード）や証明書（キー）を追加し、そのアプリが持つAPI権限・ロールを乗っ取って永続化・権限昇格を図る手法である。Microsoft GraphのservicePrincipal:addPassword／addKey（PowerShellではAdd-MgServicePrincipalPassword／Add-MgServicePrincipalKey）で実行され、既存アプリに新たな認証手段を紐付けるため元の資格情報を盗む必要がなく、追加されたクレデンシャルで正規アプリとしてトークンを取得できる。Application AdministratorやCloud Application Administratorロールがあれば悪用可能で、APT29がSolarWinds（Solorigate）事件で悪用したことで知られる（MITRE ATT&CK T1098.001）。",
+    "points": [
+      "Graph API: servicePrincipal:addPassword / addKey で資格情報を追加",
+      "MITRE ATT&CK: T1098.001（Additional Cloud Credentials）",
+      "Application/Cloud Application Administratorロールで悪用可能",
+      "APT29がSolorigate攻撃で使用した永続化手法",
+      "監視: AuditLogsのAdd service principal credentials / Update application"
+    ],
+    "related": [
+      "entra",
+      "sp",
+      "oauth",
+      "graphapi",
+      "illicitconsent"
+    ]
+  },
+  {
+    "id": "bloodhound",
+    "term": "BloodHound / SharpHound（AD攻撃経路列挙）",
+    "en": "BloodHound / SharpHound",
+    "aka": "attack path enumeration, AD attack graph, SharpHound collector, ADExplorer, Cypher",
+    "cat": "prim",
+    "body": "BloodHoundは、Active Directory／Entra IDの攻撃経路をグラフ理論で可視化する列挙ツールで、収集エージェントSharpHound（Azure向けはAzureHound）がLDAP・SAMR・SMB等を通じてユーザー・グループ・ACL・セッション・信頼関係などを収集し、Neo4jグラフDBに取り込む。攻撃者・レッドチームはCypherクエリで「任意の侵害済みノードからDomain Adminへの最短経路」を算出でき、GenericAll・WriteDacl・AddMember・HasSession・AdminToといったエッジ（権限関係）を辿って権限昇格・横展開を計画する。防御側も同じグラフでTier違反や過剰委任を検出できるため、攻防双方で用いられる（現行はBloodHound Community Edition／CE）。",
+    "points": [
+      "収集: SharpHound（AD）/ AzureHound（Entra）、ADExplorerでオフライン収集も可",
+      "バックエンドはNeo4j、Cypherで攻撃経路を照会",
+      "エッジ例: GenericAll / WriteDacl / AddMember / HasSession / AdminTo",
+      "代表クエリ: Domain Adminsへの最短経路（Shortest Path）",
+      "攻撃経路可視化と同時に防御側の過剰権限・Tier違反監査に有用"
+    ],
+    "related": [
+      "dacl",
+      "kerberoast",
+      "dcsync",
+      "tiermodel",
+      "threathunting"
+    ]
+  },
+  {
+    "id": "diamondticket",
+    "term": "Diamond / Sapphire Ticket",
+    "en": "Diamond / Sapphire Ticket",
+    "aka": "Diamond Ticket, Sapphire Ticket, modified legitimate PAC, stealthy forged ticket",
+    "cat": "prim",
+    "body": "Diamond／Sapphireチケットは、ゼロから偽造するGoldenチケットより検出困難な、次世代のKerberosチケット偽造手法である。いずれもkrbtgtアカウントのキー（ハッシュ）を必要とするが、正規のTGTをKDCから実際に取得して復号し、そのPACを改変して再暗号化する点で共通する。Diamondチケットは取得した正規TGTのPACに直接特権グループSID等を追加・改変する方式で、Sapphireチケットはさらに巧妙に、S4U2self＋U2Uトリックで高権限ユーザーの正規PACを入手し、それを自分の正規TGTのPACと差し替える。結果として正規要素の組み合わせと標準的なチケット要求フローになるため、Golden/Silverの中で最も検出が難しい部類とされる。",
+    "points": [
+      "前提: krbtgtキーが必要（Goldenと同様）",
+      "Golden=完全偽造に対し、Diamond/Sapphire=正規TGTを復号しPACを改変",
+      "Diamond: 正規PACにSID等を追加改変／Sapphire: S4U2self+U2Uで高権限PACを差し替え",
+      "正規要素の組合せで最も検出困難、Rubeus等が対応",
+      "対策: PAC検証(pacvalidation)、krbtgt定期二重ローテーション"
+    ],
+    "related": [
+      "goldenticket",
+      "krbtgt",
+      "pac",
+      "silverticket",
+      "kerberos"
+    ]
+  },
+  {
+    "id": "badsuccessor",
+    "term": "BadSuccessor (dMSA 委任乗っ取り)",
+    "en": "BadSuccessor (dMSA Migration Abuse)",
+    "aka": "msDS-ManagedAccountPrecededByLink, dMSA privesc",
+    "cat": "prim",
+    "body": "BadSuccessorは、Windows Server 2025で導入された委任管理サービスアカウント（dMSA）の移行機構の設計上の欠陥を突く権限昇格手法で、Akamaiの研究者Yuval Gordonが2025年5月に公表した。dMSAが認証する際、KDCは属性msDS-ManagedAccountPrecededByLinkが指す『移行元』アカウントのSIDを用いてPACを構築するため、攻撃者がこのリンクをDomain Admin等の高権限ユーザーに設定すると、KDCが正当な移行とみなしてdMSAに移行元の全権限を継承させてしまう。OUに対するCreateChild（子オブジェクト作成）権限さえあればdMSAを新規作成してこの攻撃が成立し、DCSync相当の権限奪取に至るため影響が大きい（Akamaiは調査環境の91%に悪用可能なOUがあったと報告）。MicrosoftはCVE-2025-53779として2025年8月Patch Tuesdayで修正した（一方向リンクを無効化し双方向のペアリングを要求）。",
+    "points": [
+      "対象: Windows Server 2025のdMSA（委任管理サービスアカウント）",
+      "鍵となる属性: msDS-ManagedAccountPrecededByLink（PAC継承を制御）",
+      "前提権限: OUに対するCreateChild権限のみでDomain Admin相当を奪取可能",
+      "公表: Akamai(Yuval Gordon)2025年5月、CVE-2025-53779として2025年8月Patch Tuesdayで修正",
+      "監視: dMSA作成とmsDS-ManagedAccountPrecededByLink変更を監査"
+    ],
+    "related": [
+      "gmsa",
+      "kdsrootkey",
+      "dcsync",
+      "kerberos",
+      "pac"
+    ]
+  },
+  {
+    "id": "mfafatigue",
+    "term": "MFA 疲労攻撃 (プッシュ爆撃)",
+    "en": "MFA Fatigue (Push Bombing)",
+    "aka": "MFA prompt bombing, push bombing, number matching, MFA spamming",
+    "cat": "prim",
+    "body": "MFA疲労攻撃（プッシュ爆撃）は、攻撃者が窃取済みの正規パスワードで繰り返しサインインを試み、被害者のスマートフォンに大量のMFAプッシュ承認通知を送りつけて、根負けや誤操作による「承認」を誘発する手法。単純な承認/拒否型のプッシュMFA（Microsoft Authenticator旧仕様、Duo Push、Okta Verify等）が標的となり、成功すれば正規MFAを突破してセッションを確立できる。MITRE ATT&CKではT1621（Multi-Factor Authentication Request Generation）に該当し、2022年9月のUber侵害（Lapsus$の関係者「Tea Pot」）が代表事例。対策として番号照合（number matching）が有効で、Microsoftは2023年5月8日にAuthenticatorのプッシュ通知全体でテナント横断的に強制有効化した。",
+    "points": [
+      "MITRE ATT&CK T1621（MFA Request Generation）",
+      "番号照合(number matching)がMicrosoft Authenticatorで2023年5月8日にテナント横断で強制有効化された有効な緩和策",
+      "短時間の大量MFA拒否イベントや連続サインイン試行が検知の指標",
+      "フィッシング耐性MFA(FIDO2)への移行が根本対策",
+      "代表事例: 2022年9月Uber侵害(Lapsus$関係者「Tea Pot」)"
+    ],
+    "related": [
+      "passwordspray",
+      "condaccess",
+      "fido2",
+      "entraidp",
+      "aitm"
+    ]
+  },
+  {
+    "id": "gpoabuse",
+    "term": "GPO悪用（グループポリシー悪用）",
+    "en": "GPO Abuse",
+    "aka": "SharpGPOAbuse, gPLink abuse, immediate scheduled task via GPO, GPO privilege escalation",
+    "cat": "prim",
+    "body": "GPO悪用は、攻撃者が書き込み可能なグループポリシーオブジェクト（GPO）のACLを悪用し、そのGPOがリンクされたOU配下の全コンピュータ/ユーザーに任意のコード実行や設定変更を配布する権限昇格・横展開手法。SharpGPOAbuse等のツールは、SYSVOL内のGPOファイルに「即時スケジュールタスク（Immediate Scheduled Task）」を書き込み、同時にLDAP上のgPCMachineExtensionNames属性とversionNumberを更新して、クライアントのgpupdate時にポリシー再適用と即時実行を強制する。gPLink属性を書き換えて悪意あるGPOを新たなコンテナにリンクする亜種もある。ドメイン全体に影響しうるため、GPOやOUへのWrite権限の棚卸しが重要。",
+    "points": [
+      "ツール: SharpGPOAbuse、PowerView、GPOddity(NTLMリレー経由)",
+      "即時スケジュールタスクがSYSVOLに書き込まれ最速のコード実行手段",
+      "要更新属性: gPCMachineExtensionNames / versionNumber / gPLink",
+      "検知: DSアクセス監査 Event ID 5136(ディレクトリオブジェクト変更)",
+      "BloodHoundでGPO書き込み可能な攻撃パスを可視化"
+    ],
+    "related": [
+      "gpo",
+      "gpp",
+      "schtask",
+      "dacl",
+      "sysvol"
+    ]
+  },
+  {
+    "id": "etwbypass",
+    "term": "ETWパッチング（ETWバイパス）",
+    "en": "ETW Patching / ETW Bypass",
+    "aka": "EtwEventWrite patch, ETW blinding, telemetry tampering, ntdll ETW patch",
+    "cat": "prim",
+    "body": "ETWパッチング（ETWバイパス）は、Event Tracing for Windows（ETW）のイベント書き込み経路を自プロセスのメモリ上で無効化し、EDR/アンチマルウェアが依存するテレメトリを「盲目化」する防御回避手法。典型的には、ntdll.dll内のEtwEventWrite（最終的にシステムコールNtTraceEventを呼ぶ）の先頭バイトを、即時復帰する命令（RET, 0xC3）やxor eax,eax; retに書き換え、常に成功(0)を返させてイベント生成を抑止する。.NET CLRのETWプロバイダやAMSIと組み合わせて悪用され、in-memoryパッチのためディスク上の痕跡は残りにくい。近年のEDRはこれらの関数のインメモリ改ざんを整合性チェックで検出する。",
+    "points": [
+      "対象関数: ntdll!EtwEventWrite / EtwEventWriteFull、最終的にNtTraceEventを呼ぶ",
+      "手口: 先頭命令をRET(0xC3)等に上書きしイベント生成を無効化",
+      "AMSIパッチやアンフックと併用されることが多い",
+      "検知: ntdllコードセクションのインメモリ改ざん/整合性検証",
+      "MITRE ATT&CK T1562.006(Indicator Blocking)関連"
+    ],
+    "related": [
+      "etw",
+      "apihook",
+      "amsi",
+      "edr",
+      "procinjection"
+    ]
+  },
+  {
+    "id": "soar",
+    "term": "SOAR（セキュリティ運用の自動化・オーケストレーション）",
+    "en": "Security Orchestration, Automation and Response (SOAR)",
+    "aka": "SOAR, playbook, automated response, Sentinel automation rules/Logic Apps",
+    "cat": "soc",
+    "body": "SOAR（Security Orchestration, Automation and Response）は、複数のセキュリティ製品やIT基盤を連携（オーケストレーション）し、プレイブックと呼ばれる定義済みワークフローでインシデント対応を自動化・半自動化するプラットフォーム。アラートのトリアージ、脅威インテリジェンスによるエンリッチメント、アカウント無効化やホスト隔離といった封じ込め処理をコード化し、対応時間（MTTR）とアナリストの負荷を削減する。Microsoft SentinelではオートメーションルールとLogic Apps（プレイブック）がSOAR機能を担い、SIEMと統合される。誤検知への過剰自動化は業務影響を招くため、封じ込めアクションには承認ゲートの設計が重要。",
+    "points": [
+      "3要素: オーケストレーション/自動化/レスポンス、中核はプレイブック",
+      "目的: MTTR短縮とSOCのアラート疲労軽減",
+      "Microsoft Sentinel: オートメーションルール + Logic Apps(プレイブック)",
+      "SIEM/EDR/XDRのアラートを入力に封じ込めを自動実行",
+      "破壊的アクションには承認ステップの組み込みが推奨"
+    ],
+    "related": [
+      "siem",
+      "ir",
+      "mde",
+      "advhunting",
+      "xdr"
+    ]
+  },
+  {
+    "id": "apihook",
+    "term": "ユーザーモードAPIフック / アンフック",
+    "en": "User-mode API Hooking / Unhooking",
+    "aka": "EDR userland hooks, ntdll unhooking, IAT/inline hook, module stomping",
+    "cat": "soc",
+    "body": "ユーザーモードAPIフックは、EDRがntdll.dllやkernel32.dll等の重要API（例: NtAllocateVirtualMemory、NtProtectVirtualMemory）の先頭にjmp命令を挿入するインラインフックや、IAT書き換えを行い、呼び出しを自社の監視スタブへ迂回させて挙動を可視化する仕組み。攻撃者側は「アンフック」により、ディスク上やKnownDlls等から取得したクリーンなntdllコピーで改ざん済みコードセクションを上書きし、EDRの監視を無効化する。フックを迂回する直接システムコール（direct/indirect syscall）やモジュールストンピングも関連手法。防御側はセルフフックの整合性監視やカーネルコールバックで補完する。",
+    "points": [
+      "フック方式: インラインフック(jmpパッチ)、IAT/EATフック",
+      "監視対象例: Nt* メモリ/プロセス操作APIをユーザーランドで捕捉",
+      "アンフック: クリーンなntdll(ディスク/KnownDlls)で.textを復元",
+      "回避併用: direct/indirect syscall、モジュールストンピング",
+      "カーネルコールバックはユーザーモードフック回避に対する補完策"
+    ],
+    "related": [
+      "edr",
+      "etwbypass",
+      "syscall",
+      "procinjection",
+      "byovd"
+    ]
+  },
+  {
+    "id": "mdca",
+    "term": "Microsoft Defender for Cloud Apps (MDCA)",
+    "en": "Microsoft Defender for Cloud Apps",
+    "aka": "MDCA, MCAS, CASB, Cloud App Security, app governance",
+    "cat": "soc",
+    "body": "Microsoft Defender for Cloud Apps（MDCA、旧Microsoft Cloud App Security/MCAS）は、ユーザーとSaaSアプリの間に位置するCASB（Cloud Access Security Broker）で、シャドーIT可視化、情報保護、脅威検知、アプリガバナンスを提供する。Cloud Discovery（ログ解析によるアプリ発見）、App Connector（APIによるSaaS連携）、そしてEntra条件付きアクセスと連携するConditional Access App Control（リバースプロキシによるセッション制御）の3方式で機能する。セッションポリシーによりダウンロード阻止・読み取り専用強制・リアルタイムDLPを実現し、OAuthアプリの不正同意（illicit consent）検知やアプリガバナンスでSaaSの脅威対策を担う。",
+    "points": [
+      "CASB。旧称 Microsoft Cloud App Security(MCAS)",
+      "3方式: Cloud Discovery / App Connector(API) / CA App Control(リバースプロキシ)",
+      "セッション制御でDL阻止・読取専用・リアルタイムDLPを実施",
+      "OAuth不正同意やリスクの高いアプリのアプリガバナンス",
+      "Entra条件付きアクセスおよびDefender XDRと統合"
+    ],
+    "related": [
+      "entra",
+      "condaccess",
+      "illicitconsent",
+      "oauth",
+      "siem"
+    ]
+  },
+  {
+    "id": "entraidp",
+    "term": "Entra ID Protection (リスクベース検知)",
+    "en": "Microsoft Entra ID Protection",
+    "aka": "user risk, sign-in risk, risky user, risk detections, risk-based CA",
+    "cat": "soc",
+    "body": "Microsoft Entra ID Protection（旧Azure AD Identity Protection）は、機械学習を用いてサインインごと・ユーザーごとのリスクを算出し、アカウント侵害の兆候を検知するリスクベース防御機能。検知はサインインリスク（当該認証が正規所有者でない確率）とユーザーリスク（ID全体が侵害された確率）に大別され、匿名IP、非定型な移動（atypical travel、旧称impossible travel）、漏洩資格情報、なじみのないサインインプロパティ等を低・中・高で評価する。リスクベース条件付きアクセスと連動し、リスク検知時にMFA強制やセキュアなパスワードリセットを要求して自動修復できる。利用にはEntra ID P2ライセンスが必要。",
+    "points": [
+      "2軸: サインインリスク / ユーザーリスク、レベルは低/中/高",
+      "代表検知: 漏洩資格情報、匿名IP、非定型な移動(atypical travel)、なじみのないサインイン",
+      "リスクベース条件付きアクセスでMFA/パスワードリセットを強制し自動修復",
+      "Entra ID P2ライセンスが必要",
+      "Microsoft Graph/Defender XDRへリスク信号を連携"
+    ],
+    "related": [
+      "entra",
+      "condaccess",
+      "mfafatigue",
+      "tokentheft",
+      "aitm"
+    ]
+  },
+  {
+    "id": "fido2",
+    "term": "フィッシング耐性MFA / パスワードレス",
+    "en": "Phishing-resistant MFA / FIDO2",
+    "aka": "FIDO2, passkey, certificate-based auth, phishing-resistant authentication",
+    "cat": "soc",
+    "body": "フィッシング耐性MFA（FIDO2/パスキー）は、WebAuthn（W3C）とCTAP2から成る公開鍵暗号ベースの認証方式で、共有シークレット（パスワードやOTP）を送受信しない点が特徴。サーバーは公開鍵のみを保持し、サインイン時はサーバーが送るチャレンジ（ノンス）に秘密鍵で署名して検証する。デバイスバウンドな認証器（セキュリティキー、TPM連動の端末固有資格情報）では秘密鍵がハードウェアから外に出ないが、同期パスキーはiCloudキーチェーンやGoogle/Microsoft等のクラウド経由で暗号化のうえ複数端末へ複製される点に留意する。資格情報はRP（リライング・パーティ）のオリジンに暗号的に束縛（origin binding）され、ブラウザは登録ドメイン以外での使用を拒否するため、AiTMプロキシによる中間者フィッシングやNTLM/認証情報リレーが構造的に無効化される。生体認証やPINでローカルにユーザー確認を行い、パスワードレス多要素を実現する。",
+    "points": [
+      "構成: WebAuthn(W3C) + CTAP2、公開鍵暗号によるチャレンジ応答",
+      "オリジン束縛でAiTM中間者フィッシング/リレーを構造的に無力化",
+      "秘密鍵はデバイスバウンド認証器(セキュリティキー/TPM)では非流出、同期パスキーはクラウドで複製される",
+      "サーバーは公開鍵のみ保持、生体・PINでローカルにユーザー確認",
+      "MFA疲労やパスワードスプレー等の資格情報攻撃への根本対策"
+    ],
+    "related": [
+      "mfafatigue",
+      "aitm",
+      "whfb",
+      "condaccess",
+      "ntlmrelay"
+    ]
+  },
+  {
+    "id": "breakglass",
+    "term": "非常用アカウント (ブレークグラス)",
+    "en": "Break-glass / Emergency Access Account",
+    "aka": "break glass, emergency access account, CA-excluded cloud-only account",
+    "cat": "soc",
+    "body": "非常用アカウント（ブレークグラス）は、Conditional Access（条件付きアクセス）による締め出しやフェデレーション障害・MFAインフラ停止などの緊急時に、Entra ID / テナントへ確実にサインインするために用意する高権限の予備アカウントである。Microsoftは、クラウド専用（オンプレ同期しない *.onmicrosoft.com）でグローバル管理者ロールを永続付与したアカウントを2つ以上作成し、ブロック系の条件付きアクセスポリシーから除外することを推奨する。ただし除外してもMFA必須化（mandatory MFA）ではAzure/Entra/Intune管理ポータルでMFAが強制されるため、現在Microsoftは通常の管理者とは異なる認証手段として、フィッシング耐性MFA（FIDO2パスキーまたは証明書ベース認証/CBA）を各ブレークグラスに登録することを推奨する。除外している分だけ悪用時のリスクが高いため、これらのアカウントのサインインは常時監視し、使用されたら即座にアラート・調査する運用が必須である。",
+    "points": [
+      "クラウド専用アカウントを最低2つ、ブロック系CAポリシーから除外（一斉ロックアウト回避）",
+      "グローバル管理者を永続割り当て（PIMのJIT対象にはしないのが定石）",
+      "CA除外でもMFA必須化下ではMFAが強制されるため、FIDO2/CBA等フィッシング耐性MFAを登録",
+      "通常管理者と別の認証手段にし、パスワード運用時は長大・複数分割保管",
+      "サインイン/ロール使用を監視しハニートークン的にアラート化するのが要点"
+    ],
+    "related": [
+      "condaccess",
+      "entraroles",
+      "pim",
+      "tenant",
+      "honeytoken"
+    ]
+  },
+  {
+    "id": "sigma",
+    "term": "Sigmaルール",
+    "en": "Sigma Rules",
+    "aka": "Sigma, generic detection rule format, sigma-to-KQL, detection-as-code",
+    "cat": "soc",
+    "body": "Sigmaは、ログベースの検知ロジックをSIEM製品に依存しない汎用フォーマットで記述するためのYAMLベースのオープン標準である。logsource（対象ログ種別）とdetection（フィールド一致条件とcondition）を記述し、pySigma / sigma-cli等のコンバータでMicrosoft Sentinel（KQL）、Splunk（SPL）、Elastic（Lucene/EQL/ES|QL）等の各バックエンドクエリへ変換できる。ネットワーク検知のSnortやファイル検知のYARAに対し「ログ検知のためのSigma」と位置づけられ、detection-as-codeとして検知ルールをGit管理・共有する用途で広く使われる。",
+    "points": [
+      "YAML記述、logsource + detection(condition)が中核構造",
+      "pySigma / sigma-cli でKQL・SPL・EQL等へバックエンド変換",
+      "MITRE ATT&CKのtags（technique ID）を付与して整理するのが一般的",
+      "SnortやYARAと並ぶ、汎用検知ルール共有のデファクト",
+      "検知ルールのバージョン管理・CI（detection-as-code）に適する"
+    ],
+    "related": [
+      "siem",
+      "advhunting",
+      "threathunting",
+      "iocioa",
+      "mitreattack"
+    ]
+  },
+  {
+    "id": "ueba",
+    "term": "UEBA（ユーザー・エンティティ行動分析）",
+    "en": "User and Entity Behavior Analytics (UEBA)",
+    "aka": "UEBA, behavioral analytics, anomaly detection, Sentinel UEBA",
+    "cat": "soc",
+    "body": "UEBA（ユーザー・エンティティ行動分析）は、ユーザーやホスト・サービスアカウント等のエンティティごとに通常の行動ベースライン（ログオン時刻・元ホスト・アクセス先・データ量など）を機械学習で構築し、そこからの逸脱を異常スコアとして検知する仕組みである。単一イベントの静的ルールでは捉えにくい「初めてのリソースへのアクセス」「不可能な移動（impossible travel）」「休眠アカウントの突然の活動」といった振る舞いの変化を浮かび上がらせる。Microsoft Sentinel UEBAやMicrosoft Defender for Identity等に組み込まれ、内部不正・アカウント乗っ取り・横展開の早期検知に寄与する。",
+    "points": [
+      "個々のユーザー/エンティティのベースラインからの逸脱を異常スコア化",
+      "impossible travel、初回アクセス、休眠アカウント再活性などを検知",
+      "静的ルールを補完し、ラテラルムーブメント・内部脅威の兆候を可視化",
+      "Sentinel UEBA、Defender for Identity(MDI)等に実装",
+      "誤検知抑制のためリスクスコアと相関分析を併用"
+    ],
+    "related": [
+      "siem",
+      "mdi",
+      "threathunting",
+      "iocioa",
+      "advhunting"
+    ]
+  },
+  {
+    "id": "ir",
+    "term": "インシデントレスポンス / DFIR",
+    "en": "Incident Response / DFIR",
+    "aka": "IR, DFIR, containment/eradication/recovery, NIST IR lifecycle, forensics",
+    "cat": "soc",
+    "body": "インシデントレスポンス（IR）/ DFIRは、セキュリティ侵害を検知してから封じ込め・根絶・復旧し、再発防止まで行う一連のプロセスと、その裏付けとなるデジタルフォレンジック（証拠保全と分析）を指す。NIST SP 800-61では、Rev.2が4フェーズ（準備／検知・分析／封じ込め・根絶・復旧／事後活動）を定義していたが、2025年4月に確定したRev.3はこれを廃してCSF 2.0の6機能（統治・識別・防御・検知・対応・復旧）に整合させたコミュニティプロファイルとなった。ほかにSANSのPICERLモデルも代表的である。AD侵害では、krbtgtの二重ローテーション、侵害された特権アカウントの無効化、ゴールデンチケット無効化などが根絶フェーズの具体策となり、揮発性データ・メモリ・イベントログの保全が分析の要となる。",
+    "points": [
+      "NIST SP 800-61 Rev.2の4フェーズ：準備→検知・分析→封じ込め・根絶・復旧→事後活動",
+      "Rev.3（2025）はRev.2を廃止しCSF 2.0の6機能に整合するプロファイルへ再構成",
+      "SANS PICERL（Preparation, Identification, Containment, Eradication, Recovery, Lessons Learned）",
+      "AD侵害の根絶ではkrbtgtパスワードの2回リセットが定石",
+      "証拠保全は揮発性の高い順（メモリ→ディスク上ログ）で実施し、SOAR/CTIと連携"
+    ],
+    "related": [
+      "threathunting",
+      "soar",
+      "siem",
+      "cti",
+      "iocioa"
+    ]
+  },
+  {
+    "id": "cti",
+    "term": "サイバー脅威インテリジェンス (CTI)",
+    "en": "Cyber Threat Intelligence (CTI)",
+    "aka": "CTI, threat intel, TI feeds, STIX/TAXII, threat actor profiling",
+    "cat": "soc",
+    "body": "サイバー脅威インテリジェンス（CTI）は、攻撃者のTTP（戦術・技術・手順）、インフラ、IoC、動機などに関する情報を収集・分析し、意思決定に資する形へ加工した知見である。戦略的（経営向けの脅威動向）・運用的（キャンペーンや脅威アクターの意図）・戦術的（IoCやTTPなど即時防御に使える情報）に層別され、STIX（構造化表現）とTAXII（交換プロトコル）で機械可読な共有が行われる。MITRE ATT&CK、Diamond Model、Cyber Kill Chainといった分析枠組みと組み合わせ、検知ルール作成・脅威ハンティング・優先度付けに活用される。",
+    "points": [
+      "層別：戦略的 / 運用的 / 戦術的インテリジェンス",
+      "STIX（データ形式）＋TAXII（配信プロトコル）で共有",
+      "分析枠組み：MITRE ATT&CK、Diamond Model、Cyber Kill Chain",
+      "IoC（既知の痕跡）よりTTP/IoA（振る舞い）の方が持続的価値が高い",
+      "ハンティング仮説・検知エンジニアリングの入力として活用"
+    ],
+    "related": [
+      "mitreattack",
+      "iocioa",
+      "threathunting",
+      "c2",
+      "killchain"
+    ]
+  },
+  {
+    "id": "pim",
+    "term": "Privileged Identity Management (PIM)",
+    "en": "Privileged Identity Management (PIM)",
+    "aka": "PIM, just-in-time, eligible role, role activation, PAM, access review",
+    "cat": "soc",
+    "body": "Privileged Identity Management（PIM）は、Microsoft Entra IDの機能で、特権ロールを常時付与（永続的アクティブ）ではなく「対象（eligible）」として割り当て、必要時にJust-In-Time（JIT）で一定時間だけ有効化（activation）させる仕組みである。有効化時にMFA・理由入力・承認ワークフロー・チケット番号を要求でき、有効期限付きで自動的に権限が失効するため、常時特権を持つアカウントを削減してTier-0の攻撃対象領域を縮小できる。定期的なアクセスレビューと有効化ログの監査により、過剰権限の是正と特権利用の追跡（PAMの一部）を実現する。",
+    "points": [
+      "対象(eligible)割り当て＋JITでの時間制限付きactivation",
+      "有効化時にMFA・承認・理由/チケット要求を強制可能",
+      "Entraロールおよびグループ、Azureリソースロールに適用",
+      "アクセスレビューで棚卸し、有効化はログ監査対象",
+      "常時特権を減らしTier-0/最小権限を実現するPAM機能"
+    ],
+    "related": [
+      "entraroles",
+      "condaccess",
+      "tiermodel",
+      "privgroups",
+      "breakglass"
     ]
   }
 ];

@@ -376,6 +376,68 @@ window.AD = window.AD || {};
     txt(360,208,'上位Tierの資格情報を下位の端末で使わない。PAW(専用管理端末)で汚染経路を断つ','lbl','middle'),
     'Tiered administration model');
 
+  /* ---- DLL search order / hijacking ---- */
+  F.dllhijack = svg(720, 230,
+    txt(360,24,'DLL 探索順とハイジャック','figt','middle') +
+    box(30,54,150,46,{t:'foo.exe',s:'foo.dll を要求',cls:'pur'}) +
+    txt(210,50,'探索順（既定・SafeDllSearchMode有効時）','lbl') +
+    box(210,64,86,34,{t:'① EXEのフォルダ',mono:true}) +
+    box(304,64,80,34,{t:'② System32',mono:true}) +
+    box(392,64,70,34,{t:'③ System',mono:true}) +
+    box(470,64,80,34,{t:'④ Windows',mono:true}) +
+    box(558,64,60,34,{t:'⑤ CWD',mono:true}) +
+    box(626,64,64,34,{t:'⑥ PATH',mono:true}) +
+    arr(180,81,210,81,{}) + arr(296,81,304,81,{}) + arr(384,81,392,81,{}) + arr(462,81,470,81,{}) + arr(538,81,558,81,{}) + arr(618,81,626,81,{}) +
+    box(210,130,180,40,{t:'悪性 foo.dll を①に設置',s:'正規より先に見つかる',cls:'off'}) +
+    arr(253,64,253,130,{kind:'off'}) +
+    txt(360,196,'正規EXEが攻撃者のDLLをロード（サイドローディング/プロキシで正規機能も維持）= 防御回避・永続化','lbl','middle') +
+    txt(360,214,'対策: 完全パス指定・署名検証・WDAC。KnownDLLs は保護対象','lbl','middle'),
+    'DLL search order hijacking');
+
+  /* ---- BloodHound attack path ---- */
+  F.bloodhound = svg(720, 220,
+    txt(360,24,'BloodHound — 攻撃経路(Attack Path)グラフ','figt','middle') +
+    box(24,64,120,46,{t:'侵害ユーザー',s:'user1',cls:'off'}) +
+    arr(144,87,196,87,{kind:'off', t:'AdminTo', dy:-6}) +
+    box(196,64,120,46,{t:'端末',s:'WS01',cls:'server'}) +
+    arr(316,87,368,87,{kind:'pur', t:'HasSession', dy:-6}) +
+    box(368,64,120,46,{t:'管理者',s:'svc-adm',cls:'admin'}) +
+    arr(488,87,540,87,{kind:'def', t:'MemberOf', dy:-6}) +
+    box(540,64,150,46,{t:'Domain Admins',cls:'pur'}) +
+    txt(360,150,'SharpHoundがACL・セッション・グループ・委任を収集 → グラフDBで最短経路を算出','lbl','middle') +
+    txt(360,170,'Cypher: "Shortest Path to Domain Admins"。防御は余分なACL/セッションの棚卸し(Attack Path削減)','lbl','middle') +
+    txt(360,196,'認証済みユーザーで収集可能。大量LDAP/SMBセッション列挙が検知シグナル','lbl','middle'),
+    'BloodHound attack path');
+
+  /* ---- Cloud authorization planes ---- */
+  F.cloudauthz = svg(720, 240,
+    txt(360,24,'クラウド認可の3面 — 別々の権限体系','figt','middle') +
+    box(24,52,216,150,{cls:'def'}) + txt(132,74,'Entra ディレクトリロール','bt','middle') +
+    txt(40,98,'Global Administrator','lbl') + txt(40,116,'Privileged Role Admin 等','lbl') +
+    txt(40,140,'→ Entra/M365 のテナント制御','lbl') + txt(40,168,'PIMでJIT有効化','lbl') +
+    box(252,52,216,150,{cls:'pur'}) + txt(360,74,'Azure RBAC','bt','middle') +
+    txt(268,98,'Owner / Contributor /','lbl') + txt(268,116,'User Access Administrator','lbl') +
+    txt(268,140,'→ Azureリソース(ARM)制御','lbl') + txt(268,168,'サブスク/管理グループ単位','lbl') +
+    box(480,52,216,150,{cls:'off'}) + txt(588,74,'Graph アクセス許可','bt','middle') +
+    txt(496,98,'Application vs Delegated','lbl') + txt(496,116,'RoleManagement.ReadWrite…','lbl') +
+    txt(496,140,'→ Graph API での操作範囲','lbl') + txt(496,168,'同意/SP資格情報追加で悪用','lbl') +
+    txt(360,224,'3面は独立。Global Admin ≠ Azure Owner。攻撃者はこの境界を跨いで昇格・横移動する','lbl','middle'),
+    'Cloud authorization planes');
+
+  /* ---- Autostart / persistence (ASEP) ---- */
+  F.asep = svg(720, 230,
+    txt(360,24,'自動実行ポイント (ASEP) — 主な永続化場所','figt','middle') +
+    box(24,54,214,40,{t:'Run / RunOnce キー',s:'HKLM|HKCU\\...\\CurrentVersion\\Run',mono:true}) +
+    box(252,54,216,40,{t:'Winlogon',s:'Shell / Userinit',mono:true}) +
+    box(482,54,214,40,{t:'スタートアップ フォルダ',s:'shell:startup'}) +
+    box(24,104,214,40,{t:'サービス / SCM',s:'CreateService',cls:'def'}) +
+    box(252,104,216,40,{t:'スケジュールタスク',s:'schtasks / atexec',cls:'def'}) +
+    box(482,104,214,40,{t:'IFEO / COMハイジャック',s:'Debugger / CLSID',cls:'off'}) +
+    arr(131,144,300,168,{}) + arr(360,144,360,168,{}) + arr(589,144,420,168,{}) +
+    box(280,168,160,34,{t:'起動時 / ログオン時に自動実行',cls:'off'}) +
+    txt(360,220,'Autoruns で棚卸し。多くは 4657(レジストリ変更)/Sysmon 13 や新規サービス 7045 で検知','lbl','middle'),
+    'Autostart extension points');
+
   // map several concept ids to the shared figures
   AD.FIGS = {
     userkernel: F.userkernel,
@@ -405,6 +467,11 @@ window.AD = window.AD || {};
     tiermodel: F.tiermodel, paw: F.tiermodel,
     tokentheft: F.token,
     shadowcred: F.pkinit, keycredlink: F.pkinit,
-    coerce: F.coercion
+    coerce: F.coercion,
+    // --- added (coverage audit) ---
+    dllhijack: F.dllhijack,
+    bloodhound: F.bloodhound,
+    entraroles: F.cloudauthz, azurerbac: F.cloudauthz, graphapi: F.cloudauthz, pim: F.cloudauthz,
+    asep: F.asep, ifeo: F.asep
   };
 })(window.AD);
