@@ -1,14 +1,11 @@
 # AD Attack Map — Red / Blue
 
-Active Directory 攻撃 256手法を、キルチェーン7フェーズ × Red/Blue 両視点 × 登場人物フロー図で
-まとめたローカル完結の静的サイト。**日本語専用**（英語版は廃止）。
-各手法の Blue 側に「検知 → 判定(ログ分析) → ハンティングクエリ(Microsoft KQL / CrowdStrike Falcon) → 対策」を収録。
-専門エージェントによる商用グレード監査（MITRE ID・イベントID・CVE帰属・機序・triage の是正）と、
-収録漏れ（Potato系LPE / Exchange RCE / SCCM・Intune / Entra 各種 / NTLM・Kerberos リレー等）の
-追加を反映済み。
+Active Directory 攻撃手法を、キルチェーン7フェーズ × Red/Blue 両視点 × 登場人物フロー図で
+まとめたローカル完結の静的サイト（日本語）。
+各手法の Blue 側は「検知 → 判定(ログ分析) → ハンティングクエリ(Microsoft KQL / CrowdStrike Falcon) → 対策」で構成。
 
-- **`index.html`** … 攻撃手法マップ（256手法）
-- **`concepts.html`** … AD / Windows 用語・概念リファレンス（191用語・図解付き）。攻撃マップの前提知識をSOC/レッド・ブルー視点で網羅。両ページはヘッダーで相互リンク。
+- **`index.html`** … 攻撃手法マップ
+- **`concepts.html`** … AD / Windows 用語・概念リファレンス（図解付き）。両ページはヘッダーで相互リンク。
 
 ## 使い方
 
@@ -28,9 +25,9 @@ js/
   data/
     ui.js               … AD.I18N.ja.ui   攻撃マップの画面文言
     phases.js           … AD.I18N.ja.phases  キルチェーン7フェーズ定義
-    attacks.js          … AD.I18N.ja.attacks   256手法の本文（hunt=KQL / huntcs=CrowdStrike 含む）
+    attacks.js          … AD.I18N.ja.attacks   各手法の本文（hunt=KQL / huntcs=CrowdStrike 含む）
     scenarios.js        … AD.I18N.ja.scenarios / groupOrder
-    concepts.js         … AD.CONCEPTS.ja   用語集191語（body / points / related）
+    concepts.js         … AD.CONCEPTS.ja   用語集の本文（body / points / related）
     concept-ui.js       … AD.CONCEPTS_UI.ja / AD.CONCEPT_CATS  用語集の文言・カテゴリ定義
     concept-figs.js     … AD.FIGS   用語集の手描きインラインSVG図解（テーマ追従）
   util.js               … AD.esc / monoWrap / scnNorm / ICONS
@@ -44,7 +41,7 @@ js/
 
 ## 言語
 
-- **日本語専用**。旧・英語版（`*.en.js` と言語トグル）は廃止済み。データは `AD.I18N.ja` / `AD.CONCEPTS.ja`。
+- 日本語のみ。データは `AD.I18N.ja` / `AD.CONCEPTS.ja`。
 - 画面文言は HTML 要素の `data-t`（textContent）/ `data-t-html`（innerHTML）/ `data-t-ph`（placeholder）/
   `data-t-al`（aria-label）/ `data-t-ti`（title）属性で対応付け。JS描画部は `AD.UI.<key>` を参照。
 - 用語カードの見出しは日本語、副題(teal)に英語の技術名を併記（`concepts.js`）。
