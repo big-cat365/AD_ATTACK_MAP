@@ -1,6 +1,6 @@
 # AD Attack Map — Red / Blue
 
-Active Directory 攻撃 239手法を、キルチェーン7フェーズ × Red/Blue 両視点 × 登場人物フロー図で
+Active Directory 攻撃 256手法を、キルチェーン7フェーズ × Red/Blue 両視点 × 登場人物フロー図で
 まとめたローカル完結の静的サイト。**日本語がデフォルト、ヘッダーの言語ボタンで英語に切替**（i18n）。
 各手法の Blue 側に「検知 → 判定(ログ分析) → ハンティングクエリ(Microsoft KQL / CrowdStrike Falcon) → 対策」を収録。
 専門エージェントによる商用グレード監査（MITRE ID・イベントID・CVE帰属・機序・triage の是正）と、
@@ -11,6 +11,7 @@ Active Directory 攻撃 239手法を、キルチェーン7フェーズ × Red/Bl
 
 `index.html` をブラウザで開くだけ（`file://` で直接ダブルクリック可）。
 サーバ・ネット接続・ビルド不要。GitHub Pages でもそのまま公開できます。
+https://big-cat365.github.io/AD_ATTACK_MAP/
 
 ## ファイル構成
 
@@ -22,8 +23,8 @@ js/
   data/
     ui.js               … AD.I18N.{ja,en}.ui   画面文言（言語別）
     phases.js           … AD.I18N.{ja,en}.phases  キルチェーン7フェーズ定義
-    attacks.js          … AD.I18N.ja.attacks   239手法の本文（日本語, hunt=KQL / huntcs=CrowdStrike 含む）
-    attacks.en.js       … AD.I18N.en.attacks   239手法の本文（英語, hunt=KQL / huntcs=CrowdStrike 含む）
+    attacks.js          … AD.I18N.ja.attacks   256手法の本文（日本語, hunt=KQL / huntcs=CrowdStrike 含む）
+    attacks.en.js       … AD.I18N.en.attacks   256手法の本文（英語, hunt=KQL / huntcs=CrowdStrike 含む）
     scenarios.js        … AD.I18N.ja.scenarios / groupOrder（日本語）
     scenarios.en.js     … AD.I18N.en.scenarios / groupOrder（英語）
   util.js               … AD.esc / monoWrap / scnNorm / ICONS
