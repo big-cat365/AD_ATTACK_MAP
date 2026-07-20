@@ -1,11 +1,14 @@
 # AD Attack Map — Red / Blue
 
 Active Directory 攻撃 256手法を、キルチェーン7フェーズ × Red/Blue 両視点 × 登場人物フロー図で
-まとめたローカル完結の静的サイト。**日本語がデフォルト、ヘッダーの言語ボタンで英語に切替**（i18n）。
+まとめたローカル完結の静的サイト。**日本語専用**（英語版は廃止）。
 各手法の Blue 側に「検知 → 判定(ログ分析) → ハンティングクエリ(Microsoft KQL / CrowdStrike Falcon) → 対策」を収録。
 専門エージェントによる商用グレード監査（MITRE ID・イベントID・CVE帰属・機序・triage の是正）と、
 収録漏れ（Potato系LPE / Exchange RCE / SCCM・Intune / Entra 各種 / NTLM・Kerberos リレー等）の
 追加を反映済み。
+
+- **`index.html`** … 攻撃手法マップ（256手法）
+- **`concepts.html`** … AD / Windows 用語・概念リファレンス（191用語・図解付き）。攻撃マップの前提知識をSOC/レッド・ブルー視点で網羅。両ページはヘッダーで相互リンク。
 
 ## 使い方
 
@@ -16,32 +19,35 @@ https://big-cat365.github.io/AD_ATTACK_MAP/
 ## ファイル構成
 
 ```
-index.html              … HTML本体（マークアップ＋各CSS/JSの読み込みのみ）
+index.html              … 攻撃マップ本体（マークアップ＋各CSS/JSの読み込みのみ）
+concepts.html           … 用語・概念リファレンス本体
 css/
-  styles.css            … 全スタイル（デザイントークン→レイアウト→コンポーネント→図→モーダル）
+  styles.css            … 共通スタイル（デザイントークン→レイアウト→コンポーネント→図→モーダル）
+  concepts.css          … 用語集ページ固有スタイル（カテゴリナビ・用語カード・SVG図）
 js/
   data/
-    ui.js               … AD.I18N.{ja,en}.ui   画面文言（言語別）
-    phases.js           … AD.I18N.{ja,en}.phases  キルチェーン7フェーズ定義
-    attacks.js          … AD.I18N.ja.attacks   256手法の本文（日本語, hunt=KQL / huntcs=CrowdStrike 含む）
-    attacks.en.js       … AD.I18N.en.attacks   256手法の本文（英語, hunt=KQL / huntcs=CrowdStrike 含む）
-    scenarios.js        … AD.I18N.ja.scenarios / groupOrder（日本語）
-    scenarios.en.js     … AD.I18N.en.scenarios / groupOrder（英語）
+    ui.js               … AD.I18N.ja.ui   攻撃マップの画面文言
+    phases.js           … AD.I18N.ja.phases  キルチェーン7フェーズ定義
+    attacks.js          … AD.I18N.ja.attacks   256手法の本文（hunt=KQL / huntcs=CrowdStrike 含む）
+    scenarios.js        … AD.I18N.ja.scenarios / groupOrder
+    concepts.js         … AD.CONCEPTS.ja   用語集191語（body / points / related）
+    concept-ui.js       … AD.CONCEPTS_UI.ja / AD.CONCEPT_CATS  用語集の文言・カテゴリ定義
+    concept-figs.js     … AD.FIGS   用語集の手描きインラインSVG図解（テーマ追従）
   util.js               … AD.esc / monoWrap / scnNorm / ICONS
   components.js         … AD.tags / AD.lanes（カードとモーダルで共有する描画片）
   diagram.js            … AD.diagram    シーケンス図レンダラ（CONFIG / ROLES / renderSeq）
   modal.js              … AD.modal      詳細モーダル（拡大図＋全文）
   views.js              … AD.views      stat/spine/カードグリッド生成＋段階描画
-  app.js                … setLang(言語切替)/視点トグル・検索・フィルタ・テーマ＋初期化
+  app.js                … 攻撃マップの視点トグル・検索・フィルタ・テーマ＋初期化
+  concepts.js           … 用語集の描画・検索・図モーダル・テーマ＋初期化
 ```
 
-## 多言語（i18n）
+## 言語
 
-- 言語ごとのデータは `AD.I18N.ja` / `AD.I18N.en`（attacks / scenarios / phases / groupOrder / ui）。
-- `app.js` の `setLang(lang)` が `AD.ATTACKS` 等を切替→`applyUiStrings()`→再描画。既定 `ja`。
+- **日本語専用**。旧・英語版（`*.en.js` と言語トグル）は廃止済み。データは `AD.I18N.ja` / `AD.CONCEPTS.ja`。
 - 画面文言は HTML 要素の `data-t`（textContent）/ `data-t-html`（innerHTML）/ `data-t-ph`（placeholder）/
   `data-t-al`（aria-label）/ `data-t-ti`（title）属性で対応付け。JS描画部は `AD.UI.<key>` を参照。
-- `name`・`tools`・MITRE/CVE・イベントID は言語共通（翻訳しない）。翻訳は説明系フィールドと図ラベルのみ。
+- 用語カードの見出しは日本語、副題(teal)に英語の技術名を併記（`concepts.js`）。
 
 ## 設計メモ
 

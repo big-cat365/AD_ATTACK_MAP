@@ -121,7 +121,6 @@ window.AD = window.AD || {};
       });
     });
     document.getElementById("themeBtn").addEventListener("click", toggleTheme);
-    document.getElementById("langBtn").addEventListener("click", function () { setLang(lang === "ja" ? "en" : "ja"); });
 
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-close]")) { AD.modal.close(); return; }

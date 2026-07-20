@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>AD / Windows Concepts — AD Attack Map</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/concepts.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <b>AD ATTACK MAP</b>
+      <span>Concepts</span>
+    </div>
+    <div class="spacer"></div>
+    <a class="iconbtn navlink" href="index.html" data-t="backMap">← 攻撃マップ</a>
+    <span class="search">
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" type="search" aria-label="用語・英語名・別名で検索" placeholder="用語 / 英語名 / 別名…" data-t-al="searchAl" data-t-ph="searchPh" autocomplete="off" />
+    </span>
+    <button class="iconbtn" id="themeBtn" aria-label="配色テーマを切替（ダーク／ライト）" data-t-al="themeAl">◐ theme</button>
+  </div>
+  <div class="topbar-filters">
+    <span class="rescount" id="rescount" role="status" aria-live="polite"></span>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="hero" aria-label="概要">
+    <p class="eyebrow">Active Directory · Windows · <span class="bt">Fundamentals</span></p>
+    <h1 class="title" data-t="title">AD / Windows 用語・概念リファレンス</h1>
+  </section>
+
+  <nav class="spine-sec" aria-label="カテゴリ">
+    <p class="spine-title" data-t="tocTitle">▸ カテゴリ — クリックで移動</p>
+    <div class="cat-nav" id="catnav"></div>
+  </nav>
+
+  <main id="main"></main>
+  <div class="noresult" id="noresult" data-t-html="noresult"></div>
+
+  <footer>
+    <div class="fgrid">
+      <div>
+        <h4>About</h4>
+        <p data-t="footNote"></p>
+      </div>
+      <div>
+        <h4>References</h4>
+        <a href="https://learn.microsoft.com/windows-server/identity/identity-and-access" target="_blank" rel="noopener">Microsoft Learn — Identity</a><br>
+        <a href="https://attack.mitre.org/" target="_blank" rel="noopener">MITRE ATT&amp;CK</a> · <a href="https://www.thehacker.recipes/" target="_blank" rel="noopener">The Hacker Recipes</a><br>
+        <a href="index.html">→ Attack Technique Map</a>
+      </div>
+    </div>
+    <p class="disc" data-t="disclaimer"></p>
+  </footer>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <button class="modal-x" data-close aria-label="閉じる">✕</button>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/data/concept-ui.js"></script>
+<script src="js/data/concept-figs.js"></script>
+<script src="js/data/concepts.js"></script>
+<script src="js/concepts.js"></script>
+</body>
+</html>
