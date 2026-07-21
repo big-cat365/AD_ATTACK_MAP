@@ -36,14 +36,46 @@ window.AD = window.AD || {};
   function renderSpine() {
     var counts = phaseCounts();
     document.getElementById("spine").innerHTML = AD.PHASES.map(function (p) {
-      return '<a class="phase-node" href="#ph-' + p.id + '" data-phase="' + p.id + '">' +
+      return '<button type="button" class="phase-node" data-phase="' + p.id + '" aria-expanded="false" aria-controls="ptoc-' + p.id + '">' +
         '<span class="rail"></span>' +
         '<span class="pnum">' + esc(p.idx) + "</span>" +
         '<span class="pname">' + esc(p.name) + "</span>" +
         '<span class="pen">' + esc(p.en) + "</span>" +
         '<span class="pcount">' + counts[p.id] + " techniques</span>" +
         '<span class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>' +
-        "</a>";
+        "</button>";
+    }).join("");
+  }
+
+  function phaseGroupBody(items) {
+    var groups = {};
+    items.forEach(function (a) { var g = a.group || "—"; (groups[g] = groups[g] || []).push(a); });
+    var gkeys = Object.keys(groups).sort(function (a, b) {
+      var ia = AD.GROUP_ORDER.indexOf(a), ib = AD.GROUP_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    var showGroups = gkeys.length > 1;
+    return gkeys.map(function (g) {
+      var itemsHtml = groups[g].map(function (a) {
+        var sev = SEV[a.sev] ? a.sev : "Medium";
+        var meta = esc(a.mitre || a.sev || "");
+        return '<button class="ptoc-item sev-' + sev + '" data-goto="' + esc(a._cid) + '">' +
+          '<span class="ptoc-t">' + esc(a.name) + "</span>" +
+          '<span class="ptoc-meta">' + meta + "</span>" +
+          "</button>";
+      }).join("");
+      return (showGroups ? '<div class="ptoc-group">' + esc(g) + ' <span class="ptoc-gc">' + groups[g].length + "</span></div>" : "") +
+        '<div class="ptoc-body">' + itemsHtml + "</div>";
+    }).join("");
+  }
+
+  function renderSpineToc() {
+    document.getElementById("spine-toc").innerHTML = AD.PHASES.map(function (p) {
+      var items = AD.ATTACKS.filter(function (a) { return a.phase === p.id; });
+      return '<div class="ptoc" id="ptoc-' + p.id + '" data-phase="' + p.id + '" hidden>' +
+        '<div class="ptoc-head"><span class="ptoc-idx">' + esc(p.idx) + '</span><span class="ptoc-name">' + esc(p.name) + '</span><span class="ptoc-en">' + esc(p.en) + "</span></div>" +
+        phaseGroupBody(items) +
+        "</div>";
     }).join("");
   }
 
@@ -56,7 +88,7 @@ window.AD = window.AD || {};
     var scn = AD.diagram.getScenario(a.name);
     var svg = scn ? AD.diagram.renderSeq(scn, { compact: true })
       : '<div style="color:var(--faint);font-family:var(--mono);font-size:11px;padding:10px">— flow n/a —</div>';
-    return '<article class="card sev-' + sev + ' reveal" data-sev="' + sev + '" data-txt="' + searchTxt + '">' +
+    return '<article id="' + a._cid + '" class="card sev-' + sev + ' reveal" data-sev="' + sev + '" data-txt="' + searchTxt + '">' +
       '<div class="card-head">' +
         '<div class="card-title-row"><div><h3>' + nameEsc + "</h3>" +
           (a.aka ? '<div class="aka">' + esc(a.aka) + "</div>" : "") + "</div>" +
@@ -110,8 +142,10 @@ window.AD = window.AD || {};
 
   /** Build the whole page body (stats + spine + grid) and kick off reveal. */
   function render() {
+    AD.ATTACKS.forEach(function (a, i) { a._cid = "tech-" + i; });
     renderStats();
     renderSpine();
+    renderSpineToc();
     renderMain();
     revealAll();
   }

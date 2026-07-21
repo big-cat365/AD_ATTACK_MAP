@@ -665,6 +665,181 @@ window.AD = window.AD || {};
     txt(350,266,'変種は誘発手段の差(PrintSpoofer/GodPotato/EfsPotato…)。監視:4673/4674・異常な名前付きパイプ(Sysmon17/18)','lbl','middle'),
     'Potato SeImpersonate privilege escalation');
 
+  /* ---- u2u: User-to-User (U2U) 認証とENC-TKT-IN-SKEY ---- */
+  F.u2u = svg(720, 336, txt(360,20,'User-to-User (U2U) 認証:サービスチケットの暗号化鍵が変わる仕組み','figt','middle') + lane(16,40,688,118,'① 通常のTGS-REQ:相手(サービス)が長期鍵を保持','def') + box(30,72,192,60,{t:'Client',s:'サービスへアクセス要求'}) + box(284,72,200,60,{t:'KDC',s:'TGS Exchange',cls:'def'}) + box(520,64,180,80,{cls:'def'}) + txt(610,86,'Service Ticket','bt','middle') + txt(610,104,'サービスの長期鍵で暗号化','lbl','middle') + txt(610,120,'(NTハッシュ由来)','lbl','middle') + arr(222,102,284,102,{kind:'def',t:'TGS-REQ',dy:-8}) + arr(484,102,520,104,{kind:'def',t:'発行',dy:-8}) + lane(16,172,688,120,'② U2U:additional ticket同梱 + ENC-TKT-IN-SKEY指定','off') + box(30,204,192,80,{cls:'off'}) + txt(126,226,'Client (攻撃者)','bt','middle') + txt(126,244,'相手のTGT(既知の鍵)を保持','lbl','middle') + txt(126,260,'additional ticketとして同梱','lbl','middle') + box(284,204,200,80,{cls:'def'}) + txt(384,226,'KDC','bt','middle') + txt(384,244,'ENC-TKT-IN-SKEY','mono','middle') + txt(384,260,'(KDCOptions bit 28)','lbl','middle') + box(520,204,180,80,{cls:'off'}) + txt(610,226,'Service Ticket','bt','middle') + txt(610,244,'相手TGTのセッション鍵で暗号化','lbl','middle') + txt(610,260,'(攻撃者が既知の鍵)','lbl','middle') + arr(222,244,284,244,{kind:'off',t:'TGS-REQ',dy:-8}) + arr(484,244,520,244,{kind:'off',t:'発行',dy:-8}) + txt(360,316,'U2U(ENC-TKT-IN-SKEY)は相手TGTの鍵で暗号化させ、SPN不要でPACを取得可能にする(Sapphire Ticket等の土台)','lbl','middle'), 'User-to-User (U2U) 認証とENC-TKT-IN-SKEY');
+
+  /* ---- ntlmmic: NTLM MIC と Drop the MIC (CVE-2019-1040) ---- */
+  F.ntlmmic = svg(740,510,
+  txt(370,22,'NTLM MIC (Message Integrity Code) と Drop the MIC','figt','middle') +
+  lane(20,34,700,208,'NTLMv2 認証: MICが3メッセージ全体を保護','def') +
+  txt(700,50,'※ MIC (id:integrity の完全性レベルとは別概念)','lbl','end') +
+  box(50,64,130,40,{t:'Client',cls:'def'}) +
+  box(560,64,130,40,{t:'Server',cls:'def'}) +
+  arr(180,128,560,128,{t:'① NEGOTIATE_MESSAGE',dy:-6}) +
+  arr(560,158,180,158,{t:'② CHALLENGE_MESSAGE',dy:-6}) +
+  arr(180,188,560,188,{kind:'def',t:'③ AUTHENTICATE_MESSAGE (+MIC)',dy:-6}) +
+  box(90,206,560,28,{t:'MIC = HMAC-MD5(ExportedSessionKey, ①+②+③[MIC=0])',cls:'def',mono:true}) +
+  txt(370,259,'TargetInfoのMsvAvFlags bit 0x2=1 → ServerがMIC検証を実施','lbl','middle') +
+  lane(20,276,700,190,'リレー攻撃: Drop the MIC (CVE-2019-1040)','off') +
+  box(40,308,120,36,{t:'Client',s:'正規認証',cls:'def'}) +
+  box(310,308,130,36,{t:'Attacker(MITM)',s:'relay',cls:'off'}) +
+  box(580,308,120,36,{t:'Target Server'}) +
+  arr(160,366,310,366,{t:'③ AUTHENTICATE+MIC',dy:-6}) +
+  arr(440,366,580,366,{kind:'off',t:'MIC除去+SIGN解除→relay',dy:-6}) +
+  box(60,386,620,48,{t:'除去: MICフィールド(16B) / NEGOTIATE_SIGN(0x10)・SEAL(0x20)等の署名フラグ',s:'NTLMSSP署名要求はSMB/LDAP側の署名(id:smbsigning)とは別レイヤ',cls:'off'}) +
+  txt(370,450,'CVE-2025-54918: LDAPのPartial MIC Removalは署名/CB強制下でもrelayを許す','lbl','middle') +
+  txt(370,484,'MICとNEGOTIATEフラグ、両方の改ざん検知を無効化して初めてNTLMリレーは成立する','lbl','middle'),
+  'NTLM MIC と Drop the MIC (CVE-2019-1040)');
+
+  /* ---- workloadidfed: ワークロード ID フェデレーション (FIC) の認証フロー ---- */
+  F.workloadidfed = svg(740, 368,
+txt(370,22,'ワークロード ID フェデレーション (FIC): シークレットレス認証の第3経路','figt','middle') +
+box(14,44,175,58,{t:'外部ワークロード / IdP',s:'GitHub Actions/K8s/他クラウド',cls:'pur'}) +
+box(252,44,232,58,{t:'Entra ID: FIC 検証',s:'issuer / subject / audience 一致',cls:'def'}) +
+box(548,44,178,58,{t:'Entra ID',s:'/token でアクセストークン発行',cls:'pur'}) +
+arr(189,132,252,132,{kind:'pur',t:'① OIDC IDトークン(JWT)を提示',dy:-8}) +
+arr(484,132,548,132,{kind:'def',t:'② 3値一致→信頼→AT発行',dy:-8}) +
+txt(40,140,'OAuth2 client_credentials は不変 — クライアント認証方式のみ置換','lbl') +
+box(40,150,300,44,{t:'client_secret / 証明書',s:'FICでは一切不要(シークレットレス)'}) +
+box(400,150,300,44,{t:'client_assertion = 外部JWT',s:'client_assertion_type=...jwt-bearer',cls:'def'}) +
+arr(340,172,400,172,{kind:'def',t:'置換',dy:-8}) +
+txt(40,204,'FIC の設定可否(オブジェクト種別)','lbl') +
+box(40,214,330,50,{t:'設定可能',s:'App Registration・UAMI(ユーザー割り当てMI)',cls:'pur'}) +
+box(400,214,300,50,{t:'設定不可',s:'システム割り当てMI(SAMI)'}) +
+box(40,280,660,50,{t:'攻撃視点: BYOIDP による永続化',s:'外部発行者との信頼をひそかに追加(FIC追加)→シークレットなしで成り代わりトークン取得',cls:'off'}) +
+txt(370,350,'FICはシークレット/証明書を使わず、issuer/subject/audienceの一致だけで信頼する(秘密なしの第3経路)','lbl','middle'),
+'ワークロード ID フェデレーション (FIC) の認証フロー');
+
+  /* ---- ssprwriteback: SSPR パスワードライトバック(クラウド→オンプレの逆方向同期) ---- */
+  F.ssprwriteback = svg(720,340,
+ txt(360,24,'SSPR パスワードライトバック(クラウド→オンプレの逆方向同期)','figt','middle') +
+ lane(10,42,700,108,'クラウド側 (Entra ID)','pur') +
+ lane(10,168,700,108,'オンプレミス AD DS','def') +
+ box(20,72,170,56,{t:'攻撃者 / 侵害クラウドID',s:'AiTM・MFA疲労・GA奪取等',cls:'off'}) +
+ box(275,72,170,56,{t:'Entra ID SSPR',s:'登録済みセキュリティ情報で認証',cls:'pur'}) +
+ box(530,72,170,56,{t:'Entra Connect',s:'Password Writeback 有効',cls:'pur'}) +
+ box(530,198,170,56,{t:'MSOL_ コネクタアカウント',s:'Reset Password 権限を委任',cls:'def'}) +
+ box(275,198,170,56,{t:'オンプレ AD 対象ユーザー',s:'Tier0/特権も対象になり得る',cls:'off'}) +
+ box(20,198,170,56,{t:'オンプレ特権奪取',s:'ドメイン侵入に直結',cls:'off'}) +
+ arr(190,100,275,100,{kind:'off',t:'SSPR要求',dy:14}) +
+ num(232,86,1) +
+ arr(445,100,530,100,{kind:'off',t:'結果送信',dy:14}) +
+ num(487,86,2) +
+ arr(615,128,615,198,{kind:'off'}) +
+ num(615,159,3) +
+ txt(608,140,'暗号化チャネルで書き戻し','lbl','end') +
+ arr(530,226,445,226,{kind:'off',t:'強制リセット',dy:14}) +
+ num(487,212,4) +
+ arr(275,226,190,226,{kind:'off',t:'Tier0特権侵害',dy:14}) +
+ num(232,212,5) +
+ txt(360,316,'SSPR書き戻しは数少ないクラウド→オンプレ方向の経路。特権アカウントはスコープ除外が必須','lbl','middle'),
+ 'SSPR パスワードライトバック(クラウド→オンプレの逆方向同期)');
+
+  /* ---- actortoken: アクタートークンとS2S委任フロー ---- */
+  F.actortoken = svg(720, 500,
+  txt(360,22,'アクタートークン (actor token): S2S委任とテナント境界の死角','figt','middle') +
+  box(20,45,200,50,{t:'Exchange 等 (第一者SP)',s:'actor アプリ (呼び出し元)',cls:'pur'}) +
+  box(260,45,200,50,{t:'ACS',s:'旧: Access Control Service',cls:'def'}) +
+  box(500,45,200,50,{t:'Azure AD Graph 等',s:'ターゲット (S2S 呼び出し先)',cls:'pur'}) +
+  num(100,115,1) + arr(120,115,360,115,{t:'actor token 要求 (S2S 呼出)',dy:-8}) +
+  num(340,150,2) + arr(360,150,120,150,{kind:'def',t:'actor token 発行 (ACS署名)',dy:14}) +
+  num(72,143,3) + arr(90,98,90,188,{dash:true}) +
+  txt(105,178,'wrapper JWT 構築 (actor token を格納 + nameid=netId)','lbl') +
+  lane(140,190,440,140,'Wrapper JWT (alg: none, 未署名)') +
+  box(170,225,200,60,{t:'actor token (ACS署名)',cls:'pur'}) +
+  box(390,225,175,60,{t:'nameid claim',s:'= netId (対象ユーザー)',cls:'pur'}) +
+  txt(360,300,'ACS署名 (trustedForDelegation: true=第一者 / false=それ以外)','lbl','middle') +
+  txt(360,317,'netId ≒ 連番（通常のアクセストークンでは puid として出現）','lbl','middle') +
+  num(540,200,4) + arr(560,214,600,97,{kind:'pur',t:'wrapper JWT 送信 (Bearer, as netId)',dy:-8}) +
+  arr(360,330,360,345,{kind:'off',dash:true}) +
+  box(40,345,640,110,{cls:'off'}) +
+  txt(360,367,'攻撃面: netId 総当り × テナント境界チェック漏れ','bt','middle') +
+  txt(60,388,'netId はほぼ連番 → 短時間の総当りで対象ユーザーを特定可能','lbl') +
+  txt(60,406,'要求元テナントと対象 netId の所属テナント一致チェックが欠如','lbl') +
+  txt(60,424,'CVE-2025-55241 (CVSS 10.0): 全テナントの任意ユーザー（Global Admin含む）に成りすまし','lbl') +
+  txt(360,478,'サインイン/監査ログにほぼ痕跡が残らない — Entra最高深刻度技法の前提知識','lbl','middle'),
+  'アクタートークンとS2S委任フロー');
+
+  /* ---- enrollagent: 登録エージェント (Enrollment Agent) の委任モデルと悪用 (ESC3) ---- */
+  F.enrollagent = svg(740, 456,
+  txt(370,20,'登録エージェント (Enrollment Agent) による委任発行の悪用 (ESC3)','figt','middle') +
+  num(22,36,1) + box(8,46,236,140,{cls:'off'}) +
+  txt(126,68,'Enrollment Agent証明書取得','bt','middle') +
+  txt(20,90,'EKU: Certificate Request Agent','lbl') +
+  txt(20,110,'を持つテンプレートへ登録(ESC3)','lbl') +
+  txt(20,130,'→ スマートカード発行代行が本来用途','lbl') +
+  txt(20,150,'(攻撃では秘密鍵は攻撃者自身)','lbl') +
+  num(266,36,2) + box(252,46,236,140,{cls:'off'}) +
+  txt(370,68,'on-behalf-of 要求の構築','bt','middle') +
+  txt(264,90,'内側要求(PKCS#10/CMC)に','lbl') +
+  txt(264,110,'対象ユーザーの識別情報(SAN)','lbl') +
+  txt(264,130,'エージェント秘密鍵でCMS署名','lbl') +
+  txt(264,150,'(PKCS#7)としてCAへ送信','lbl') +
+  num(510,36,3) + box(496,46,236,140,{cls:'def'}) +
+  txt(614,68,'CA: 検証して発行','bt','middle') +
+  txt(508,90,'外側の署名とEKUを検証','lbl') +
+  txt(508,110,'登録エージェント制限をチェック','lbl') +
+  txt(508,130,'内側要求の身元(SAN)で発行','lbl') +
+  txt(508,150,'→ 対象ユーザー名義の証明書','lbl') +
+  arr(244,116,252,116,{kind:'off'}) +
+  arr(488,116,496,116,{kind:'off'}) +
+  arr(370,186,370,210,{kind:'off',dash:true,t:'同じ効果を制限なく実現',dy:-4}) +
+  arr(614,186,614,210,{kind:'def',t:'委任範囲を制限?',dy:-4}) +
+  box(8,210,480,100,{cls:'off'}) +
+  txt(248,234,'ESC15 (EKUwu): 同じ委任を制限なく再現','bt','middle') +
+  txt(20,256,'V1テンプレート: 要求者が拡張を注入可能','lbl') +
+  txt(20,276,'Application PolicyにCertificate Request Agentを注入','lbl') +
+  txt(20,296,'→ EKU拡張は無視されApplication Policyが優先(実装の癖)','lbl') +
+  box(496,210,236,100,{cls:'def'}) +
+  txt(614,234,'登録エージェント制限','bt','middle') +
+  txt(508,256,'CA>[登録エージェント]タブ','lbl') +
+  txt(508,276,'既定 = 制限しない','lbl') +
+  txt(508,296,'→ 任意ユーザーへ代理発行可','lbl') +
+  arr(614,310,614,326,{kind:'def',t:'発行',dy:-4}) +
+  box(496,326,236,84,{t:'発行された証明書',s:'Subject/SAN=対象ユーザー',cls:'pur'}) +
+  arr(496,345,468,345,{kind:'off',t:'PKINIT要求→なりすまし成功',dy:-6}) +
+  box(8,326,460,84,{cls:'off'}) +
+  txt(238,352,'PKINITでなりすまし認証','bt','middle') +
+  txt(20,374,'攻撃者が発行された証明書を使用','lbl') +
+  txt(20,394,'対象ユーザー(例: Domain Admin)として認証成功','lbl') +
+  txt(370,436,'秘密鍵の窃取や登録エージェント制限の不備/バイパスが本質的リスク','lbl','middle'),
+  '登録エージェント (Enrollment Agent) による委任発行の悪用 (ESC3)');
+
+  /* ---- shadowprincipal: シャドウセキュリティプリンシパルとPAM/PIMトラスト ---- */
+  F.shadowprincipal = svg(740, 430,
+  txt(370,24,'シャドウセキュリティプリンシパル (msDS-ShadowPrincipal) とPAM/PIMトラスト','figt','middle') +
+  lane(16,44,290,278,'本番 (CORP) フォレスト','def') +
+  lane(434,44,290,278,'管理/バスティオン (PRIV) フォレスト','pur') +
+  box(36,80,250,64,{t:'特権グループ',s:'Domain Admins 等 (CORPの実グループ)',cls:'def'}) +
+  box(454,80,250,64,{t:'Shadow Security Principal',s:'CN=Services配下 (Configuration NC)',cls:'pur'}) +
+  box(312,168,120,70,{t:'PAM/PIM Trust',s:'CORP→PRIV (一方向)',cls:'off'}) +
+  box(36,230,250,70,{t:'実効効果 (PRIVで一時取得)',s:'Domain Admins相当の権限でCORPへアクセス',cls:'off'}) +
+  box(454,230,250,70,{t:'msDS-ShadowPrincipalSid',s:'値 = CORP特権グループのSID',cls:'off'}) +
+  num(298,100,1) + arr(286,112,454,112,{kind:'off',t:'SID登録',dy:-8}) +
+  num(442,253,2) + arr(454,265,286,265,{kind:'off',t:'SID History行使',dy:-8}) +
+  box(40,332,660,64,{t:'netdom trust /EnableSIDHistory:yes /Quarantine:no /EnablePIMTrust:yes (CORP側で実行)',s:'SIDフィルタ/クォランティンを明示的に無効化し、高特権SIDの伝播を許可 — 悪用の核心',cls:'off'}) +
+  txt(370,414,'※「PIM」はnetdomのEnablePIMTrust由来のオンプレミス用語、クラウドのEntra ID PIMとは別物','lbl','middle'),
+  'シャドウセキュリティプリンシパルとPAM/PIMトラスト');
+
+  /* ---- oxid: DCOM OXID解決とRogueOxidResolverリレー ---- */
+  F.oxid = svg(740, 364,
+  txt(370,24,'DCOM OXID解決とRogueOxidResolverによる認証リレー','figt','middle') +
+  box(20,54,160,58,{t:'クライアント',s:'DCOMオブジェクト要求元'}) +
+  box(280,54,180,58,{t:'RPCSS (OXIDリゾルバ)',s:'IObjectExporter @135/tcp',cls:'def'}) +
+  box(560,54,150,58,{t:'DCOMサーバー',s:'OXIDで一意に識別'}) +
+  num(195,83,1) + arr(210,83,280,83,{kind:'def',t:'ResolveOxid2',dy:-8}) +
+  num(470,83,2) + arr(484,83,560,83,{kind:'def',t:'binding返却',dy:-8}) +
+  num(95,118,3) + arr(108,118,628,118,{kind:'def',t:'ResolveOxid2結果で動的ポートへ直接接続',dy:14}) +
+  lane(20,165,700,150,'悪用: RogueOxidResolverによる認証リレー攻撃','off') +
+  box(35,200,170,56,{t:'被害者クライアント',s:'ログオン中ユーザー'}) +
+  box(285,200,190,56,{t:'RogueOxidResolver',s:'偽OXIDリゾルバ(攻撃者)',cls:'off'}) +
+  box(550,200,160,56,{t:'認証強制先サーバー',s:'NTLM/Kerberosリレー着弾',cls:'off'}) +
+  num(215,228,4) + arr(230,228,285,228,{kind:'off',t:'DCOM誘導',dy:-8}) +
+  num(485,228,5) + arr(500,228,550,228,{kind:'off',t:'偽装binding',dy:-8}) +
+  num(105,272,6) + arr(120,272,632,272,{kind:'off',t:'NTLM/Kerberos認証をリレー(RemotePotato0/RemoteKrbRelay)',dy:14}) +
+  txt(370,344,'検知ポイント: 135/tcp宛OXIDリゾルバ呼び出し→動的ポートへの後続接続を監視','lbl','middle'),
+  'DCOM OXID解決とRogueOxidResolverによる認証リレー');
+
   // map several concept ids to the shared figures
   AD.FIGS = {
     userkernel: F.userkernel,
@@ -717,6 +892,14 @@ window.AD = window.AD || {};
     nopac: F.nopac,
     potato: F.potato,
     reflectiveload: F.procinjection,
-    unconstrained: F.delegation
+    unconstrained: F.delegation,
+    u2u: F.u2u,
+    ntlmmic: F.ntlmmic,
+    workloadidfed: F.workloadidfed,
+    ssprwriteback: F.ssprwriteback,
+    actortoken: F.actortoken,
+    enrollagent: F.enrollagent,
+    shadowprincipal: F.shadowprincipal,
+    oxid: F.oxid
   };
 })(window.AD);

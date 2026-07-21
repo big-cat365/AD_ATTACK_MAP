@@ -22,12 +22,22 @@ window.AD = window.AD || {};
   function catLabel(c) { return lang === "ja" ? c.ja : c.en; }
 
   function renderNav() {
-    var counts = {};
-    (AD.CONCEPTS[lang] || []).forEach(function (t) { counts[t.cat] = (counts[t.cat] || 0) + 1; });
+    var data = AD.CONCEPTS[lang] || [];
     document.getElementById("catnav").innerHTML = CATS.map(function (c) {
-      if (!counts[c.id]) return "";
-      return '<a class="cat-node" href="#cat-' + c.id + '"><span class="cat-name">' + esc(catLabel(c)) +
-        '</span><span class="cat-count">' + counts[c.id] + "</span></a>";
+      var items = data.filter(function (t) { return t.cat === c.id; });
+      if (!items.length) return "";
+      var sub = items.map(function (t) {
+        var en = (t.en && t.en !== t.term) ? '<span class="cat-sub-en">' + esc(t.en) + "</span>" : "";
+        return '<button class="cat-sub" data-goto="' + esc(t.id) + '"><span class="cat-sub-term">' + esc(t.term) + "</span>" + en + "</button>";
+      }).join("");
+      return '<div class="cat-group">' +
+        '<button class="cat-node" aria-expanded="false" aria-controls="sub-' + esc(c.id) + '">' +
+          '<span class="cat-chevron" aria-hidden="true">›</span>' +
+          '<span class="cat-name">' + esc(catLabel(c)) + "</span>" +
+          '<span class="cat-count">' + items.length + "</span>" +
+        "</button>" +
+        '<div class="cat-sublist" id="sub-' + esc(c.id) + '" hidden>' + sub + "</div>" +
+      "</div>";
     }).join("");
   }
 
@@ -159,6 +169,14 @@ window.AD = window.AD || {};
       if (fig) { openFig(fig.getAttribute("data-fig")); return; }
       var rel = e.target.closest("[data-goto]");
       if (rel) { gotoCard(rel.getAttribute("data-goto")); return; }
+      var catBtn = e.target.closest(".cat-node");
+      if (catBtn) {
+        var ex = catBtn.getAttribute("aria-expanded") === "true";
+        catBtn.setAttribute("aria-expanded", ex ? "false" : "true");
+        var sl = document.getElementById(catBtn.getAttribute("aria-controls"));
+        if (sl) sl.hidden = ex;
+        return;
+      }
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && isOpen()) closeFig();

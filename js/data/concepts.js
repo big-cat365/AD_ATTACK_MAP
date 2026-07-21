@@ -297,7 +297,9 @@ AD.CONCEPTS.ja = [
       "smb",
       "wmi",
       "dc",
-      "replication"
+      "replication",
+      "oxid",
+      "epmreg"
     ]
   },
   {
@@ -456,7 +458,8 @@ AD.CONCEPTS.ja = [
       "wellknownsid",
       "krbtgt",
       "fsmo",
-      "group"
+      "group",
+      "primarygroupid"
     ]
   },
   {
@@ -567,7 +570,8 @@ AD.CONCEPTS.ja = [
       "secdesc",
       "auditpolicy",
       "eventlog",
-      "ntds"
+      "ntds",
+      "dschanges"
     ]
   },
   {
@@ -995,7 +999,8 @@ AD.CONCEPTS.ja = [
       "domain",
       "kerberos",
       "sid",
-      "domaintree"
+      "domaintree",
+      "shadowprincipal"
     ]
   },
   {
@@ -1106,7 +1111,8 @@ AD.CONCEPTS.ja = [
       "token",
       "sid",
       "dacl",
-      "principal"
+      "principal",
+      "primarygroupid"
     ]
   },
   {
@@ -1260,7 +1266,8 @@ AD.CONCEPTS.ja = [
       "secdesc",
       "group",
       "fsmo",
-      "krbtgt"
+      "krbtgt",
+      "dsheuristics"
     ]
   },
   {
@@ -1302,7 +1309,8 @@ AD.CONCEPTS.ja = [
       "netntlm",
       "kerberos",
       "sspi",
-      "authnz"
+      "authnz",
+      "ntlmmic"
     ]
   },
   {
@@ -1324,7 +1332,8 @@ AD.CONCEPTS.ja = [
       "sam",
       "ntds",
       "kerberos",
-      "etype"
+      "etype",
+      "kerbsalt"
     ]
   },
   {
@@ -1346,7 +1355,8 @@ AD.CONCEPTS.ja = [
       "nthash",
       "smb",
       "ldap",
-      "sspi"
+      "sspi",
+      "ntlmmic"
     ]
   },
   {
@@ -1369,7 +1379,9 @@ AD.CONCEPTS.ja = [
       "st",
       "krbtgt",
       "pac",
-      "nopac"
+      "nopac",
+      "u2u",
+      "kdcerrcode"
     ]
   },
   {
@@ -1501,7 +1513,8 @@ AD.CONCEPTS.ja = [
       "tgt",
       "uacflags",
       "etype",
-      "kerberos"
+      "kerberos",
+      "kdcerrcode"
     ]
   },
   {
@@ -1523,7 +1536,9 @@ AD.CONCEPTS.ja = [
       "st",
       "nthash",
       "preauth",
-      "kdc"
+      "kdc",
+      "kerbsalt",
+      "sessionkey"
     ]
   },
   {
@@ -1591,7 +1606,8 @@ AD.CONCEPTS.ja = [
       "st",
       "spn",
       "pac",
-      "nopac"
+      "nopac",
+      "u2u"
     ]
   },
   {
@@ -1655,7 +1671,10 @@ AD.CONCEPTS.ja = [
       "pki",
       "pkinit",
       "eku",
-      "adcsesc"
+      "adcsesc",
+      "enrollagent",
+      "caperm",
+      "issuancepolicy"
     ]
   },
   {
@@ -1698,7 +1717,9 @@ AD.CONCEPTS.ja = [
       "eku",
       "san",
       "authnz",
-      "adcsesc"
+      "adcsesc",
+      "enrollagent",
+      "apppolicy"
     ]
   },
   {
@@ -1720,7 +1741,9 @@ AD.CONCEPTS.ja = [
       "pkinit",
       "adcs",
       "san",
-      "kerberos"
+      "kerberos",
+      "apppolicy",
+      "issuancepolicy"
     ]
   },
   {
@@ -1764,7 +1787,9 @@ AD.CONCEPTS.ja = [
       "pac",
       "adcs",
       "certmapping",
-      "adcsesc"
+      "adcsesc",
+      "u2u",
+      "sessionkey"
     ]
   },
   {
@@ -1852,7 +1877,9 @@ AD.CONCEPTS.ja = [
       "tokens",
       "tenant",
       "saml",
-      "sp"
+      "sp",
+      "foci",
+      "workloadidfed"
     ]
   },
   {
@@ -1874,7 +1901,8 @@ AD.CONCEPTS.ja = [
       "prt",
       "entra",
       "condaccess",
-      "saml"
+      "saml",
+      "actortoken"
     ]
   },
   {
@@ -1918,7 +1946,9 @@ AD.CONCEPTS.ja = [
       "tokens",
       "oauth",
       "condaccess",
-      "devicejoin"
+      "devicejoin",
+      "actortoken",
+      "foci"
     ]
   },
   {
@@ -1963,7 +1993,8 @@ AD.CONCEPTS.ja = [
       "adds",
       "nthash",
       "tenant",
-      "hybridauth"
+      "hybridauth",
+      "ssprwriteback"
     ]
   },
   {
@@ -1985,7 +2016,8 @@ AD.CONCEPTS.ja = [
       "tenant",
       "oauth",
       "tokens",
-      "principal"
+      "principal",
+      "workloadidfed"
     ]
   },
   {
@@ -2030,7 +2062,8 @@ AD.CONCEPTS.ja = [
       "sysmon",
       "wef",
       "etw",
-      "eventlogclear"
+      "eventlogclear",
+      "dschanges"
     ]
   },
   {
@@ -2052,7 +2085,10 @@ AD.CONCEPTS.ja = [
       "sacl",
       "sysmon",
       "ntds",
-      "wef"
+      "wef",
+      "dschanges",
+      "wfpaudit",
+      "dhcpdnsauditlog"
     ]
   },
   {
@@ -2162,7 +2198,8 @@ AD.CONCEPTS.ja = [
       "wmi",
       "registry",
       "namedpipe",
-      "service"
+      "service",
+      "oxid"
     ]
   },
   {
@@ -2491,7 +2528,8 @@ AD.CONCEPTS.ja = [
       "rid",
       "pac",
       "sidfiltering",
-      "dcshadow"
+      "dcshadow",
+      "shadowprincipal"
     ]
   },
   {
@@ -2733,7 +2771,8 @@ AD.CONCEPTS.ja = [
       "namepoison",
       "aitm",
       "ntlmrelay",
-      "namingcontext"
+      "namingcontext",
+      "dnsupdateproxy"
     ]
   },
   {
@@ -2971,7 +3010,8 @@ AD.CONCEPTS.ja = [
       "ntlm",
       "smbsigning",
       "ldap",
-      "adcs"
+      "adcs",
+      "ntlmmic"
     ]
   },
   {
@@ -3301,7 +3341,9 @@ AD.CONCEPTS.ja = [
       "ptt",
       "nthash",
       "etype",
-      "kerberoast"
+      "kerberoast",
+      "kerbsalt",
+      "sessionkey"
     ]
   },
   {
@@ -3501,7 +3543,9 @@ AD.CONCEPTS.ja = [
       "smbsigning",
       "epa",
       "coercion",
-      "adcsesc"
+      "adcsesc",
+      "ntlmmic",
+      "webclient"
     ]
   },
   {
@@ -3526,7 +3570,10 @@ AD.CONCEPTS.ja = [
       "machineacct",
       "adcs",
       "unconstrained",
-      "printnightmare"
+      "printnightmare",
+      "webclient",
+      "oxid",
+      "epmreg"
     ]
   },
   {
@@ -3548,7 +3595,8 @@ AD.CONCEPTS.ja = [
       "netntlm",
       "smbsigning",
       "coercion",
-      "smb"
+      "smb",
+      "wpad"
     ]
   },
   {
@@ -3731,7 +3779,8 @@ AD.CONCEPTS.ja = [
       "lsass",
       "userkernel",
       "wdac",
-      "vbs"
+      "vbs",
+      "ioctl"
     ]
   },
   {
@@ -4127,7 +4176,8 @@ AD.CONCEPTS.ja = [
       "ntlm",
       "coercion",
       "namepoison",
-      "epa"
+      "epa",
+      "ntlmmic"
     ]
   },
   {
@@ -4435,7 +4485,8 @@ AD.CONCEPTS.ja = [
       "tenant",
       "azurerbac",
       "graphapi",
-      "pim"
+      "pim",
+      "gdap"
     ]
   },
   {
@@ -4562,7 +4613,8 @@ AD.CONCEPTS.ja = [
       "tgt",
       "kerberoast",
       "passwordspray",
-      "logonevents"
+      "logonevents",
+      "kdcerrcode"
     ]
   },
   {
@@ -4720,7 +4772,8 @@ AD.CONCEPTS.ja = [
       "krbtgt",
       "pac",
       "silverticket",
-      "kerberos"
+      "kerberos",
+      "u2u"
     ]
   },
   {
@@ -6008,6 +6061,629 @@ AD.CONCEPTS.ja = [
       "logonevents",
       "protectedusers",
       "gpo"
+    ]
+  },
+  {
+    "id": "u2u",
+    "term": "User-to-User (U2U) 認証",
+    "en": "User-to-User (U2U) Authentication",
+    "aka": "ENC-TKT-IN-SKEY, KDCOptions bit 28, additional ticket / second ticket, S4U2Self+U2U",
+    "cat": "auth",
+    "body": "User-to-User (U2U) 認証は、相手(サーバー役)が長期鍵(通常はサービスアカウントのNTハッシュ由来の鍵)を持たない状況でもピア間認証を可能にするKerberosの拡張的な仕組み(RFC 4120 2.9.2, 3.7)。通常のTGS-REQではKDCがサービスチケットをサービスの長期鍵で暗号化するが、U2Uではクライアントがアプリケーション層の事前交換で入手した相手のTGTを「additional ticket(second ticket)」としてTGS-REQのadditional-ticketsフィールドに同梱し、KDC-REQ-BODYのkdc-options(KDCOptionsフラグ)にENC-TKT-IN-SKEYビット(bit 28)を立てて要求する。これはPA-DATAではなくKDCOptionsのフラグである点に注意。この要求によりKDCはサービスチケットをサービスの長期鍵ではなく、同梱されたTGTに含まれるセッション鍵で暗号化して返す。この仕組みはS4U2Self+U2Uの文脈で悪用され、ターゲットにSPNや攻撃者が知らない長期鍵(NTハッシュ)がなくても、攻撃者が自分自身の既知のTGTセッション鍵で暗号化させることでSPN登録を不要にしつつ、サービスチケットを既知の鍵でそのまま復号可能にする。この結果ターゲットの正規PACがそのまま得られる状態になり、Sapphire TicketやUnPAC-the-hash(getcredentials)がU2Uを踏み台にPACを正規に取得できる理由になっている。",
+    "points": [
+      "RFC 4120 2.9.2 / 3.7: ピア間(peer-to-peer)認証をKDC仲介で実現",
+      "KDCOptionsフラグ ENC-TKT-IN-SKEY(bit 28、PA-DATAではない)をTGS-REQに設定し、相手のTGTを\"additional ticket\"としてadditional-ticketsフィールドに同梱",
+      "サービスチケットはサービスの長期鍵ではなく同梱TGTのセッション鍵で暗号化",
+      "S4U2Self+U2U: SPN不要かつターゲットの長期鍵(NTハッシュ)不要でチケット復号を実現(攻撃者は自分の既知TGTセッション鍵で復号)",
+      "Sapphire Ticket / UnPAC-the-hash(getcredentials)がPAC取得に悪用"
+    ],
+    "related": [
+      "kerberos",
+      "krbmsgs",
+      "s4u",
+      "pac",
+      "pkinit",
+      "diamondticket"
+    ]
+  },
+  {
+    "id": "kdcerrcode",
+    "term": "KDCエラーコード / 事前認証タイプ (KRB-ERROR / PreAuthType)",
+    "en": "KDC Error Codes & Pre-Authentication Type (KRB-ERROR / PreAuthType Fields)",
+    "aka": "KDC_ERR_PREAUTH_REQUIRED(25/0x19), KDC_ERR_C_PRINCIPAL_UNKNOWN(6/0x6), KDC_ERR_ETYPE_NOTSUPP(14/0xE), PA-ENC-TIMESTAMP(padata-type 2), PA-PK-AS-REQ(padata-type 16), 4768のResult Code・4771のFailure Code・両者のPre-Authentication Typeフィールド",
+    "cat": "auth",
+    "body": "KDCエラーコード(KRB-ERROR)は、KDCがAS-REQ/TGS-REQを処理できなかった際にRFC 4120準拠のerror-codeフィールドへ格納して返す数値で、代表的な値は事前認証が必要なことを示すKDC_ERR_PREAUTH_REQUIRED=25(0x19)、対象プリンシパルが存在しないKDC_ERR_C_PRINCIPAL_UNKNOWN=6(0x6)、要求された暗号化種別をKDCがサポートしないKDC_ERR_ETYPE_NOTSUPP=14(0xE)などである。これらはWindowsのセキュリティイベント4768(TGT要求)のResult Codeフィールド、および4771(Kerberos事前認証失敗)のFailure Codeフィールドに記録され、SOCはこの数値だけでアカウントの存在有無や暗号化ダウングレードの試行を判別できる。同じイベントのPre-Authentication Type(PreAuthType)フィールドはクライアントが用いたpadata(事前認証データ)方式を示し、PA-ENC-TIMESTAMP(padata-type 2)は通常のパスワードベース事前認証、PA-PK-AS-REQ(padata-type 16)は証明書ベースのPKINIT認証を意味し、値0は事前認証そのものが行われていないことを示す。マップ上の複数の技法──認証情報なしのユーザー列挙(エラーコードの違いで有効アカウントを判定)、AS-REP Roasting偵察(4768でPreAuthType=0を検出)、RC4ダウングレード拒否の検知(0xE)、Shadow CredentialsやPKINITベースの成りすまし検知(PreAuthType=16)──は、いずれもこのerror-codeとPreAuthTypeという2フィールドの意味を正確に読み取れることが前提になっており、断片的な数値の暗記ではなくフィールドの構造理解が検知ロジック構築の土台となる。",
+    "points": [
+      "KDC_ERR_PREAUTH_REQUIRED=25(0x19): 事前認証必須の応答、アカウント自体は存在",
+      "KDC_ERR_C_PRINCIPAL_UNKNOWN=6(0x6): プリンシパル不在 → 無認証ユーザー列挙のシグナル",
+      "KDC_ERR_ETYPE_NOTSUPP=14(0xE): 要求etype非対応、RC4ダウングレード拒否時などに出現",
+      "PreAuthType: PA-ENC-TIMESTAMP=2(パスワード認証)、PA-PK-AS-REQ=16(PKINIT証明書認証)、0=事前認証なし(AS-REP Roast標的)",
+      "4768のResult Code・4771のFailure Codeと、両イベントのPre-Authentication Typeフィールドがhunt/triageクエリの基本項目"
+    ],
+    "related": [
+      "preauth",
+      "kdc",
+      "authevents",
+      "asreproast",
+      "pkinit",
+      "etype"
+    ]
+  },
+  {
+    "id": "kerbsalt",
+    "term": "Kerberos 鍵導出のソルトと反復回数 (string2key)",
+    "en": "Kerberos Key Derivation: Salt & Iteration Count (string2key)",
+    "aka": "string2key, S2K, RFC 3962, iteration count既定4096, salt=REALM+sAMAccountName(ユーザー) / REALM+host+FQDN(コンピュータ)",
+    "cat": "auth",
+    "body": "Kerberos の対称鍵導出は RFC 3961/3962 が定める string2key 関数(S2K)によって行われ、AES128/AES256 鍵はユーザーの平文パスワードと salt、既定 4096 回の iteration count を PBKDF2 類似の反復処理にかけることで導出される。salt の組み立てはアカウント種別で異なり、ユーザーアカウントは大文字化した REALM 名+大文字小文字を区別する sAMAccountName を連結したもの、コンピュータアカウントは大文字化した REALM 名+文字列 \"host\"+小文字化した FQDN ホスト名を連結したものとなる。これに対し RC4-HMAC(etype 23 / 0x17)は NT ハッシュ(MD4)をそのまま暗号鍵として使い salt も iteration count も介さないため、hashcat mode 13100(Kerberoasting)/18200(AS-REP Roasting)等によるオフライン解読が即座に成立する一方、AES 系は salt と 4096 回の反復コストが乗る分だけクラックが重く、辞書やレインボーテーブルの使い回しも困難になる(Kerberoasting=TGS-REP の AES ハッシュは hashcat mode 19600/19700 が対応するが、AS-REP Roasting で AES 専用アカウントに当たった場合は hashcat に専用モードがなく、John the Ripper の krb5asrep フォーマット等を使うのが実務上一般的)。この仕組みの帰結として、パスワード自体を変えなくても sAMAccountName や UPN、あるいはコンピュータ名(dNSHostName)を変更すれば salt が変わり、AES 鍵そのものと事前計算済みのクラック材料が無効化される。この点が Kerberoasting/AS-REP Roasting でのハッシュ形式・クラックツール選択や、Overpass-the-Hash/Pass-the-Key で「パスワードが変わらない限り同一鍵が有効」とされる根拠を正しく理解するうえで欠かせない。",
+    "points": [
+      "RFC 3961/3962のstring2key(S2K)関数: パスワード+salt+iteration countからAES128/256鍵を導出",
+      "既定iteration count = 4096(AS-REPのPA-ETYPE-INFO2で通知)",
+      "ユーザーアカウント: 大文字REALM+大文字小文字を区別するsAMAccountName",
+      "コンピュータアカウント: 大文字REALM+\"host\"+小文字FQDNホスト名",
+      "RC4-HMACはNTハッシュを無salt・無iterationでそのまま鍵に使用→即時オフライン解読が可能"
+    ],
+    "related": [
+      "kerberos",
+      "etype",
+      "nthash",
+      "kerberoast",
+      "asreproast",
+      "realm"
+    ]
+  },
+  {
+    "id": "sessionkey",
+    "term": "Kerberos セッション鍵 / サブキー",
+    "en": "Kerberos Session Key / Subkey",
+    "aka": "AS-REP session key, TGS session key, authenticator subkey",
+    "cat": "auth",
+    "body": "セッション鍵(サブキー)は、AS-REP/TGS-REPでチケット本体と同梱してクライアントに渡される対称鍵で、クライアントの長期鍵(NTハッシュやAES鍵)そのものではなく、チケット発行対象(KDC・サービス、あるいはU2Uでは相手プリンシパル)とクライアントの間だけで共有される短命鍵である。TGTにはTGTセッション鍵、STにはSTセッション鍵が付属する。TGTセッション鍵は後続のTGS-REQでAuthenticatorを暗号化する鍵として機能し、対応するTGS-REPの応答部もこの鍵で保護される。STセッション鍵はAP-REQでAuthenticatorを暗号化する鍵であると同時に、AP-REPによる相互認証(mutual authentication)を成立させる鍵としても機能する。クライアントはAP-REQのAuthenticatorに独自の一時サブキーを含めることもでき、これは後続メッセージの保護(GSS-API confidentiality/integrity)に使われる。CVE-2022-33679は、事前認証が無効なアカウントに対しRC4-MD4という弱いetype(値-128)への暗号ダウングレードを強制したうえで、KDCへ大量のリクエストを送るオンラインのオラクル攻撃によってAS-REP中のこのセッション鍵をバイト単位で復元できてしまう脆弱性で、TGT自体は平文で同梱されているため、鍵さえ判明すればそのまま流用可能になりTGT窃取に直結する。U2U(User-to-User)認証では、サービス自身の長期鍵の代わりに提示されたTGTのセッション鍵でTGSチケットを暗号化するため、このセッション鍵の秘匿性がTGSの安全性そのものを支える。なお委任転送でチケットとセッション鍵を一緒に運ぶ搬送用メッセージ型はKRB-CREDと呼ばれ、セッション鍵自体の別名ではない点に注意が必要である。RubeusのtgtdelegはAP-REQのAuthenticatorチェックサムを悪用してこのKRB-CREDを取得し、ローカルキャッシュのSTセッション鍵でそれを復号してTGTと同梱のセッション鍵を抽出する。",
+    "points": [
+      "AS-REPにTGTセッション鍵、TGS-REPにSTセッション鍵が同梱される",
+      "クライアントの長期鍵(NTハッシュ/AES鍵)とは別物の短命な対称鍵",
+      "TGTセッション鍵はTGS-REQのAuthenticator暗号化(TGS-REP保護)に、STセッション鍵はAP-REQの相互認証に使われる",
+      "AP-REQのAuthenticatorに追加のサブキーを含められる(GSS-API保護用)",
+      "KRB-CREDはセッション鍵の別名ではなくチケット+鍵を運ぶ搬送用メッセージ型(tgtdelegが悪用)"
+    ],
+    "related": [
+      "kerberos",
+      "tgt",
+      "st",
+      "krbmsgs",
+      "u2u",
+      "etype"
+    ]
+  },
+  {
+    "id": "oxid",
+    "term": "OXIDリゾルバ (DCOMオブジェクトエクスポータ解決)",
+    "en": "OXID Resolver (Object Exporter ID Resolution)",
+    "aka": "IObjectExporter, ResolveOxid2, RPCSS(実装元サービス), RogueOxidResolver, OXID",
+    "cat": "os",
+    "body": "OXID(Object EXporter ID)リゾルバは、分散COM(DCOM)オブジェクトが現在どのマシン・どのRPCエンドポイントで動作しているかを解決する仕組み。実体は各マシン上でRPCSSサービスが公開するIObjectExporterインタフェース(いわゆるOXIDリゾルバ)であり、DCOMオブジェクトエクスポータはOXIDという識別子で一意に管理される。クライアントやサーバーはこのインタフェースのResolveOxid2メソッドを呼び出し、対象オブジェクトの文字列バインディング(ホスト/IPとRPCプロトコルシーケンス)を取得したうえで実際のDCOM接続を確立する。この呼び出しは135/tcpにあるオブジェクトリゾルバの既知エンドポイント(well-known endpoint)へ直接到達し、失敗時のみエンドポイントマッパーによる動的解決にフォールバックする。この解決要求はDCOMサーバーからクライアントへのコールバックにも使われるため、攻撃者が細工した文字列バインディングを注入すれば、対象マシンに任意ホスト宛てのRPC接続や認証(NTLM/Kerberos)を強制できる。RemotePotato0はログオン中ユーザーのDCOMアクティベーションをRogueOxidResolverでリレーしNTLM認証を窃取し、RemoteKrbRelayは同様にOXID解決の仕組みを悪用しKerberos認証をリレーする。検知では135/tcpへのOXIDリゾルバ呼び出しとそれに続く動的ポートへの接続を監視対象とする。",
+    "points": [
+      "IObjectExporterインタフェース(OXIDリゾルバ)をRPCSSサービスが実装・公開",
+      "OXID = DCOMオブジェクトエクスポータを一意に指す識別子(Object EXporter ID)",
+      "ResolveOxid2でホスト/プロトコルシーケンスを含む文字列バインディングを取得",
+      "135/tcpの既知エンドポイントへ直接到達(失敗時のみ動的解決にフォールバック)、実通信は動的ポート",
+      "RemotePotato0(RogueOxidResolverでNTLM)やRemoteKrbRelay(Kerberos)は偽バインディングを注入し認証をリレー"
+    ],
+    "related": [
+      "rpc",
+      "com",
+      "potato",
+      "ntlmrelay",
+      "epmreg"
+    ]
+  },
+  {
+    "id": "epmreg",
+    "term": "RPCエンドポイントマッパー登録 (RpcEpRegister)",
+    "en": "RPC Endpoint Mapper Registration (RpcEpRegister)",
+    "aka": "RpcEpRegister, RpcEpRegisterNoReplace, ept_insert, EPMデータベース, first-registration-wins, first-come-first-served, EPM Server Spoofing",
+    "cat": "os",
+    "body": "RPCエンドポイントマッパー登録は、RPCサーバーがRpcServerUseProtseq系APIでRPCランタイムに動的ポート(プロトコルシーケンスとエンドポイント)をバインドし、RpcServerRegisterIfでインタフェースをRPCランタイムライブラリへ登録した後、自身のインタフェースUUID・バージョン・バインディング情報を、RPCSSサービス(TCP135で待ち受け)が保持するEPMデータベースへ RpcEpRegister / RpcEpRegisterNoReplace API(ワイヤ上はept_insert操作に相当)を呼び出して公開する工程である。この登録は同一インタフェースUUIDに対して最初に登録したプロセスが優先される「first-registration-wins」(実態はfirst-come-first-served)の信頼モデルで運用されており、登録元プロセスの正当性を検証する強い認可チェックは存在しない。なお、RpcServerRegisterIfはRPCランタイムライブラリへインタフェースを登録し呼び出しを受け付け可能にするAPIであり、EPMデータベースへの登録(RpcEpRegister)とは別工程である。実際のRPCサーバー起動シーケンスは通常 RpcServerUseProtseq系 → RpcServerRegisterIf → RpcEpRegister → RpcServerListen の順に呼ばれる。この認可なき先着順という弱点のため、攻撃者プロセスが正規サーバーより先に同一インタフェースUUIDを登録すれば、後続クライアントのept_map解決(id:rpc)を乗っ取り、偽エンドポイントへ誘導できる(EPM Server Spoofing, CVE-2025-49760)。攻撃マップ上ではクライアント側の動的ポート解決だけでなく、この登録側メカニズムを理解して初めて「EPMデータベースへの毒入れ」という攻撃面の核心が把握できる。",
+    "points": [
+      "RpcEpRegister / RpcEpRegisterNoReplace: インタフェースUUID・バージョン・バインディング情報をEPMデータベースへ登録(ワイヤ上はept_insert操作に相当。クライアント側解決のept_mapとは別opnum)",
+      "RPCSSサービスがTCP135で待ち受け、EPMデータベース(インメモリ、プロセス終了で自動失効)を保持",
+      "first-registration-wins(first-come-first-served): 同一インタフェースUUIDは最初の登録者が優先され、登録元の正当性を検証する強い認可チェックはない",
+      "RpcServerRegisterIfは別工程(RPCランタイムライブラリへのインタフェース登録)。実際の起動順は通常 RpcServerUseProtseq系 → RpcServerRegisterIf → RpcEpRegister → RpcServerListen",
+      "CVE-2025-49760 (EPM Server Spoofing, CVSS 3.5, 2025年7月修正): 先着登録により後続クライアントのept_map解決を乗っ取り、Windows Storage等の機微情報窃取・ドメイン権限昇格(ESC8連鎖)へ発展"
+    ],
+    "related": [
+      "rpc",
+      "com",
+      "oxid",
+      "namedpipe",
+      "coercion"
+    ]
+  },
+  {
+    "id": "ntlmmic",
+    "term": "NTLM MIC / NTLMSSP セッションセキュリティフラグ (SIGN/SEAL)",
+    "en": "NTLM Message Integrity Code (MIC) & NTLMSSP Session Security Flags (SIGN/SEAL/LOCAL_CALL)",
+    "aka": "MIC, Message Integrity Check, MsvAvFlags, NTLMSSP_NEGOTIATE_SIGN, NTLMSSP_NEGOTIATE_SEAL, NTLMSSP_NEGOTIATE_LOCAL_CALL, AUTHENTICATE_MESSAGE",
+    "cat": "auth",
+    "body": "NTLM Message Integrity Code (MIC) は、NTLMv2認証の第3メッセージ AUTHENTICATE_MESSAGE に付加されるHMAC-MD5ベースの16バイトフィールドで、NEGOTIATE_MESSAGE・CHALLENGE_MESSAGE・AUTHENTICATE_MESSAGE(MICフィールド自体は計算前に16バイトのゼロで埋められる)の3メッセージ全体を、SessionBaseKeyから導出されるExportedSessionKeyでHMAC-MD5署名し、中間者によるフィールド改竄(ネゴシエートフラグの書き換えなど)を検知する仕組みである。AUTHENTICATE_MESSAGEのTargetInfoにあるMsvAvFlags AV_PAIRのbit 0x2が1になっているとき、サーバはMICフィールドの検証を行う設計になっており、この「検証要否の合図」自体を無効化・回避することが後述の攻撃の核心となる。本項のMICは整合性レベル(id:integrity)のMandatory Integrity Controlとは無関係の、NTLM内部の完全性コードであり、両者は同じ略語を共有するだけの別概念なので混同しないこと。「Message Integrity Check」という呼称も実務では広く流通するが、MS-NLMP仕様書や公式CVEアドバイザリは一貫して「Message Integrity Code」と表記するため、こちらを正式名として扱う。MICとは別レイヤの仕組みとして、NTLMSSPのネゴシエートフラグにはNTLMSSP_NEGOTIATE_SIGN(0x00000010)・NTLMSSP_NEGOTIATE_SEAL(0x00000020)・NTLMSSP_NEGOTIATE_LOCAL_CALL(0x00004000)などメッセージレベルの署名/封印/ローカル呼び出しを要求するビットがあり、これはSMB/LDAPのプロトコル層署名(id:smbsigning)とは独立した層で、リレーしたAUTHENTICATE_MESSAGE内でこれらのフラグを書き換えれば署名要求そのものを黙らせられる。Drop the MIC (CVE-2019-1040)はMICフィールドの除去に加えてNTLMSSP_NEGOTIATE_SIGN/ALWAYS_SIGNなどの署名系フラグも併せて解除することで改竄検知と署名要求の両方を無力化し、CVE-2025-54918はLDAP側実装がMICを部分的にしか保護しない隙(Partial MIC Removal)を突いて、署名やチャネルバインディングを強制した環境でもリレーを成立させるというように、この2フィールド(MICとネゴシエートフラグ)の内部構造を理解して初めて、NTLMリレー対策がなぜ・どこまで破られ得るかが読み解ける。",
+    "points": [
+      "AUTHENTICATE_MESSAGE内のHMAC-MD5(鍵はSessionBaseKeyから導出されるExportedSessionKey)で、NEGOTIATE/CHALLENGE/AUTHENTICATEの3メッセージを束ねて署名",
+      "正式名はMessage Integrity Code(MS-NLMP準拠)、\"Message Integrity Check\"は広く使われる別名として併記",
+      "id:integrity(Mandatory Integrity Control)のMICとは無関係の別概念 — 略語衝突に注意",
+      "MsvAvFlags AV_PAIRのbit 0x2がMIC検証要否をサーバに伝える合図であり、CVE-2019-1040はこの合図と紐づくNEGOTIATE_SIGN/ALWAYS_SIGNフラグも併せて無効化する",
+      "NTLMSSP_NEGOTIATE_SIGN 0x00000010 / NTLMSSP_NEGOTIATE_SEAL 0x00000020 / NTLMSSP_NEGOTIATE_LOCAL_CALL 0x00004000 はメッセージレベルの署名・封印フラグでSMB/LDAP署名とは別レイヤ(0x00008000はNEGOTIATE_ALWAYS_SIGNでLOCAL_CALLではない)",
+      "CVE-2019-1040(MICとSIGN系フラグの除去)→CVE-2025-54918(部分的MIC保護の迂回, Partial MIC Removal)という攻撃技法の進化系譜"
+    ],
+    "related": [
+      "ntlm",
+      "netntlm",
+      "ntlmrelay",
+      "epa",
+      "smbsigning",
+      "sspi"
+    ]
+  },
+  {
+    "id": "webclient",
+    "term": "WebClient サービス / WebDAV リダイレクタ",
+    "en": "WebClient Service / WebDAV Redirector",
+    "aka": "WebClient service, WebDAV Redirector, webclnt.dll, DAV RPC SERVICE named pipe, HTTP-based NTLM coercion",
+    "cat": "os",
+    "body": "WebClient サービス(表示名 WebClient、実体は webclnt.dll)は、Windows の WebDAV Mini-Redirector が UNC 形式のパス(\\\\server@port\\path や \\\\server@SSL@port\\path)で WebDAV 共有にアクセスするためのクライアント側コンポーネントである。SMB(445/tcp)ではなく HTTP(既定80/tcp、SSL指定時443/tcp)で通信するため、SMB署名の強制設定が一切適用されない別経路の認証チャネルを作り出す。既定では Windows Workstation(クライアント)OS にのみプリインストールされ手動(トリガー開始、ETWイベントで起動)状態で待機し、Windows Server OS には既定でインストールされない(Server 2012/2012 R2は「Desktop Experience」機能、Server 2016以降は「WebDAV リダイレクタ」機能を個別に追加すれば利用可能になる)。サービスは要求時に遅延起動し、起動すると名前付きパイプ \\\\.\\pipe\\DAV RPC SERVICE を作成するため、この名前付きパイプ作成イベントの監視がWebClient稼働(≒WebDAVアクセス発生)の検知指標になる。PetitPotam等の強制認証技法の宛先をSMBのUNCパスではなくこの \\\\server@80\\ 形式に変えると、対象ホストのWebClientサービスが起動してHTTPベースのNTLM認証が発生し、SMB署名の対象外であるだけでなくAD CS Web登録(ESC8)のようなHTTPエンドポイントへそのまま中継できるクロスプロトコルNTLMリレーの起点となる。",
+    "points": [
+      "webclnt.dll / サービス表示名 \"WebClient\"、UNCパス \\\\server@port\\path でWebDAV(HTTP)アクセスを実現",
+      "HTTP 80/tcp(SSL指定時443/tcp)で通信 → SMB(445/tcp)署名強制の対象外となる別経路",
+      "既定でWorkstation(クライアント)OSにのみ存在し手動(トリガー開始)、Server OSは既定未インストール(Desktop Experienceまたは WebDAVリダイレクタ機能の追加時のみ利用可)",
+      "起動検知は名前付きパイプ \\\\.\\pipe\\DAV RPC SERVICE の作成監視が有効",
+      "coercionの宛先を\\\\server@80\\形式にするとHTTP NTLM認証を誘発 → ESC8等クロスプロトコルNTLMリレーの起点になる"
+    ],
+    "related": [
+      "coercion",
+      "ntlmrelay",
+      "smbsigning",
+      "namedpipe",
+      "adcsesc",
+      "enrollep"
+    ]
+  },
+  {
+    "id": "wpad",
+    "term": "WPAD (Web Proxy Auto-Discovery Protocol)",
+    "en": "Web Proxy Auto-Discovery Protocol (WPAD) / PAC File",
+    "aka": "WPAD, PAC file, wpad.dat, DHCP Option 252, Proxy Auto-Config, 407 Proxy Authentication Required",
+    "cat": "os",
+    "body": "WPAD (Web Proxy Auto-Discovery Protocol) は、Kerberos の権限属性証明書 (PAC、認可データ) とは無関係の別概念で、ブラウザや Windows の WinHTTP/WinINET がプロキシ設定を自動発見する仕組みである。WinHTTP の自動検出はまず DHCP Option 252 で PAC ファイルの URL 取得を試み、失敗すると DNS で「wpad.<接尾辞>」ホスト名を解決して http://wpad.<suffix>/wpad.dat を取得する(DHCP優先・DNSは次点という順序はWPAD仕様どおりの公式挙動)。取得した wpad.dat (PAC ファイル) は FindProxyForURL() という JavaScript 関数を含み、アクセス先 URL ごとにどのプロキシへ転送するかを返す。この設計の弱点は「名前解決を制した者が HTTP プロキシ設定を制する」点にあり、LLMNR/NBT-NS や DNS の名前解決を偽装トラフィックで乗っ取れれば、被害者の全 HTTP トラフィックを不正プロキシへ誘導できる。さらに偽 WPAD サーバーが HTTP 407 Proxy-Authentication Required で応答すると、クライアントは既定で NTLM 認証を自動送信するため、ユーザー操作なしに Net-NTLM 資格情報(あるいはリレー可能な認証セッション)が漏洩する。Windows は既定で DNS Global Query Block List (GQBL) に「wpad」と「isatap」を登録し単純な名前衝突を緩和しているが、かつてはワイルドカードレコードや DNAME レコードで GQBL を回避でき(CVE-2018-8320、2018年10月修正)、パッチ後も NS レコードによる回避は現在も有効なため、ADIDNS への書き込み権限を持てば依然として wpad 解決を乗っ取れる。DHCP を悪用する経路も複数あり、mitm6 は DHCPv6 で偽の名前解決サーバーを配布し WPAD 等のホスト名解決を乗っ取って NTLM リレーへ接続する一方、Akamai の DDSpoof は DHCPv6 ではなく Microsoft DHCP サーバーの DNS 動的更新機能を無認証で悪用し wpad を含む ADIDNS レコードを直接スプーフィングする、mitm6 とは別系統の技法である。",
+    "points": [
+      "DHCP Option 252 → 失敗時に DNS 'wpad.<接尾辞>' の順で探索(WinHTTP公式仕様)",
+      "wpad.dat = PAC ファイル、FindProxyForURL() 関数でプロキシを決定",
+      "偽 WPAD の 407 Proxy-Authentication Required で NTLM 自動応答 → 資格情報漏洩",
+      "既定でGQBLに'wpad'/'isatap'登録。ワイルドカード/DNAME回避はCVE-2018-8320で修正済みだがNSレコード回避は現在も有効",
+      "mitm6(DHCPv6で名前解決を乗っ取り)とDDSpoof(DHCP DNS動的更新の無認証悪用でADIDNSにwpad等を注入)は別系統、いずれもntlmrelayx等と連携可能"
+    ],
+    "related": [
+      "namepoison",
+      "ntlmrelay",
+      "netntlm",
+      "adidns",
+      "pac",
+      "ntlm",
+      "dnsupdateproxy"
+    ]
+  },
+  {
+    "id": "enrollagent",
+    "term": "登録エージェント (Enrollment Agent)",
+    "en": "Enrollment Agent (Certificate Request Agent)",
+    "aka": "Certificate Request Agent EKU, 1.3.6.1.4.1.311.20.2.1, on-behalf-of enrollment, Enrollment Agent Restrictions",
+    "cat": "pki",
+    "body": "登録エージェント (Enrollment Agent) は、証明書要求エージェント EKU (Certificate Request Agent, OID 1.3.6.1.4.1.311.20.2.1) を持つ証明書の保有者に与えられる、AD CS 上で「他人になり代わって(on-behalf-of)証明書要求(CSR)に署名し、CA に発行させる」委任モデルである。本来はスマートカード発行担当者がエンドユーザーの秘密鍵を扱わずに代理でスマートカード証明書を発行できるようにする仕組みで、対象ユーザーの識別情報を含む内側の要求(PKCS#10/CMC)を、エージェント自身の秘密鍵で署名した CMS(PKCS#7)構造で包んで CA に送信する。CA はその外側の署名をエージェント証明書の EKU とともに検証したうえで、内側の要求に埋め込まれた対象ユーザーの身元(サブジェクト/SAN)で証明書を発行する。CA 側にはこの委任範囲を制限する「登録エージェント制限 (Enrollment Agent Restrictions)」があり、証明機関 MMC の [プロパティ]>[登録エージェント] タブで「登録エージェントを制限する」を有効にすると、特定のエージェント(またはグループ)が代理発行できるテンプレートと対象ユーザーの範囲を限定できるが、既定は「登録エージェントを制限しない」であり、任意のエージェントが任意のユーザーに代わって任意のテンプレートを要求できてしまう。攻撃マップ上では ESC3 がこのモデルの中核で、Certificate Request Agent EKU を発行するテンプレートへの登録権限を悪用してエージェント証明書を取得し、それを用いて Domain Admin 等の高権限ユーザーになり代わった認証用証明書を二段階目のテンプレートから発行させ PKINIT で身元を乗っ取る。ESC15 (EKUwu) は、証明書に Application Policies 拡張と EKU 拡張が両方存在する場合、CA/Windows 側の検証が EKU 拡張を無視して Application Policies 拡張を優先するという実装上の癖を突き、要求者が独自の拡張を注入できる V1 テンプレートに Certificate Request Agent の Application Policy を注入することで、本来この用途を許可していないテンプレートでも登録エージェント制限を経ずに同じ委任モデルを成立させてしまう。",
+    "points": [
+      "EKU OID = 1.3.6.1.4.1.311.20.2.1 (Certificate Request Agent)",
+      "本来はスマートカード発行代行、対象ユーザーのCSR(PKCS#10/CMC)をエージェント秘密鍵で署名したCMS(PKCS#7)に包んで送るon-behalf-of発行モデル",
+      "CA側の緩和策=登録エージェント制限(Enrollment Agent Restrictions)、証明機関MMCの[プロパティ]>[登録エージェント]タブの「登録エージェントを制限する」で設定",
+      "既定は「登録エージェントを制限しない」(Not restricted) = 任意エージェントが任意ユーザー・任意テンプレートで代理発行可能",
+      "ESC3=このEKUを持つテンプレートの登録権限悪用、ESC15(EKUwu)=Application PolicyがEKUより優先される実装上の癖を突きV1テンプレートにCertificate Request Agentを注入して制限を回避"
+    ],
+    "related": [
+      "eku",
+      "template",
+      "adcs",
+      "adcsesc",
+      "caperm",
+      "apppolicy"
+    ]
+  },
+  {
+    "id": "caperm",
+    "term": "CAセキュリティ権限とポリシー設定 (ManageCA / ManageCertificates / EDITF)",
+    "en": "CA Security Permissions & Policy Module Flags (CA Administrator / Certificate Manager / EDITF_ATTRIBUTESUBJECTALTNAME2)",
+    "aka": "ManageCA, ManageCertificates, CA Administrator, Certificate Manager (Officer), Request Certificates, Issue and Manage Certificates, CA\\Security, EditFlags, certutil -setreg policy\\EditFlags",
+    "cat": "pki",
+    "body": "CAオブジェクトはAD内の通常のオブジェクトACL(GenericAll/WriteDACL等)とは別に、証明機関コンソールの「セキュリティ」タブに独立したアクセス制御体系を持つ。これは下位から順に3階層で、(1) Request Certificates(証明書の発行を要求できる権限。GUIで「Enroll」と呼ばれることもあるが、これはテンプレート側の拡張権限Certificate-Enrollmentの名称であり、CAセキュリティタブ上の正式名は「Request Certificates」)、(2) Issue and Manage Certificates(Certificate Manager/Officerロールとも呼ばれる。保留中または失敗した証明書要求を強制的に承認・発行できる)、(3) Manage CA(CA Administratorロール。ポリシーモジュール設定を含むCAの全構成を変更できる最上位権限)となる。Manage CAを保持する攻撃者はポリシーモジュールのEditFlagsを自由に書き換えられ、その一つEDITF_ATTRIBUTESUBJECTALTNAME2はcertutil -setreg policy\\EditFlags +EDITF_ATTRIBUTESUBJECTALTNAME2で設定しCertSvcサービス再起動で反映される、CA全体に効くグローバル設定である。これはテンプレート単位で任意SAN指定を許可するENROLLEE_SUPPLIES_SUBJECT(ESC1)とは別レイヤであり、有効化すると全テンプレートの全登録者がリクエスト時に任意のSANを指定可能になる(ESC6)。さらにManage CAは、自身をofficerとして追加登録することでIssue and Manage Certificates権限を自らに付与できる(例: certipy ca -add-officer)。したがってManage CAの奪取(ESC7)は、(a) officer自己登録によりManage Certificates権限を得て保留要求を強制承認する経路と、(b) EditFlags書き換えによるESC6化という、2方向の昇格経路を同時に開く。",
+    "points": [
+      "権限階層: Request Certificates(発行要求) < Issue and Manage Certificates(保留/失敗要求の強制承認、通称ManageCertificates) < Manage CA(CA全構成の変更、通称ManageCA)",
+      "GUI上の「Enroll」はテンプレート側拡張権限Certificate-Enrollmentの名称。CAセキュリティタブでの正式名は「Request Certificates」",
+      "EDITF_ATTRIBUTESUBJECTALTNAME2はCA全体に効くポリシーモジュールフラグで、テンプレート単位のENROLLEE_SUPPLIES_SUBJECT(ESC1)とは別レイヤ",
+      "certutil -setreg policy\\EditFlags +EDITF_ATTRIBUTESUBJECTALTNAME2 → CertSvc再起動で有効化、全登録者が任意SANを指定可能に(ESC6)",
+      "Manage CA保持者はofficer自己登録でManage Certificates権限を取得でき(ESC7の強制承認経路)、EditFlags書き換え(ESC6化)も自由に行える"
+    ],
+    "related": [
+      "adcs",
+      "ca",
+      "template",
+      "adcsesc",
+      "accessmask",
+      "secdesc"
+    ]
+  },
+  {
+    "id": "apppolicy",
+    "term": "Application Policies 拡張 (EKUwu)",
+    "en": "Application Policies Extension vs EKU (EKUwu)",
+    "aka": "szOID_APPLICATION_CERT_POLICIES, OID 1.3.6.1.4.1.311.21.10, ESC15, CVE-2024-49019",
+    "cat": "pki",
+    "body": "Application Policies 拡張(OID 1.3.6.1.4.1.311.21.10, szOID_APPLICATION_CERT_POLICIES)は、標準のEKU拡張(2.5.29.37)とは別に存在するMicrosoft独自の証明書拡張で、証明書の用途をOIDのリストとして表現する。ポイントは「等価」ではなく「優先」である。レガシーなCAPI2証明書チェーン検証ロジックでは、証明書がApplication PoliciesとEKUの両方を保持する場合、Application Policiesが優先され、EKU側の値は事実上無視される——これはMicrosoftの公式ドキュメント(Windows Server「Using Application Policies」)に明記された挙動である。schemaVersion=1(V1)の証明書テンプレートでENROLLEE_SUPPLIES_SUBJECTフラグ(Subject Nameを「要求で指定」)が有効な場合、CA側が制限をかけない限りこの拡張はCSR属性(msPKI-Certificate-Application-Policy)として要求者が自由に注入でき、EKUフィールドを書き換えずに実効的な用途(クライアント認証など)を偽装できてしまう——これがEKUwu(ESC15、CVE-2024-49019、TrustedSec Justin Bollingerが2024年に発見)の技術的前提となる。LDAP Schannel認証のようにレガシーな証明書検証パスに依存するコンシューマは、このApplication Policiesを見て許可された用途を判定するため、攻撃者はV1テンプレートからApplication Policiesにクライアント認証用OIDなどを注入するだけで、EKU制限をすり抜けたなりすまし用証明書を発行させられる。",
+    "points": [
+      "OID 1.3.6.1.4.1.311.21.10 (szOID_APPLICATION_CERT_POLICIES) — EKU (2.5.29.37) とは別拡張",
+      "レガシーCAPI2チェーン検証ではApplication PoliciesがEKUより「優先」され、EKUは事実上無視される(等価ではない)",
+      "schemaVersion=1 (V1) テンプレート + ENROLLEE_SUPPLIES_SUBJECT有効時、CSR属性 msPKI-Certificate-Application-Policy への自由注入が可能 → ESC15/EKUwu (CVE-2024-49019) の土台",
+      "LDAP Schannel認証などレガシー検証パス依存のコンシューマが実際の悪用対象",
+      "V2以降のテンプレートはクローン時に自動昇格し、同様の自由注入は成立しにくい"
+    ],
+    "related": [
+      "template",
+      "eku",
+      "adcsesc",
+      "ca",
+      "issuancepolicy",
+      "caperm"
+    ]
+  },
+  {
+    "id": "issuancepolicy",
+    "term": "発行ポリシー OID (Issuance Policy / Certificate Policies)",
+    "en": "Issuance Policy OID (Certificate Policies Extension / OID Group Link)",
+    "aka": "Certificate Policies extension 2.5.29.32, msPKI-Certificate-Policy, msDS-OIDToGroupLink, OID group link, Authentication Mechanism Assurance, ESC13",
+    "cat": "pki",
+    "body": "発行ポリシー OID (Issuance Policy) は、X.509証明書の標準拡張であるCertificate Policies拡張(OID 2.5.29.32, RFC 5280)に埋め込まれる、その証明書がどの審査・発行方針の下で発行されたかを示すポリシー識別子群である。AD CSでは証明書テンプレートのmsPKI-Certificate-Policy属性に列挙したポリシーOIDが発行証明書に転記され、各OID自体はAD上のPKI OIDコンテナ(CN=OID,CN=Public Key Services,CN=Services,CN=Configuration,DC=...)内のmsPKI-Enterprise-Oidオブジェクトとして表現される。このOIDオブジェクトはmsDS-OIDToGroupLink属性を持つことができ、これを設定すると当該発行ポリシーが埋め込まれた証明書での認証時に、証明書所有者が指定したADグループの実メンバーでなくても、そのグループSIDが暗黙的にPACへ付与される。これは本来、Windows Server 2008 R2で導入されたスマートカード証明書の発行方針に基づく動的なグループ付与を行う「Authentication Mechanism Assurance (AMA)」機能のための仕組みであり、msDS-OIDToGroupLinkを設定できるグループはユニバーサルスコープに限られ、設定後はADがそのグループへの通常のメンバー追加を拒否するため、リンク先グループは常に空のまま運用される。ESC13は、低権限ユーザーが登録可能な証明書テンプレートにクライアント認証EKUと、特権グループへリンクされた発行ポリシーOIDが設定されている場合、そのテンプレートから取得した証明書によるPKINIT認証だけで実際のグループメンバーシップなしに特権グループ相当の権限を獲得できる問題を指す。Certificate Policies拡張(発行ポリシー)はApplication Policies拡張(拡張キー使用法/EKUに相当する目的OID)とは別物であり混同に注意が必要。",
+    "points": [
+      "Certificate Policies拡張 = OID 2.5.29.32 (RFC 5280)、証明書にポリシー識別子(OID)を格納",
+      "テンプレート側: msPKI-Certificate-Policy属性で発行ポリシーOIDを指定",
+      "AD側: PKI OIDコンテナ内のmsPKI-Enterprise-OidオブジェクトがOIDを表現し、msDS-OIDToGroupLink属性でグループにリンク",
+      "リンク先グループはユニバーサルスコープに限定され、リンク設定後はADがメンバー追加を拒否するため常に空(元はスマートカード認証向けAuthentication Mechanism Assurance機能)",
+      "リンク先グループはPKINIT認証時に実メンバーシップ不要で暗黙的にPACへSID付与",
+      "ESC13 = クライアント認証EKUと特権グループへリンクされた発行ポリシーOIDを持つテンプレートを悪用した権限昇格"
+    ],
+    "related": [
+      "template",
+      "eku",
+      "adcsesc",
+      "pac",
+      "pkinit",
+      "apppolicy"
+    ]
+  },
+  {
+    "id": "actortoken",
+    "term": "アクタートークン (S2S / ACS)",
+    "en": "Actor Token (Service-to-Service OAuth via Access Control Service)",
+    "aka": "S2S actor token, Access Control Service (ACS), trustedfordelegation, netId, puid, nameid claim",
+    "cat": "cloud",
+    "body": "アクタートークンは、Microsoft内部のサービス間(S2S)通信のために「Access Control Service (ACS)」と呼ばれる古いサービスが発行する、通常のOAuthアクセストークン/リフレッシュトークン/IDトークンとは別系統の第3のトークン種別である。あるMicrosoft製サービス(Exchangeなど)が別のサービス(Azure AD Graph等)に対し、特定のユーザーとして振る舞う権限を主張するために使われる。アクタートークン自体はACSが署名し、trustedfordelegationというクレームを持つ(Microsoft製ファーストパーティアプリにはtrue、それ以外のアプリにはfalseで発行される)。実際に「誰として振る舞うか」の指定は、この署名済みアクタートークンをactortokenクレームとして格納した「未署名」のラッパーJWT(alg: none)を介して行われ、ラッパー側のnameidクレームに対象ユーザーのnetId(MSAコードベース由来の内部識別子で、通常のEntraアクセストークンではpuidクレームとして現れる)を格納する形式をとる。RFC 8693のような標準化されたOAuthトークン交換(token exchange)プロトコルではなく、Microsoft独自の内部機構である点に注意。ACSは一般提供サービスとしては2018年11月に正式に廃止されているが、この内部S2Sアクタートークン発行用途に限っては稼働が継続しているとみられる(研究者調査時点)。netIdはほぼ連番の値であるため短時間の総当たりが可能な上、要求元テナントと対象netIdの所属テナントが一致するかというテナント境界の検証が漏れていたため、任意テナントの任意ユーザー(Global Admin含む)へ成りすませる致命的な攻撃面となった(CVE-2025-55241, CVSS 10.0)。発行・利用が通常のサインインログや監査ログにほぼ痕跡を残さないため、Entra関連の最高深刻度技法を理解するうえで前提となる基盤概念。",
+    "points": [
+      "ACS(Access Control Service)が発行する第3のトークン種別。通常のアクセス/リフレッシュ/IDトークンとは別系統",
+      "アクタートークン自体はACS署名済みでtrustedfordelegationクレームを持つ(Microsoft製ファーストパーティアプリはtrue、非Microsoftアプリはfalse)",
+      "対象ユーザーの指定は未署名のラッパーJWT(actortokenクレームに署名済みアクタートークンを格納)のnameidクレーム=netId(通常のアクセストークンのpuidに相当)で行う",
+      "RFC 8693のようなOAuthトークン交換(token exchange)標準に基づくものではない、Microsoft独自の内部機構",
+      "ACSは一般提供サービスとしては2018年に廃止済みだが、この内部S2Sアクタートークン発行用途に限り稼働継続とみられる",
+      "netIdの総当たり容易性とテナント境界検証の漏れにより、任意テナントの任意ユーザーになりすませた(CVE-2025-55241, CVSS 10.0)"
+    ],
+    "related": [
+      "entra",
+      "tokens",
+      "tenant",
+      "sp",
+      "hybridauth",
+      "oauth"
+    ]
+  },
+  {
+    "id": "workloadidfed",
+    "term": "ワークロード ID フェデレーション (フェデレーション ID 資格情報 / FIC)",
+    "en": "Workload Identity Federation (Federated Identity Credentials, FIC)",
+    "aka": "FIC, federatedIdentityCredentials, BYOIDP, client_assertion (jwt-bearer), issuer/subject/audience",
+    "cat": "cloud",
+    "body": "ワークロード ID フェデレーション (Microsoft公式訳: ワークロード ID フェデレーション/フェデレーション ID 資格情報) は、アプリやユーザー割り当てマネージド ID (UAMI) がクライアントシークレットや証明書を一切保持せずに、外部の OIDC 発行者 (issuer) が署名した JWT を提示するだけで Entra ID からトークンを取得できる、秘密なし認証の第3の経路。設定単位はフェデレーション ID 資格情報 (Federated Identity Credential, FIC) というオブジェクトで、これはアプリ登録 (application object) と UAMI のどちらにも追加できる (システム割り当てマネージド ID には設定不可)。issuer・subject (sub クレーム)・audience の3値一致を検証条件として登録する。認証時は OAuth2 の client credentials grant (grant_type=client_credentials) はそのままに、クライアント認証方式だけを client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer + client_assertion (外部 IdP 発行の JWT) に置き換えて /token エンドポイントへ要求する。これは同じ RFC 7523 の中でも、JWT自体を grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer として認可グラントに使う「JWT Bearer Grant」(2.1節) とは別のセクション (2.2節、JWT によるクライアント認証) にあたり、混同してaka表記する際は注意が必要。GitHub Actions OIDC のようなパスワードレス CI/CD 認証として正規に広く使われる一方、UAMI では管理者が明示的に設定できる唯一の資格情報型 (Microsoft はマネージド ID 裏のサービスプリンシパルへのシークレット/証明書の直接設定を許可していない) でもあるため、攻撃者が外部発行者との信頼関係をひそかに追加(BYOIDP)し、シークレットなしでアプリ/UAMIに成り代わってトークンを取得する永続化技法の前提となる。",
+    "points": [
+      "FIC (Federated Identity Credential) はアプリ登録とUAMIの両方に設定可能(システム割り当てMIは不可)",
+      "検証条件は issuer / subject (sub) / audience の3値一致",
+      "grant_type=client_credentials + client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer + client_assertion で /token へリクエスト",
+      "同じRFC 7523でも2.1節の\"JWT Bearer Grant\"(grant_type=jwt-bearer)ではなく2.2節のJWTクライアント認証(client_assertion_type=jwt-bearer)にあたる",
+      "GitHub Actions OIDC等シークレットレスCI/CD認証の正規基盤であり、かつUAMIで管理者が明示設定できる唯一の資格情報型"
+    ],
+    "related": [
+      "sp",
+      "imds",
+      "tokens",
+      "oauth",
+      "spcredadd",
+      "apppolicy"
+    ]
+  },
+  {
+    "id": "foci",
+    "term": "FOCI (ファミリー クライアントID)",
+    "en": "Family of Client IDs (FOCI)",
+    "aka": "foci=1, family refresh token (FRT), first-party app family",
+    "cat": "cloud",
+    "body": "FOCI (Family of Client IDs) は、Microsoft純正の第一者アプリ群(Azure CLI, Microsoft Teams, Microsoft Office, Intune Company Portal など)が同一の「ファミリー」に属し、リフレッシュトークンをファミリー内で共有できるMicrosoft独自の内部挙動である。あるファミリーアプリでサインインすると、トークンエンドポイントが返すJSONレスポンスに foci=1 というフィールドが付与され、これがそのリフレッシュトークンがファミリー内で共有可能な「ファミリーリフレッシュトークン(FRT)」であることを示す(このフィールドはリフレッシュトークン自体に埋め込まれたクレームではなく、レスポンス側の属性である点に注意)。このFRTを refresh_token grant で別の family client_id に対して送信すると、ユーザーの再認証なしに別アプリ向けのアクセストークンを取得できる。この交換は非対話的であり、リフレッシュトークン自体が既にMFA済みのセッションを体現しているため、実際に起きているのはMFAの突破ではなく「MFA再プロンプトの回避」に過ぎない。条件付きアクセスは client_id/app 単位で適用されるため、制限的なCAポリシーが元のアプリにのみ紐づいている場合、ファミリー内の別アプリ(制限が緩い、または既に同意済み)を経由してアプリ単位の条件付きアクセスを回避できる—CA全体の無効化ではない点に注意が必要である。既知の悪用パターンとして、Intune Company Portalに設定されているデバイス準拠チェックの除外とFOCIを連鎖させ、デバイス準拠を要求するCAポリシーごとバイパスする手口がある。",
+    "points": [
+      "foci=1 フィールド(トークンレスポンス側の属性、RT内部のクレームではない) = Microsoft第一者アプリの「ファミリー」所属を示す",
+      "refresh_token grant + 別の family client_id → 再認証なしにトークン交換",
+      "交換は非対話的 → MFA自体の突破ではなくMFA再プロンプトの回避",
+      "条件付きアクセスは client_id/app 単位 → ファミリー内アプリ経由でアプリ単位のCAを回避(CA全体の無効化ではない)",
+      "Intune Company Portalのデバイス準拠除外と連鎖 → デバイス準拠バイパスへ悪用される"
+    ],
+    "related": [
+      "entra",
+      "oauth",
+      "tokens",
+      "condaccess",
+      "sp",
+      "intunemdm"
+    ]
+  },
+  {
+    "id": "ssprwriteback",
+    "term": "SSPR とパスワードライトバック",
+    "en": "Self-Service Password Reset (SSPR) & Password Writeback",
+    "aka": "SSPR, Password Writeback, AAD Connect writeback",
+    "cat": "cloud",
+    "body": "SSPR (Self-Service Password Reset) は Entra ID のクラウド側機能で、ユーザーが事前登録した複数のセキュリティ情報(電話、メール、Microsoft Authenticatorなど)で本人確認を行い、管理者を介さず自分でパスワードをリセット・変更できる仕組み。パスワードライトバック (Password Writeback) は Entra Connect (Entra Connect Sync) のオプション機能で、このクラウド側のパスワードリセット/変更結果をオンプレミス AD DS へ即時に書き戻す、攻撃マップ上でほぼ唯一のクラウド→オンプレ方向のハイブリッド同期経路である(通常のハイブリッド同期は PHS/PTA/フェデレーションのようにオンプレ→クラウドが基本方向)。実装面では、Entra Connect 導入時に作成される AD DS コネクタアカウント (MSOL_ に続くランダムな英数字文字列であり、GUID形式ではない) に対し、既定でドメインルート(または委任先OU)配下のユーザーオブジェクトへ User-Force-Change-Password 拡張権限(表示名は Reset Password の control access right)、および lockoutTime・pwdLastSet 属性への書き込み権限が委任されており、コネクタサーバーが暗号化チャネル経由でオンプレ DC にパスワード変更を書き込む。攻撃面としては、AiTM・MFA疲労・不正な同意付与・Global Admin奪取などでクラウド側アイデンティティが乗っ取られた場合、SSPR経由でオンプレ側の対象アカウント(スコープ設定次第では特権アカウントも含む)のパスワードを強制変更でき、クラウド侵害がそのままオンプレの特権奪取・ドメイン侵入に転化し得る。防御としては、Tier 0/特権アカウントをライトバック対象スコープから除外(OU/パスワードポリシーで制御)し、コネクタアカウントの活動監視、SSPR登録・利用への条件付きアクセス適用、Event 4724(パスワードリセット試行)などの監視が重要。",
+    "points": [
+      "SSPR = クラウド側セルフサービス/管理者パスワードリセット、複数の登録済みセキュリティ情報で本人確認",
+      "Password Writeback = Entra Connect Sync によるクラウド→オンプレAD DSへの逆方向書き戻し(マップ上ほぼ唯一のcloud→on-prem同期経路)",
+      "実装は AD DS コネクタアカウント (MSOL_<ランダムな英数字文字列、GUID形式ではない>) への User-Force-Change-Password 拡張権限(表示名 Reset Password)+ lockoutTime/pwdLastSet 書き込み権限の委任",
+      "スコープ制御(Tier 0除外)なしだと、クラウド侵害→オンプレ特権アカウントのパスワード強制変更に悪用され得る",
+      "監視: Event 4724(パスワードリセット試行、MSOL_アカウントが実行者として記録される)、コネクタアカウントの活動、SSPR登録/利用への条件付きアクセス適用"
+    ],
+    "related": [
+      "entraconnect",
+      "hybridauth",
+      "entra",
+      "extendedrights",
+      "entralogs",
+      "condaccess",
+      "aitm",
+      "mfafatigue"
+    ]
+  },
+  {
+    "id": "gdap",
+    "term": "CSP委任管理者権限 (DAP / GDAP)",
+    "en": "CSP Delegated Admin Privileges (DAP / GDAP)",
+    "aka": "Delegated Admin Privileges, Granular Delegated Admin Privileges, Admin Agents, Partner Center, CrossTenantAccessType=serviceProvider",
+    "cat": "cloud",
+    "body": "CSP委任管理者権限は、Microsoftのクラウドソリューションプロバイダー(CSP)/パートナー(MSP)が顧客テナント内に資格情報やディレクトリオブジェクトを一切持たずに、テナント間の委任関係だけで管理者相当の操作を行える委任管理モデル。旧来のDAP(Delegated Admin Privileges)はパートナー導入時に自動付与され期限のないGlobal Administrator相当の権限で、パートナーテナント側の「AdminAgents」(Admin Agents)セキュリティグループへの所属がそのまま全顧客テナントへの支配力に直結する。後継のGDAP(Granular Delegated Admin Privileges)はEntraディレクトリロール単位で権限を絞り込み、最長2年(自動延長オプションで6か月単位に延長可)の時間制限付きで、パートナーテナント内のセキュリティグループを介して顧客側の各ロールにマッピングされる点がDAPと異なる。この関係はPartner Center経由で確立され、Microsoft Graphの`crossTenantAccessPolicyConfigurationPartner`リソース上では、パートナーをCSPとして扱うかどうかが`isServiceProvider`(Boolean)プロパティで表現される。一方、この関係に基づく実際のサインインは、Entraサインインログ(Graphの`signIn`リソース、Log Analyticsの`SigninLogs`テーブル)側で`crossTenantAccessType`フィールド(値`serviceProvider`)としてタグ付けされ、これが検知・ハンティングの主要な手がかりとなる — 本マップの技術エントリでは`SigninLogs`テーブルのフィールド名に合わせて`CrossTenantAccessType`(先頭大文字のPascalCase)と表記している。攻撃マップ上重要なのは、顧客側に痕跡を残す資格情報も足がかりも不要で、パートナーテナント側の1アカウント侵害だけで多数の顧客テナントへ横展開できるサプライチェーン型の増幅リスクである点。",
+    "points": [
+      "DAP = 自動付与・無期限、GA相当、AdminAgentsグループへの所属が支配力そのもの",
+      "GDAP = ロール単位で権限を限定、最長2年(自動延長で6か月単位に延長可)の時間制限付き",
+      "パートナー側のセキュリティグループを顧客テナントのEntraディレクトリロールにマッピング",
+      "顧客テナント内に資格情報・オブジェクトが一切存在しないまま管理操作が可能",
+      "設定はGraphの`isServiceProvider`(crossTenantAccessPolicyConfigurationPartner)、検知はサインインログの`crossTenantAccessType`=`serviceProvider`"
+    ],
+    "related": [
+      "entra",
+      "tenant",
+      "entraroles",
+      "graphapi",
+      "pim",
+      "b2bguest"
+    ]
+  },
+  {
+    "id": "dsheuristics",
+    "term": "dSHeuristics",
+    "en": "dSHeuristics (DS-Heuristics attribute)",
+    "aka": "dwAdminSDExMask, フォレスト全体のディレクトリ動作フラグ, 匿名LDAPアクセス制御, List Object Mode",
+    "cat": "adstruct",
+    "body": "dSHeuristics は Configuration NC 内の CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=<フォレストルート> オブジェクトが保持する単一の Unicode 文字列属性で、1文字ごとに全く異なる意味を持つ位置指定フラグの集合として、フォレスト全体(全ドメイン・全 DC)のディレクトリ挙動を切り替える。既定値は空文字列(全機能オフ)で、いずれか1台の DC で書き換えればレプリケーションにより全社へ波及するため影響範囲が広い。代表的な文字位置として、3文字目は List Object Mode を制御し、1 に設定すると子オブジェクトの列挙に通常の List Contents 権限に加えて個別の List Object(LO)アクセス権が必要になり、機密 OU 配下のオブジェクト可視性を絞り込める。7文字目は匿名 LDAP バインド・匿名クエリの許可可否に関わり、既定で無効化されている匿名アクセスを緩める値へ変更すると事前認証なしのディレクトリ偵察が成立してしまう。16文字目は dwAdminSDExMask と呼ばれる16進値で(KB817433 で導入)、AdminSDHolder が SDProp によって定期的に ACL を再適用・保護する対象グループから、Account Operators・Print Operators・Backup Operators・Server Operators などの既定保護グループを個別に除外設定でき、攻撃者がここを悪用すると特定グループへの改ざん済み ACL が SDProp の巡回監査で復元されなくなる。書き込みには Enterprise Admins 相当の権限が必要だが変更履歴が目立ちにくいため、属性値そのものの定期監査が防御上の要点となる。",
+    "points": [
+      "CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration 配下の単一 Unicode 文字列属性、既定値は空文字列",
+      "3文字目 = List Object Mode(0/1)。1で子オブジェクト列挙に List Object(LO)権限が追加要求される",
+      "7文字目 = 匿名 LDAP バインド/クエリの許可可否を制御",
+      "16文字目 = dwAdminSDExMask(16進、KB817433)。SDProp/AdminSDHolder のACL再適用対象から特定の保護グループを除外可能",
+      "フォレスト全体にレプリケートされるため単一 DC への書き込みが全ドメインへ波及"
+    ],
+    "related": [
+      "adminsdholder",
+      "ldap",
+      "forest",
+      "dacl",
+      "secdesc"
+    ]
+  },
+  {
+    "id": "primarygroupid",
+    "term": "primaryGroupID",
+    "en": "primaryGroupID Attribute",
+    "aka": "プライマリグループ, RID 512/513/515/516/519, POSIX/RFC2307互換, memberOfに現れない所属",
+    "cat": "objects",
+    "body": "primaryGroupID は、ユーザー/コンピュータオブジェクトが持つ「既定グループ」を、対象グループの相対識別子(RID)の整数値で直接指す属性である。AD本来のグループ表現はmemberOf/member(逆リンク)による多対多だが、この属性はWindows NT設計時に求められたPOSIX互換(1ユーザーにつき1つの主グループという要求。のちのRFC 2307/NIS相互運用でも利用)を満たすために導入され、user クラス(computerはそのサブクラス)にのみ定義されており、group オブジェクトは持たない。既定値はユーザーが513(Domain Users、ゲストアカウントは514/Domain Guestsの場合あり)、コンピュータが515(Domain Computers)、ドメインコントローラが516(Domain Controllers)、RODCが521(Read-only Domain Controllers)。primaryGroupIDで指定されたグループのmember属性には対象オブジェクトのDNが列挙されないため、memberOfのバックリンクをたどるnet group /domainやLDAPのmemberOf列挙では所属が可視化されない仕組みになっている。これはWindows 2000時代、レプリケートされるmember属性が単一値あたり約5000メンバー程度で頭打ちになっていた制約を回避するため、Domain Usersのような巨大グループの所属をmember属性側に格納せずに済ませる設計に由来する。攻撃者はこの属性を512(Domain Admins)等の特権グループのRIDへ書き換えることで、通常のグループメンバーシップ列挙に現れないまま実効的な特権グループ所属を獲得できる。検知には4728/4732のようなmember属性変更を追うグループ管理イベントではなく、4738(ユーザーオブジェクト変更)/4742(コンピュータオブジェクト変更)の「Primary Group Id」フィールド、または既定で無効な「ディレクトリサービスの変更」監査を有効化した上での5136で、primaryGroupID自体の変更を直接確認する必要がある。ただしDCShadowはLSASSを経由する通常の書き込みパスを迂回し複製プロトコル経由で直接改ざんするため、これら4738/4742/5136のいずれのイベントも生成されない点に注意が必要である。",
+    "points": [
+      "既定値: user=513(Domain Users、ゲストは514/Domain Guestsの場合あり)/computer=515(Domain Computers)/DC=516(Domain Controllers)/RODC=521",
+      "改ざん対象としてよく狙われるRID: 512(Domain Admins)ほか特権グループ",
+      "指定先グループのmember属性に自身のDNが載らない→memberOf/net groupで不可視",
+      "属性はuserクラス(computerはそのサブクラス)にのみ定義。groupオブジェクトは持たない",
+      "背景: Windows 2000のmember属性 約5000件上限というレプリケーション制約の回避策",
+      "検知は4728/4732ではなく4738(ユーザー)/4742(コンピュータ)のPrimary Group Idフィールド、または既定無効の5136で確認。DCShadow経由の改ざんはこれらのイベントを生成しない"
+    ],
+    "related": [
+      "rid",
+      "userobj",
+      "computerobj",
+      "group",
+      "dcshadow"
+    ]
+  },
+  {
+    "id": "shadowprincipal",
+    "term": "シャドウセキュリティプリンシパル / PAMトラスト",
+    "en": "Shadow Security Principal & MIM PAM Trust",
+    "aka": "msDS-ShadowPrincipal, msDS-ShadowPrincipalSid, Privileged Access Management (PAM), PIMトラスト (netdom /EnablePIMTrust), バスティオン/管理(PRIV)フォレスト",
+    "cat": "adstruct",
+    "body": "シャドウセキュリティプリンシパル(msDS-ShadowPrincipal)は、MIM(Microsoft Identity Manager)のPAM(Privileged Access Management)機能で使われる、バスティオン/管理(PRIV)フォレスト側に作成される「影」のセキュリティプリンシパルである。CN=Shadow Principal Configuration,CN=Services,CN=Configuration(PRIVフォレストのConfiguration NC配下)に生成され、必須属性 msDS-ShadowPrincipalSid に本番(生産/CORP)フォレストの特権グループ(Domain Admins等)のSIDを格納することで、本番フォレスト側のメンバーシップを一切変更せずに管理フォレスト側で一時的な特権割り当てを実現する。この仕組みを支えるのがPIMトラストで、常に本番(生産/CORP)フォレストから管理/バスティオン(PRIV)フォレストへ向かう一方向トラスト(本番側がバスティオン側を信頼し、逆方向には設定しない)として構成される。Windows Server 2016以降のネイティブなシャドウプリンシパル/TTLメンバーシップ機能を使うには、本番(CORP)フォレストではなく管理/バスティオン(PRIV)フォレスト側のフォレスト機能レベルをWindows Server 2016以上へ引き上げ、同じくPRIVフォレスト側で「Privileged Access Management Feature」というAD Optional Featureを有効化する必要があり、これはAD Optional Feature共通の性質として不可逆な操作である(本番フォレストに機能レベル要件は無い)。トラスト自体はnetdom trustコマンド(本番フォレスト側で実行)の /EnableSIDHistory:yes・/Quarantine:no・/EnablePIMTrust:yes オプションで確立される。通常のトラストにもSIDHistoryオプション自体は存在するが、/EnablePIMTrust:yes はSIDフィルタリング/クォランティンで通常ブロックされるDomain Admins/Enterprise Admins等の高特権SIDの伝播まで明示的に許可する点が本機構固有の危険性であり、攻撃者がPAM Trust/Shadow Security Principal Abuse技法で悪用の核心とする箇所である。なお、この文脈の「PIM」はnetdomのEnablePIMTrustオプションに由来するオンプレミス用語であり、クラウドのMicrosoft Entra ID Privileged Identity Management(PIM)とは名称が同じだけの別機能である点に注意。",
+    "points": [
+      "msDS-ShadowPrincipal: バスティオン/管理(PRIV)フォレスト側の「影」プリンシパル。必須属性 msDS-ShadowPrincipalSid(単一値)に本番フォレストの特権SIDを格納する(SidHistoryという名の属性は存在しない)",
+      "PIMトラスト = 本番(生産/CORP)フォレストが管理/バスティオン(PRIV)フォレストを信頼する一方向トラスト(常に片方向、逆方向には設定しない)",
+      "有効化条件: 本番(CORP)ではなく管理/バスティオン(PRIV)フォレストの機能レベルをWindows Server 2016以上に引き上げ、同フォレストで'Privileged Access Management Feature'(AD Optional Feature、不可逆)を有効化する",
+      "netdom trust <CORP> /domain:<PRIV> /EnablePIMTrust:yes を /EnableSIDHistory:yes・/Quarantine:no と併用し、SIDフィルタリング/クォランティンを迂回してDomain/Enterprise Admins等の高特権SID伝播を明示的に許可する(New-ADTrustというcmdletは実在しない)",
+      "構成情報は CN=Shadow Principal Configuration,CN=Services,CN=Configuration(PRIVフォレスト側)配下に保持される",
+      "この'PIM'はクラウドのMicrosoft Entra ID Privileged Identity Management(PIM)とは無関係の別機能(同名衝突に注意)"
+    ],
+    "related": [
+      "trust",
+      "sidhistory",
+      "sidfiltering",
+      "tiermodel",
+      "forest",
+      "pim"
+    ]
+  },
+  {
+    "id": "reversiblepwd",
+    "term": "可逆暗号化でのパスワード保存",
+    "en": "Reversible Encryption Password Storage (ADS_UF_ENCRYPTED_TEXT_PASSWORD_ALLOWED, userAccountControl 0x80)",
+    "aka": "Store password using reversible encryption, supplementalCredentials Primary:CLEARTEXT, RC4可逆暗号, ADS_UF_ENCRYPTED_TEXT_PASSWORD_ALLOWED",
+    "cat": "auth",
+    "body": "可逆暗号化でのパスワード保存は、ユーザーオブジェクトのuserAccountControlにADS_UF_ENCRYPTED_TEXT_PASSWORD_ALLOWED(0x80、通称ENCRYPTED_TEXT_PASSWORD_ALLOWED)フラグを立てる、またはドメインの既定パスワードポリシー/PSO(msDS-PasswordReversibleEncryptionEnabled)を有効化することで発動する設定で、パスワードを事実上平文と等価な形でDC側に保持させる。有効化後に新規のパスワード設定・変更が行われると、DCはNTハッシュを格納するunicodePwd属性とは別に、supplementalCredentials属性内のPrimary:CLEARTEXTパッケージとしてRC4で可逆暗号化(DCのブートキー/SYSKEYで復号可能)した平文コピーを保存する([MS-SAMR]仕様)。有効化前から存在する既存パスワードは遡って平文化されない点に注意。このフラグはMS-CHAP/CHAPを使うRADIUS認証、IIS Digest認証、旧Macintoshクライアントとの相互運用など、サーバー側でクライアントの平文パスワードを再現する必要があった古い要件のために設けられた歴史的機能で、既定は無効。攻撃側の視点では、DCSyncやNTDS.dit抽出でこのPrimary:CLEARTEXTパッケージを復号すればハッシュ解読を経ずに即座に平文パスワードそのものを得られるため、NTハッシュ窃取(pass-the-hashで足りる被害)より深刻度が一段高い。攻撃マップ上でこのフラグを扱う技法カードはフラグの検知・無効化手順が中心で、平文相当コピーの実体がsupplementalCredentials/Primary:CLEARTEXTという構造にある点を説明する概念エントリはこれまで存在しなかった。",
+    "points": [
+      "ADS_UF_ENCRYPTED_TEXT_PASSWORD_ALLOWED = userAccountControl 0x80(通称ENCRYPTED_TEXT_PASSWORD_ALLOWED、dsmodでは-reversiblepwd)",
+      "平文相当コピーはsupplementalCredentials属性内のPrimary:CLEARTEXTパッケージに格納(unicodePwd=NTハッシュとは別領域)",
+      "RC4による可逆暗号化でDC側が復号可能(NTDS.dit全体を保護するPEK/ブートキー機構の一部)",
+      "由来はMS-CHAP/RADIUS、IIS Digest認証、旧Macintosh等の相互運用互換のための歴史的フラグ。既定は無効、有効化後の新規パスワードのみ平文化",
+      "DCSync/NTDS.dit抽出で即時平文復元 → 通常のNTハッシュ窃取より深刻"
+    ],
+    "related": [
+      "uacflags",
+      "nthash",
+      "wdigest",
+      "dcsync",
+      "ntds"
+    ]
+  },
+  {
+    "id": "dnsupdateproxy",
+    "term": "DnsUpdateProxy / 所有者なし動的DNSレコード",
+    "en": "DnsUpdateProxy / Unsecured Dynamic DNS Records",
+    "aka": "DnsUpdateProxy, DHCP代理動的更新, レコード所有権(オブジェクトSID), OpenAclOnProxyUpdates, Name Protection/DHCID",
+    "cat": "adstruct",
+    "body": "DnsUpdateProxy は、DHCPサーバーがDHCPクライアントに代わってADIDNSへ動的更新(A/PTRレコードの登録)を行うために用意された組み込みのセキュリティグループである。ADIDNSのセキュア動的更新では、レコードを作成(secure dynamic update)した主体のオブジェクトSIDがDACLに書き込まれ、以後は所有者本人(または管理者)しか上書きできないのが原則だが、DHCPサーバーがこのグループのメンバーとして代理更新すると、Microsoft公式ドキュメントの表現ではそのレコードは「secured でない状態」になり、「そのレコードを最初に変更したユーザーがオーナーになる (the first user to modify... becomes its owner)」という所有権未確定のレース状態に置かれる――恒久的に誰でも上書きできるわけではなく、先着順で所有権が確定する点が要点である。Akamaiらの解析では、この状態のACLはAuthenticated Users相当の主体に書き込み権限を付与する形になっており、結果としてドメイン内の認証済み任意のプリンシパルが早い者勝ちでレコードを作成・乗っ取りできてしまう。この挙動はDNSサーバー側のプロパティ OpenAclOnProxyUpdates(既定値1)で制御されており、dnscmd /config /OpenAclOnProxyUpdates 0 とすることでDnsUpdateProxy起因の緩いACL付与自体を無効化できる。この仕組みは、Windows 2000時代からある「複数のDHCPサーバー(バックアップ機や引き継ぎ構成)が同一クライアントのレコードを更新しようとした際、先に登録した1台のみが所有者となり他のサーバーは更新に失敗する」という問題を回避するための代替策として導入された経緯を持つ。Windows Server 2008 R2以降のDHCPには「名前保護(Name Protection)」機能があり、DHCIDリソースレコード(RFC 4701/4703)でクライアントとレコードの紐付けを検証することでこの弱点を部分的に緩和できるが、既定では無効な環境が多い。攻撃マップ上ではADIDNS/DHCP動的更新なりすまし技法(DDSpoof系)の対策(DnsUpdateProxy運用の廃止、専用ダミーアカウントでの動的更新、OpenAclOnProxyUpdates無効化、Name Protection有効化)を理解する前提となる一般像である。",
+    "points": [
+      "DHCPサーバーがクライアント代理で動的更新する際に加入する組み込みグループ",
+      "作成レコードは secured でない状態→最初に変更したユーザーが所有者になるレース状態(恒久的に誰でも上書き可ではない)",
+      "Akamai解析: 該当ACLはAuthenticated Users相当に書込権限を付与",
+      "複数DHCPサーバー(バックアップ機/引き継ぎ構成)間の所有者競合(更新エラー)回避が導入の動機",
+      "OpenAclOnProxyUpdates(既定1)がこの緩いACL付与を制御。dnscmd /config /OpenAclOnProxyUpdates 0 で無効化可能",
+      "緩和策: DnsUpdateProxy運用中止、専用ダミーアカウントでの動的更新、Name Protection(DHCIDレコード, Server 2008 R2以降)の有効化"
+    ],
+    "related": [
+      "adidns",
+      "dclocator",
+      "secdesc",
+      "accessmask",
+      "dhcpdnsauditlog",
+      "wellknownsid"
+    ]
+  },
+  {
+    "id": "dschanges",
+    "term": "ディレクトリサービス変更監査 (5136/5137/5141)",
+    "en": "Directory Service Changes Auditing (Event 5136/5137/5141)",
+    "aka": "5136 Modify, 5137 Create, 5138 Undelete, 5139 Move, 5141 Delete, DS Changes subcategory, old/new value auditing, AttributeLDAPDisplayName",
+    "cat": "logging",
+    "body": "ディレクトリサービス変更監査は、高度な監査ポリシーの「ディレクトリサービスの変更」(DS Changes)サブカテゴリが生成するイベント群の総称で、中核は5136(オブジェクト変更)・5137(オブジェクト作成)・5141(オブジェクト削除)だが、同じサブカテゴリから5138(オブジェクト復元/Undelete)と5139(オブジェクト移動/Move)も記録される。4662が「どのアクセス権が行使されたか」という操作の発生のみを記すのに対し、5136はAttributeLDAPDisplayNameで変更された属性名を特定した上で、値の変更を『Operation\\Type = Value Deleted』(旧値)と『Operation\\Type = Value Added』(新値)という2件のイベントとして記録し、両者は同一のCorrelation IDで紐付くため、攻撃者が書き込んだ具体的な値そのものまで前後関係込みで追跡できる点が本質的に異なる。有効化には二段構えの設定が必須で、(1)グループポリシーで「DS Access > ディレクトリサービスの変更」監査サブカテゴリを成功/失敗で有効化すること、(2)監視対象オブジェクト(コンテナ・OU・個別オブジェクト)のSACLに監査ACE(通常はEveryoneに対するWrite Property等の成功監査)を明示的に設定することの両方が揃わない限りイベントは一切生成されない。攻撃マップのhuntフィールドで「5136で属性が変わった」という記述が成立する前提はこの二重要件であり、どちらか一方が欠けた環境ではShadow Credentials(msDS-KeyCredentialLink)、RBCD(msDS-AllowedToActOnBehalfOfOtherIdentity)、BadSuccessor(msDS-ManagedAccountPrecededByLink)などの属性書き換え検知クエリが根本的に機能しなくなる。GPOリンクの変更やACL改ざんの検知でも同様に5136/5139が利用されるため、Tier 0オブジェクトへのSACL設計は検知体制の生命線となる。",
+    "points": [
+      "5136=Modify, 5137=Create, 5138=Undelete, 5139=Move, 5141=Delete — 同一DS Changesサブカテゴリが生成",
+      "4662(アクセス発生の記録のみ)と異なり、5136はAttributeLDAPDisplayNameに加え、Value Deleted(旧値)/Value Added(新値)という相関イベントペア(共通Correlation ID)として変更値まで記録",
+      "有効化要件は二重: (1)高度な監査ポリシー『ディレクトリサービスの変更』を有効化 (2)対象オブジェクトのSACLに監査ACE設定",
+      "サブカテゴリ無効・SACL未設定のいずれか片方でも欠けるとイベント自体が生成されない",
+      "msDS-KeyCredentialLink/msDS-AllowedToActOnBehalfOfOtherIdentity/msDS-ManagedAccountPrecededByLink等の属性書換検知huntが本サブカテゴリに依存"
+    ],
+    "related": [
+      "sacl",
+      "auditpolicy",
+      "eventlog",
+      "keycredlink",
+      "rbcdattr",
+      "badsuccessor"
+    ]
+  },
+  {
+    "id": "wfpaudit",
+    "term": "WFP (Windows Filtering Platform) 接続監査 (5156/5157)",
+    "en": "Windows Filtering Platform Connection Auditing (Event 5156/5157)",
+    "aka": "WFP, Filtering Platform Connection, フィルタリング プラットフォームの接続の監査",
+    "cat": "logging",
+    "body": "WFP (Windows Filtering Platform) 接続監査は、Windows Firewall や IPsec が経由するカーネルモードのフィルタリング基盤 (Base Filtering Engine) を通過する各コネクションの許可/拒否を、詳細監査ポリシーのオブジェクトアクセス配下のサブカテゴリ「フィルタリング プラットフォームの接続の監査」(auditpol /set /subcategory:\"Filtering Platform Connection\") で記録する仕組みで、既定では無効化されている。許可された接続は Event 5156、ブロックされた接続は Event 5157 として記録され、Application Name、Direction、Source/Destination Address・Port、Protocol、Filter Run-Time ID、Layer Name などのフィールドを含む。これは Sysmon Event ID 3 (ネットワーク接続) のようなサードパーティ製テレメトリや、Zeek/PCAP 等の外部 NSM とは別物で、エージェント導入やパケットキャプチャなしに OS 標準機能だけでホスト自身のカーネルレベル接続可視性(ループバックや localhost 接続も含む)を得られる点が特徴。実装上の落とし穴として、SourceAddress や DestPort などのフィールドは Event 4624 の IpAddress のように SecurityEvent テーブル(Microsoft Sentinel 等)で独立した列にパースされず、EventData/RenderedDescription 内のテキストとして埋め込まれるため、クエリ時に文字列抽出(正規表現等)が必要になる。攻撃マップ上では、LDAP Ping/cLDAP によるユーザー列挙時の TCP 389/636 への送信元接続や、SMB/RPC 系横展開における 445/135 への許可接続を補足する低コストな検知ソースとして機能するが、全許可接続を記録すると大量のログになるため実運用ではフィルタの絞り込みが必要になる。",
+    "points": [
+      "Event 5156 = 許可接続、5157 = ブロック接続(カーネルのBFEが記録)",
+      "有効化には auditpol /set /subcategory:\"Filtering Platform Connection\" が必須(既定は無効)",
+      "主要フィールド: Application Name, Direction, SourceAddress/Port, DestAddress/Port, Protocol, Filter/Layer Run-Time ID",
+      "落とし穴: SourceAddress等はSecurityEvent(Sentinel)の独立列ではなくEventData内の文字列として格納",
+      "Sysmon EID3や外部NSM(Zeek/PCAP)とは別物の、OS標準カーネルフィルタ(WFP)による接続監査"
+    ],
+    "related": [
+      "eventlog",
+      "auditpolicy",
+      "sysmon",
+      "networktelemetry",
+      "rpc",
+      "smb"
+    ]
+  },
+  {
+    "id": "dhcpdnsauditlog",
+    "term": "DHCP/DNSサーバ監査ログ (DhcpSrvLog / DNS-Server Audit)",
+    "en": "DHCP Server Audit Log (DhcpSrvLog) / DNS Server Audit Log",
+    "aka": "DhcpSrvLog-*.log, Microsoft-Windows-Dhcp-Server/Operational, Microsoft-Windows-DNS-Server/Audit, DNS 515/516/519/520",
+    "cat": "logging",
+    "body": "DHCP/DNSサーバ監査ログは、Windows の DHCP サーバ役割・DNS サーバ役割がそれぞれ独自に生成する運用監査記録で、通常の Security イベントログ(4624 等)や AD DS 監査(5136)とは別系統のログ源である。DHCP サーバは既定で %SystemRoot%\\System32\\dhcp\\ 配下に曜日ごとの平文ログファイル DhcpSrvLog-Mon.log〜DhcpSrvLog-Sun.log を書き出す。各ファイルは該当曜日の1日分を保持し、翌週の同じ曜日に上書きされる形で7ファイルがローテーションする。ログはCSV形式で、イベントID 10/11(リース割当/更新)、12(リース解放)、30(DNS動的更新要求の送信)、31(DNS更新失敗)、32(DNS更新成功)などを記録する。これとは別に Microsoft-Windows-Dhcp-Server/Operational チャネル(イベントログ)も存在し、スコープの作成・変更・削除やDNS動的更新設定の変更といった構成操作寄りのイベントを扱う(サービス起動/停止ではない)。DNS サーバ側は Windows Server 2012 R2 以降で Microsoft-Windows-DNS-Server/Audit という専用チャネルが独立して用意され、Analytical/Debug ログとは別に既定で有効化されている。ゾーン操作カテゴリのイベントとしてリソースレコードの追加(515 Record create)・削除(516 Record delete)を記録するほか、RFC 2136 動的更新経由の作成・削除は専用の519(Record create - dynamic update)・520(Record delete - dynamic update)として区別され、更新元IPアドレスも記録される。攻撃者が WPAD レコードや DC 名(A/SRVレコード)を不正登録・上書きする、あるいは DHCP の DNS 動的更新代理登録機能を悪用してレコードを差し替える場合、Security ログや AD DS 監査には痕跡が残らないことが多く、この2系統のログを見ていないと検知できない。防御側は DhcpSrvLog の 30/32(DNS更新要求/成功)と DNS Server 監査の 515/516(動的更新由来を区別したい場合は519/520)を突き合わせ、想定外クライアントによるレコード登録や wpad・DC 名への上書きを相関分析することが検知の要となる。",
+    "points": [
+      "DhcpSrvLog-Mon〜Sun.log: %SystemRoot%\\System32\\dhcp\\ に平文CSV、曜日ごとに1ファイルを保持し翌週同曜日に上書きローテーション",
+      "DHCP イベントID: 10/11=リース割当/更新、12=解放、30=DNS動的更新要求、31=更新失敗、32=更新成功",
+      "Microsoft-Windows-Dhcp-Server/Operational はスコープ作成/変更/削除など構成操作を記録する別チャネル(サービス起動停止ではない)",
+      "Microsoft-Windows-DNS-Server/Audit(Server 2012 R2+、既定有効): 515=レコード追加、516=レコード削除。動的更新由来の作成/削除は519/520で区別され更新元IPも記録",
+      "Security(5136等)のAD DS監査だけでは捕捉できないwpad・DC名の不正登録検知に必須"
+    ],
+    "related": [
+      "adidns",
+      "dclocator",
+      "eventlog",
+      "namepoison",
+      "wpad",
+      "dnsupdateproxy"
+    ]
+  },
+  {
+    "id": "ioctl",
+    "term": "IOCTL / DeviceIoControl (カーネルドライバ通信)",
+    "en": "I/O Control Codes (IOCTL) via DeviceIoControl",
+    "aka": "IOCTLハンドラ, DeviceIoControl API, IRP_MJ_DEVICE_CONTROL, IRP",
+    "cat": "os",
+    "body": "IOCTL(I/O Control Code)は、ユーザーモードのプロセスがカーネルモードのデバイスドライバへ制御コマンドやデータを送受信するための標準的な通信機構である。典型的な流れは、CreateFile でドライバのデバイスオブジェクト(例: \\Device\\Afd)へのハンドルを取得し、DeviceIoControl API に操作を識別する32ビットのIOCTLコードと入出力バッファを渡すと、I/Oマネージャがそのハンドルを基に IRP_MJ_DEVICE_CONTROL 型のIRP(I/O Request Packet)を組み立て、対応するドライバのディスパッチルーチンへ渡す、というものである。バッファの受け渡し方式は METHOD_BUFFERED(カーネルがコピーバッファを介する)や METHOD_NEITHER(ユーザーモードのポインタが未検証のまま渡る)などIOCTLコード自体にエンコードされており、後者は特に危険である。攻撃マップ上、afd.sys の IOCTL EoP(CVE-2023-21768)や CLFS ドライバのBLF操作EoPのような kernel-LPE 技法は、この「低権限プロセスからでも到達可能なIOCTLハンドラの入力検証不備がカーネルメモリ破壊に直結する」という前提の上に成り立っており、IOCTLの仕組みを理解しないとこれらの脆弱性の本質(=ユーザー制御可能なポインタ/サイズがカーネル側で検証されずに使われる)を把握できない。同様にBYOVDでは、署名済みだが脆弱な任意のドライバが公開するIOCTLハンドラを悪用し、カーネル権限での任意アドレス読み書きやプロセス終了保護解除を実現する。",
+    "points": [
+      "CreateFile→ハンドル取得→DeviceIoControl(IOCTLコード指定)→I/OマネージャがIRP_MJ_DEVICE_CONTROL型IRP生成→ドライバのディスパッチルーチンが処理",
+      "IOCTLコード/IRP_MJ_DEVICE_CONTROL(IRPのメジャー機能コード)/DeviceIoControl(ユーザーモードAPI)は厳密には別レイヤだが実務上まとめて「IOCTLハンドラ」と呼ばれる",
+      "バッファリング方式: METHOD_BUFFERED(カーネルコピー)、METHOD_NEITHER(ユーザーポインタ直渡し、要検証)",
+      "afd.sys IOCTL EoP(CVE-2023-21768)、clfs.sys BLF操作EoPなどkernel-LPEの共通前提",
+      "BYOVDは署名済み脆弱ドライバのIOCTLハンドラを悪用しカーネル権限の読み書き/プロセス保護解除を狙う"
+    ],
+    "related": [
+      "userkernel",
+      "syscall",
+      "byovd",
+      "handle"
     ]
   }
 ];

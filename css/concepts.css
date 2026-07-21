@@ -4,19 +4,24 @@
    category nav, concept cards, and the inline-figure (.fig) styling. */
 
 /* top-bar link that matches .iconbtn */
-.navlink { text-decoration: none; display: inline-flex; align-items: center; }
-.navlink:hover { color: var(--ink); border-color: var(--muted); }
 
 /* ---------- category nav ---------- */
-.cat-nav { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-.cat-node {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 10px 13px; border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--panel); color: var(--ink-2); text-decoration: none;
-  font-size: 13px; transition: border-color .16s, color .16s, background .16s;
-}
-.cat-node:hover { background: var(--panel-2); border-color: var(--muted); color: var(--ink); }
+.cat-nav { display: flex; flex-direction: column; gap: 6px; }
+.cat-group { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+.cat-node { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--panel); color: var(--ink-2); border: 0; cursor: pointer; font-size: 13.5px; font-family: inherit; text-align: left; transition: background .16s, color .16s; }
+.cat-node:hover { background: var(--panel-2); color: var(--ink); }
+.cat-node[aria-expanded="true"] { background: var(--panel-2); color: var(--ink); }
+.cat-node .cat-name { flex: 1; font-weight: 600; }
 .cat-node .cat-count { font-family: var(--mono); font-size: 11px; color: var(--faint); background: var(--ground-2); border: 1px solid var(--line-soft); border-radius: 999px; padding: 1px 8px; }
+.cat-node .cat-chevron { color: var(--muted); font-size: 15px; line-height: 1; transition: transform .18s; display: inline-block; }
+.cat-node[aria-expanded="true"] .cat-chevron { transform: rotate(90deg); }
+.cat-sublist { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.cat-sublist[hidden] { display: none; }
+.cat-sub { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 7px 14px 7px 34px; background: transparent; border: 0; border-top: 1px solid var(--line-soft); cursor: pointer; text-align: left; font-family: inherit; color: var(--ink-2); font-size: 12.5px; transition: background .14s, color .14s; }
+.cat-sub:first-child { border-top: 0; }
+.cat-sub:hover { background: var(--panel-2); color: var(--ink); }
+.cat-sub .cat-sub-term { font-weight: 500; }
+.cat-sub .cat-sub-en { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
 
 /* ---------- section ---------- */
 .c-section { margin: 40px 0 8px; scroll-margin-top: 96px; }

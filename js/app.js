@@ -106,6 +106,28 @@ window.AD = window.AD || {};
 
   function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
 
+  /* ---- phase spine accordion (kill-chain TOC) ---- */
+  function togglePhase(pid) {
+    var panel = document.getElementById("ptoc-" + pid);
+    var wasOpen = panel && !panel.hidden;
+    document.getElementById("spine-toc").hidden = true;
+    document.querySelectorAll(".ptoc").forEach(function (p) { p.hidden = true; });
+    document.querySelectorAll(".phase-node").forEach(function (n) { n.setAttribute("aria-expanded", "false"); });
+    if (!wasOpen) {
+      if (panel) panel.hidden = false;
+      var node = document.querySelector('.phase-node[data-phase="' + pid + '"]');
+      if (node) node.setAttribute("aria-expanded", "true");
+      document.getElementById("spine-toc").hidden = false;
+    }
+  }
+
+  function gotoTech(cid) {
+    var el = document.getElementById(cid);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  }
+
   /* ---- event wiring (bound once; survives re-render/lang-switch) ---- */
   function wire() {
     document.querySelectorAll(".segmented button").forEach(function (b) {
@@ -125,6 +147,10 @@ window.AD = window.AD || {};
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-close]")) { AD.modal.close(); return; }
       if (e.target.closest("#clearFilters, #clearFilters2")) { clearFilters(); return; }
+      var pn = e.target.closest(".phase-node");
+      if (pn && pn.dataset.phase) { togglePhase(pn.dataset.phase); return; }
+      var gt = e.target.closest("[data-goto]");
+      if (gt) { gotoTech(gt.getAttribute("data-goto")); return; }
       var ex = e.target.closest("[data-expand]");
       if (ex) { AD.modal.open(ex.getAttribute("data-expand")); return; }
       var dg = e.target.closest(".diagram");
