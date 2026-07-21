@@ -60,8 +60,8 @@ window.AD = window.AD || {};
     box(60,222,190,44,{t:'ntoskrnl.exe',s:'Executive / Kernel',cls:'off'}) +
     box(270,222,190,44,{t:'Drivers (.sys)',s:'file, net, GPU…',cls:'off'}) +
     box(480,222,180,44,{t:'HAL',s:'hardware layer',cls:'off'}) +
-    arr(360,154,360,196,{kind:'', t:'syscall (int 0x2e / syscall)  ↓  return  ↑', dy:-2}) +
-    txt(50,172,'trap / transition boundary — only the kernel touches hardware & other processes','lbl'),
+    arr(360,154,360,196,{kind:'', t:'syscall ↓ / return ↑', dy:-2}) +
+    txt(360,296,'境界はシステムコール(syscall)。カーネルのみがハードウェアと全プロセスへアクセスできる','lbl','middle'),
     'User mode Ring 3 and kernel mode Ring 0 separation');
 
   /* ---- Access token ---- */
@@ -87,7 +87,7 @@ window.AD = window.AD || {};
     txt(360,120,'S-1-5-21-1466...-1177...-2451...-1104','mono2','middle') +
     txt(645,132,'↑ RID','lbl','middle') +
     box(40,150,300,44,{t:'Well-known: S-1-5-18 = SYSTEM',mono:true}) +
-    box(360,150,320,44,{t:'RID 500=Administrator · 512=Domain Admins · 502=krbtgt',mono:true,cls:'def'}),
+    box(360,150,320,44,{t:'500=Admin · 512=Domain Admins · 502=krbtgt',mono:true,cls:'def'}),
     'SID structure S-1-5-21-domain-RID');
 
   /* ---- Security Descriptor / DACL ---- */
@@ -108,7 +108,7 @@ window.AD = window.AD || {};
   /* ---- Forest / domain / OU tree ---- */
   F.forest = svg(720, 320,
     txt(360,24,'Active Directory logical structure','figt','middle') +
-    box(280,42,160,40,{t:'Forest',s:'schema · config · Enterprise Admins',cls:'pur'}) +
+    box(266,42,188,40,{t:'Forest',s:'schema · config · Enterprise Admins',cls:'pur'}) +
     arr(360,82,200,110,{}) + arr(360,82,540,110,{}) +
     box(120,110,160,40,{t:'Domain tree A',s:'corp.local',cls:'def'}) +
     box(460,110,160,40,{t:'Domain tree B',s:'other.local',cls:'def'}) +
@@ -381,7 +381,7 @@ window.AD = window.AD || {};
     txt(360,24,'DLL 探索順とハイジャック','figt','middle') +
     box(30,54,150,46,{t:'foo.exe',s:'foo.dll を要求',cls:'pur'}) +
     txt(210,50,'探索順（既定・SafeDllSearchMode有効時）','lbl') +
-    box(210,64,86,34,{t:'① EXEのフォルダ',mono:true}) +
+    box(210,64,86,34,{t:'① EXEフォルダ',mono:true}) +
     box(304,64,80,34,{t:'② System32',mono:true}) +
     box(392,64,70,34,{t:'③ System',mono:true}) +
     box(470,64,80,34,{t:'④ Windows',mono:true}) +
@@ -438,6 +438,233 @@ window.AD = window.AD || {};
     txt(360,220,'Autoruns で棚卸し。多くは 4657(レジストリ変更)/Sysmon 13 や新規サービス 7045 で検知','lbl','middle'),
     'Autostart extension points');
 
+  /* ---- Normal process tree / ancestry ---- */
+  F.proctree = svg(760, 380,
+    txt(380,24,'正常なプロセス系譜(親子関係)','figt','middle') +
+    box(310,40,140,32,{t:'System (PID 4)',s:'カーネル'}) +
+    arr(380,72,380,90,{}) +
+    box(310,90,140,34,{t:'smss.exe',s:'セッションマネージャ'}) +
+    arr(360,124,190,148,{}) + arr(400,124,590,148,{}) +
+    box(100,148,180,34,{t:'wininit.exe',s:'セッション0'}) +
+    box(500,148,180,34,{t:'winlogon.exe',s:'対話セッション'}) +
+    arr(190,182,105,206,{}) + arr(190,182,270,206,{}) +
+    box(30,206,150,34,{t:'services.exe',s:'SCM',cls:'def'}) +
+    box(200,206,140,34,{t:'lsass.exe',s:'LSA / 資格情報',cls:'def'}) +
+    arr(105,240,95,264,{}) + arr(105,240,260,264,{}) +
+    box(20,264,150,34,{t:'svchost.exe -k',s:'共有サービス',mono:true}) +
+    box(185,264,150,34,{t:'spoolsv.exe 等',s:'サービス'}) +
+    arr(590,182,590,206,{}) +
+    box(500,206,180,34,{t:'userinit.exe',s:'(即終了)'}) +
+    arr(590,240,590,264,{}) +
+    box(500,264,180,34,{t:'explorer.exe',s:'デスクトップ'}) +
+    arr(590,298,590,320,{}) +
+    box(500,320,180,32,{t:'cmd / powershell',s:'ユーザーのシェル'}) +
+    box(20,312,320,54,{cls:'off'}) +
+    txt(180,330,'異常シグナル(要調査)','bt','middle') +
+    txt(180,348,'lsass親≠wininit・引数なしsvchost','lbl','middle') +
+    txt(180,362,'Office製品→powershell 等','lbl','middle'),
+    'Normal Windows process tree');
+
+  /* ---- Alert triage / confusion matrix ---- */
+  F.triage = svg(620, 300,
+    txt(310,24,'トリアージと混同行列(FP / TP / FN / TN)','figt','middle') +
+    txt(275,60,'アラート発報 (+)','lbl','middle') + txt(445,60,'発報なし (−)','lbl','middle') +
+    box(200,72,150,66,{t:'TP 真陽性',s:'脅威を正しく検知',cls:'def'}) +
+    box(360,72,150,66,{t:'FN 偽陰性',s:'検知漏れ=最も危険',cls:'off'}) +
+    box(200,146,150,66,{t:'FP 偽陽性',s:'誤検知(工数浪費)',cls:'off'}) +
+    box(360,146,150,66,{t:'TN 真陰性',s:'正常を正常と判定'}) +
+    txt(192,112,'悪性','lbl','end') + txt(192,186,'正常','lbl','end') +
+    txt(310,244,'流れ: 発報 → エンリッチ → 検証 → エスカレ / クローズ','lbl','middle') +
+    txt(310,270,'FP多発=アラート疲れ→TP見落とし。チューニングで精度改善','lbl','middle'),
+    'Triage confusion matrix');
+
+  /* ---- Pyramid of Pain ---- */
+  F.pyramid = svg(640, 340,
+    txt(320,24,'痛みのピラミッド(Pyramid of Pain)','figt','middle') +
+    box(240,70,160,38,{t:'TTPs',s:'最も困難',cls:'off'}) +
+    box(200,110,240,38,{t:'ツール',s:'困難',cls:'pur'}) +
+    box(160,150,320,38,{t:'ネットワーク/ホストアーティファクト',s:'煩わしい',cls:'def'}) +
+    box(120,190,400,38,{t:'ドメイン名',s:'単純',cls:'def'}) +
+    box(80,230,480,38,{t:'IP アドレス',s:'簡単'}) +
+    box(40,270,560,38,{t:'ハッシュ値',s:'些細'}) +
+    arr(24,300,24,96,{kind:'off'}) +
+    txt(16,302,'易','lbl','middle') + txt(16,92,'難','lbl','middle') +
+    txt(320,326,'下=変更容易で陳腐化 / 上=検知で攻撃者に最大の痛み(IOA・TTP検知が有効)','lbl','middle'),
+    'Pyramid of Pain');
+
+  /* ---- Diamond Model ---- */
+  F.diamondmodel = svg(560, 342,
+    txt(280,24,'ダイヤモンドモデル(侵入分析)','figt','middle') +
+    box(210,48,140,40,{t:'Adversary',s:'敵対者',cls:'off'}) +
+    box(385,152,150,46,{t:'Capability',s:'能力 / TTP',cls:'pur'}) +
+    box(210,258,140,40,{t:'Victim',s:'被害者',cls:'def'}) +
+    box(25,152,150,46,{t:'Infrastructure',s:'C2 / ドメイン / IP',cls:'pur'}) +
+    arr(345,86,452,152,{}) + arr(452,198,348,258,{}) + arr(215,258,110,198,{}) + arr(110,152,215,86,{}) +
+    txt(280,322,'1頂点から辺をたどり他頂点へピボット(相関・帰属)。Kill Chain / ATT&CK と相補','lbl','middle'),
+    'Diamond Model of Intrusion Analysis');
+
+  /* ---- Logon events / logon types ---- */
+  F.logonevents = svg(720, 320,
+    txt(360,24,'ログオンイベントと Logon Type','figt','middle') +
+    box(30,44,160,40,{t:'4624',s:'ログオン成功',cls:'def'}) +
+    box(200,44,160,40,{t:'4625',s:'ログオン失敗',cls:'off'}) +
+    box(370,44,150,40,{t:'4634 / 4647',s:'ログオフ'}) +
+    box(530,44,160,40,{t:'4648',s:'明示的資格情報',cls:'pur'}) +
+    txt(62,112,'Type','lbl','middle') + txt(150,112,'意味','lbl') + txt(360,112,'攻撃 / トリアージ観点','lbl') +
+    box(40,120,44,28,{t:'2',mono:true}) + txt(100,139,'対話(コンソール)','lbl') + txt(360,139,'コンソール / 物理アクセス','lbl') +
+    box(40,156,44,28,{t:'3',mono:true,cls:'off'}) + txt(100,175,'ネットワーク','lbl') + txt(360,175,'PtH・SMB共有・横展開の主戦場','lbl') +
+    box(40,192,44,28,{t:'9',mono:true,cls:'off'}) + txt(100,211,'NewCredentials','lbl') + txt(360,211,'runas /netonly・PtH の痕跡','lbl') +
+    box(40,228,44,28,{t:'10',mono:true,cls:'off'}) + txt(100,247,'RemoteInteractive','lbl') + txt(360,247,'RDP — 侵害時の主要経路','lbl') +
+    box(40,264,44,28,{t:'5',mono:true}) + txt(100,283,'サービス','lbl') + txt(360,283,'サービス実行(7045と相関)','lbl'),
+    'Logon events and logon types');
+
+  /* ---- Account / group management events ---- */
+  F.acctmgmtevents = svg(700, 300,
+    txt(350,24,'アカウント / グループ管理イベント','figt','middle') +
+    lane(24,44,330,150,'アカウント操作 (Security)','') +
+    box(36,74,140,30,{t:'4720',s:'ユーザー作成',cls:'def'}) +
+    box(186,74,156,30,{t:'4726',s:'ユーザー削除'}) +
+    box(36,110,140,30,{t:'4722 / 4725',s:'有効化 / 無効化'}) +
+    box(186,110,156,30,{t:'4738',s:'アカウント変更'}) +
+    box(36,146,306,30,{t:'4740',s:'ロックアウト(スプレー副作用)',cls:'off'}) +
+    lane(370,44,306,150,'グループ加入','') +
+    box(382,74,282,30,{t:'4728',s:'グローバルグループへ追加',cls:'def'}) +
+    box(382,110,282,30,{t:'4732 / 4756',s:'ローカル / ユニバーサル',cls:'def'}) +
+    box(382,146,282,30,{t:'特権グループ加入=最優先',s:'Domain / Enterprise Admins',cls:'off'}) +
+    box(24,212,652,42,{cls:'off'}) +
+    txt(350,228,'典型シグネチャ','bt','middle') +
+    txt(350,246,'4720(ユーザー作成) → 4728(Domain Admins 加入)= 攻撃者の特権アカウント作成','lbl','middle'),
+    'Account and group management events');
+
+  /* ---- Email authentication SPF/DKIM/DMARC ---- */
+  F.emailauth = svg(720, 290,
+    txt(360,24,'メール認証(SPF / DKIM / DMARC)','figt','middle') +
+    box(180,50,520,44,{t:'DNS 公開レコード',s:'SPF(TXT)・DKIM公開鍵・DMARCポリシー(p=none/quarantine/reject)'}) +
+    arr(250,94,250,120,{dash:true}) + arr(430,94,430,120,{dash:true}) + arr(620,94,620,120,{dash:true}) +
+    box(24,120,110,48,{t:'送信サーバ',s:'From: 差出人'}) +
+    arr(134,144,180,144,{kind:'off'}) +
+    box(180,120,140,48,{t:'SPF',s:'送信元IPを検証',cls:'def'}) +
+    arr(320,144,360,144,{kind:'off'}) +
+    box(360,120,140,48,{t:'DKIM',s:'署名を検証',cls:'def'}) +
+    arr(500,144,540,144,{kind:'off'}) +
+    box(540,120,160,48,{t:'DMARC',s:'整合性 + ポリシー',cls:'pur'}) +
+    txt(360,210,'解析: Authentication-Results と From / Return-Path / Reply-To の不一致を確認','lbl','middle') +
+    txt(360,236,'DMARC=reject でも類似ドメイン・表示名詐称・正規ドメイン侵害は通り得る','lbl','middle'),
+    'Email authentication SPF DKIM DMARC');
+
+  /* ---- Ransomware operator kill chain ---- */
+  F.ransomware = svg(760, 206,
+    txt(380,22,'ランサムウェアの運用型キルチェーン','figt','middle') +
+    box(20,50,96,48,{t:'初期侵入',cls:'off'}) +
+    box(126,50,96,48,{t:'探索'}) +
+    box(232,50,96,48,{t:'権限昇格'}) +
+    box(338,50,96,48,{t:'横展開'}) +
+    box(444,50,96,48,{t:'持ち出し'}) +
+    box(550,50,96,48,{t:'暗号化',cls:'off'}) +
+    box(656,50,96,48,{t:'恐喝',cls:'off'}) +
+    arr(116,74,126,74,{}) + arr(222,74,232,74,{}) + arr(328,74,338,74,{}) + arr(434,74,444,74,{}) + arr(540,74,550,74,{}) + arr(646,74,656,74,{}) +
+    box(20,116,520,30,{t:'← 検知の勝機:暗号化前に止める',cls:'def'}) +
+    box(550,116,202,30,{t:'暗号化・恐喝=手遅れ',cls:'off'}) +
+    txt(380,178,'二重恐喝=暗号化前にデータ窃取し公開を脅迫。RaaSで分業、正規ツール(PsExec/GPO)で全社展開','lbl','middle'),
+    'Ransomware operator kill chain');
+
+  /* ---- Malware taxonomy ---- */
+  F.malwaretypes = svg(720, 300,
+    txt(360,24,'マルウェア分類(機能別)','figt','middle') +
+    box(20,50,216,60,{t:'ローダー / ドロッパー',s:'次段を取得・実行'}) +
+    box(252,50,216,60,{t:'RAT',s:'遠隔操作'}) +
+    box(484,50,216,60,{t:'インフォスティーラー',s:'資格情報 / Cookie 窃取',cls:'off'}) +
+    box(20,120,216,60,{t:'ボット / ボットネット',s:'C2配下で一斉操作'}) +
+    box(252,120,216,60,{t:'ランサムウェア',s:'暗号化・恐喝',cls:'off'}) +
+    box(484,120,216,60,{t:'ワイパー',s:'データ破壊',cls:'off'}) +
+    box(20,190,216,60,{t:'ルートキット / ブートキット',s:'隠蔽・持続'}) +
+    box(252,190,216,60,{t:'バンキング型',s:'金融詐取'}) +
+    box(484,190,216,60,{t:'クリプトマイナー',s:'資源悪用'}) +
+    txt(360,282,'スティーラーのセッションCookie窃取はMFAを迂回→駆除+資格情報 / トークン失効まで対応','lbl','middle'),
+    'Malware taxonomy');
+
+  /* ---- Remote service execution / lateral movement ---- */
+  F.remoteexec = svg(720, 290,
+    txt(360,24,'リモートサービス実行・管理共有','figt','middle') +
+    box(24,110,150,64,{t:'攻撃元',s:'管理者権限 / PtH',cls:'off'}) +
+    arr(174,142,250,142,{kind:'off',t:'SMB 445',dy:-6}) +
+    box(250,84,220,34,{t:'PsExec',s:'ADMIN$へ配置→SCMで起動',cls:'off'}) +
+    box(250,126,220,34,{t:'WMIExec',s:'Win32_Process.Create',cls:'off'}) +
+    box(250,168,220,34,{t:'DCOM / SMBExec',s:'COM / 名前付きパイプ',cls:'off'}) +
+    arr(470,101,514,120,{kind:'off'}) + arr(470,143,514,150,{kind:'off'}) + arr(470,185,514,180,{kind:'off'}) +
+    box(516,80,178,150,{cls:'def'}) + txt(605,100,'標的ホスト','bt','middle') +
+    box(526,112,158,26,{t:'ADMIN$ / C$ / IPC$',mono:true}) +
+    box(526,144,158,26,{t:'services.exe (SCM)'}) +
+    box(526,176,158,26,{t:'WmiPrvSE.exe'}) +
+    txt(360,258,'検知: 5140/5145(共有)・7045/4697(サービス)・4624 Type3・WmiPrvSE配下の子。PtHと併用','lbl','middle'),
+    'Remote service execution');
+
+  /* ---- AD CS ESC escalation ---- */
+  F.adcsesc = svg(720, 292,
+    txt(360,24,'AD CS ドメイン昇格(ESC)','figt','middle') +
+    num(89,88,'1') + num(249,88,'2') + num(419,88,'3') + num(594,88,'4') +
+    box(24,100,130,56,{t:'低権限ユーザー',s:'一般ドメイン',cls:'off'}) +
+    arr(154,128,174,128,{kind:'off'}) +
+    box(174,100,150,56,{t:'脆弱な設定',s:'テンプレ / CA / 登録EP',cls:'off'}) +
+    arr(324,128,344,128,{kind:'off'}) +
+    box(344,100,150,56,{t:'証明書要求',s:'SAN に DA を指定',cls:'off'}) +
+    arr(494,128,514,128,{kind:'off'}) +
+    box(514,100,160,56,{t:'PKINIT 認証',s:'高権限として認証',cls:'pur'}) +
+    box(24,190,160,30,{t:'ESC1: SAN任意指定'}) +
+    box(194,190,160,30,{t:'ESC6: CA側でSAN付与'}) +
+    box(364,190,150,30,{t:'ESC8: NTLMリレー'}) +
+    box(524,190,150,30,{t:'ESC13: OID→グループ'}) +
+    txt(360,254,'証明書は失効/パスワード変更に強く永続的。監視: 4886/4887・異常SAN・Web登録へのNTLM','lbl','middle'),
+    'AD CS ESC escalation');
+
+  /* ---- Hybrid authentication methods ---- */
+  F.hybridauth = svg(740, 310,
+    txt(370,24,'ハイブリッド認証方式(PHS / PTA / フェデレーション)','figt','middle') +
+    box(40,44,150,34,{t:'オンプレ AD'}) +
+    arr(190,61,550,61,{kind:'',t:'Entra Connect 同期',dy:-4}) +
+    box(550,44,150,34,{t:'Entra ID'}) +
+    box(24,100,226,156,{cls:'def'}) + txt(137,122,'PHS(ハッシュ同期)','bt','middle') +
+    txt(36,148,'ADハッシュのハッシュを','lbl') + txt(36,166,'Entraへ同期→クラウド認証','lbl') +
+    box(36,192,202,50,{cls:'off'}) + txt(137,210,'攻撃対象','bs','middle') + txt(137,228,'同期サーバ / MSOL_アカウント','lbl','middle') +
+    box(258,100,224,156,{cls:'def'}) + txt(370,122,'PTA(パススルー)','bt','middle') +
+    txt(270,148,'オンプレエージェントが','lbl') + txt(270,166,'認証を中継(ハッシュ無)','lbl') +
+    box(270,192,200,50,{cls:'off'}) + txt(370,210,'攻撃対象','bs','middle') + txt(370,228,'悪性エージェントで資格情報傍受','lbl','middle') +
+    box(490,100,226,156,{cls:'pur'}) + txt(603,122,'フェデレーション','bt','middle') +
+    txt(502,148,'オンプレIdPがトークンに','lbl') + txt(502,166,'署名(ADFS 等)','lbl') +
+    box(502,192,202,50,{cls:'off'}) + txt(603,210,'攻撃対象','bs','middle') + txt(603,228,'署名証明書窃取→Golden SAML','lbl','middle') +
+    txt(370,286,'Entra Connect サーバはテナント全体に直結する Tier0 資産','lbl','middle'),
+    'Hybrid authentication methods');
+
+  /* ---- noPac / sAMAccountName spoofing ---- */
+  F.nopac = svg(720, 264,
+    txt(360,22,'noPac / sAMAccountName スプーフィング','figt','middle') +
+    box(24,54,200,54,{t:'① マシンアカウント作成',s:'MAQ=10 で誰でも可'}) +
+    box(260,54,200,54,{t:'② DC名へ改名',s:'sAMAccountName=DC01',cls:'off'}) +
+    box(496,54,200,54,{t:'③ TGT 取得',s:'改名アカウントで'}) +
+    arr(224,81,260,81,{kind:'off'}) + arr(460,81,496,81,{kind:'off'}) +
+    arr(596,108,596,144,{kind:'off'}) +
+    box(496,144,200,54,{t:'④ アカウント削除/改名',s:'DC01 を解決不能に',cls:'off'}) +
+    box(260,144,200,54,{t:'⑤ KDC が $ を補完',s:'実在 DC01$ になりすまし',cls:'off'}) +
+    box(24,144,200,54,{t:'⑥ DCSync',s:'ドメイン掌握',cls:'off'}) +
+    arr(496,171,460,171,{kind:'off'}) + arr(260,171,224,171,{kind:'off'}) +
+    txt(360,232,'CVE-2021-42278 + 42287 の連鎖。監視: 4741/4742/4781(旧名末尾$→DC名)。対策: KB5008102+380, MAQ=0','lbl','middle'),
+    'noPac sAMAccountName spoofing');
+
+  /* ---- Potato / SeImpersonate ---- */
+  F.potato = svg(700, 282,
+    txt(350,22,'Potato 系:SeImpersonate による SYSTEM 昇格','figt','middle') +
+    box(24,96,158,64,{t:'低特権サービス',s:'SeImpersonate 保有',cls:'off'}) +
+    arr(182,128,238,128,{kind:'off',t:'①誘発',dy:-6}) +
+    box(238,96,196,64,{t:'攻撃者エンドポイント',s:'名前付きパイプ / RPC / DCOM',cls:'off'}) +
+    box(238,196,196,48,{t:'SYSTEMコンポーネント',s:'spoolss / EFSRPC 等'}) +
+    arr(336,196,336,160,{kind:'',t:'②SYSTEM認証',dy:2}) +
+    arr(434,128,490,128,{kind:'off',t:'③トークン',dy:-6}) +
+    box(490,96,186,64,{t:'SYSTEMトークン',s:'SeImpersonateで偽装',cls:'off'}) +
+    arr(583,160,583,196,{kind:'off'}) +
+    box(490,196,186,48,{t:'④ SYSTEMで実行',s:'任意プロセス起動',cls:'off'}) +
+    txt(350,266,'変種は誘発手段の差(PrintSpoofer/GodPotato/EfsPotato…)。監視:4673/4674・異常な名前付きパイプ(Sysmon17/18)','lbl','middle'),
+    'Potato SeImpersonate privilege escalation');
+
   // map several concept ids to the shared figures
   AD.FIGS = {
     userkernel: F.userkernel,
@@ -472,6 +699,24 @@ window.AD = window.AD || {};
     dllhijack: F.dllhijack,
     bloodhound: F.bloodhound,
     entraroles: F.cloudauthz, azurerbac: F.cloudauthz, graphapi: F.cloudauthz, pim: F.cloudauthz,
-    asep: F.asep, ifeo: F.asep
+    asep: F.asep, ifeo: F.asep,
+    // --- added (SOC/AD deep-dive) ---
+    proctree: F.proctree, ppidspoof: F.proctree,
+    dll: F.dllhijack,
+    triage: F.triage,
+    pyramid: F.pyramid,
+    diamondmodel: F.diamondmodel,
+    logonevents: F.logonevents,
+    acctmgmtevents: F.acctmgmtevents,
+    emailauth: F.emailauth,
+    ransomware: F.ransomware,
+    malwaretypes: F.malwaretypes,
+    remoteexec: F.remoteexec,
+    adcsesc: F.adcsesc,
+    hybridauth: F.hybridauth,
+    nopac: F.nopac,
+    potato: F.potato,
+    reflectiveload: F.procinjection,
+    unconstrained: F.delegation
   };
 })(window.AD);

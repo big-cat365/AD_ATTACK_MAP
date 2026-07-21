@@ -38,7 +38,8 @@ AD.CONCEPTS.ja = [
       "userkernel",
       "token",
       "lsass",
-      "integrity"
+      "integrity",
+      "proctree"
     ]
   },
   {
@@ -58,7 +59,8 @@ AD.CONCEPTS.ja = [
       "privilege",
       "integrity",
       "uac",
-      "logonsession"
+      "logonsession",
+      "ppidspoof"
     ]
   },
   {
@@ -181,7 +183,8 @@ AD.CONCEPTS.ja = [
       "dpapi",
       "kerberos",
       "nthash",
-      "token"
+      "token",
+      "skeletonkey"
     ]
   },
   {
@@ -212,20 +215,22 @@ AD.CONCEPTS.ja = [
     "en": "Windows Registry",
     "aka": "HKLM, HKCU, hive, key/value",
     "cat": "os",
-    "body": "Windowsレジストリは、OSとアプリケーションの構成・セキュリティポリシー・資格情報素材を格納する階層型データベースで、キー/サブキー/値(名前・型・データ)から構成される。主要ルートはHKLM(マシン全体)、HKCU(現在ユーザー)、HKU、HKCR、HKCC。物理的には%SystemRoot%\\System32\\config配下のハイブファイル(SYSTEM, SOFTWARE, SECURITY, SAM)とユーザープロファイルのNTUSER.datに保存される。攻撃者は自動実行キー(HKLM/HKCU\\...\\Run、Winlogon、サービス定義HKLM\\SYSTEM\\CurrentControlSet\\Services)を永続化に悪用し、SAM/SECURITYハイブから資格情報を窃取する。各キーはセキュリティ記述子(DACL/SACL)で保護され、SACL設定でアクセス監査が可能。",
+    "body": "Windowsレジストリは、OSとアプリケーションの構成・セキュリティポリシー・資格情報素材を格納する階層型データベースで、キー/サブキー/値(名前・型・データ)から構成される。主要ルートはHKLM(マシン全体)、HKCU(現在ユーザー)、HKU、HKCR、HKCC。物理的には%SystemRoot%\\System32\\config配下のハイブファイル(SYSTEM/SOFTWARE/SECURITY/SAM/DEFAULT)、およびユーザープロファイルのNTUSER.dat(HKCU)とUsrClass.dat(HKCR/HKCU\\Software\\Classes)に永続化される。各ハイブは変更を先行記録するトランザクションログ(<ハイブ名>.LOG1/.LOG2、トランザクショナルレジストリはconfig\\TxR配下の.regtrans-ms/.blf(CLFS形式))を伴い、reg save/RegRipper/ハイブパーサによるオフライン解析で削除キーや未コミットの直近改変を復元できる。HKLM\\HARDWARE等は揮発性で対応ファイルを持たず起動ごとにメモリ上へ再構築される。攻撃者は自動実行キー(Run、Winlogon、Services)で永続化し、SAM/SECURITYハイブから資格情報を窃取する。各キーはDACL/SACLで保護され、Sysmon EID 12/13/14で監視できる。",
     "points": [
-      "ルートキー: HKLM, HKCU, HKU, HKCR, HKCC",
-      "ハイブファイル: SYSTEM/SOFTWARE/SECURITY/SAM + NTUSER.dat",
-      "永続化の要注意キー: ...\\CurrentVersion\\Run, Winlogon, Services",
-      "各キーはDACL/SACLで保護(Sysmon EID 12/13/14で監視)",
-      "値の型: REG_SZ, REG_DWORD, REG_BINARY, REG_MULTI_SZ 等"
+      "ルートキー: HKLM / HKCU / HKU / HKCR / HKCC",
+      "ハイブファイル: %SystemRoot%\\System32\\config の SYSTEM/SOFTWARE/SECURITY/SAM/DEFAULT + NTUSER.dat/UsrClass.dat",
+      "トランザクションログ: <ハイブ>.LOG1/.LOG2 と config\\TxR の .regtrans-ms/.blf(CLFS)= 復元源",
+      "揮発性ハイブ HKLM\\HARDWARE はファイル無しで起動時にメモリ再構築",
+      "オフライン解析: reg save / RegRipper / hiveパーサで削除キー・未コミット改変を復元",
+      "永続化キー Run/Winlogon/Services; DACL/SACL保護、監視 Sysmon EID 12/13/14"
     ],
     "related": [
       "sam",
       "service",
       "secdesc",
       "dacl",
-      "sacl"
+      "sacl",
+      "uacbypass"
     ]
   },
   {
@@ -247,7 +252,8 @@ AD.CONCEPTS.ja = [
       "process",
       "privilege",
       "gmsa",
-      "smb"
+      "smb",
+      "remoteexec"
     ]
   },
   {
@@ -313,7 +319,8 @@ AD.CONCEPTS.ja = [
       "rpc",
       "ntlm",
       "netntlm",
-      "wmi"
+      "wmi",
+      "remoteexec"
     ]
   },
   {
@@ -335,7 +342,8 @@ AD.CONCEPTS.ja = [
       "smb",
       "process",
       "wef",
-      "sysmon"
+      "sysmon",
+      "remoteexec"
     ]
   },
   {
@@ -388,12 +396,14 @@ AD.CONCEPTS.ja = [
     "en": "Security Principal",
     "aka": "user, group, computer, service — anything with a SID",
     "cat": "identity",
-    "body": "セキュリティプリンシパル（Security Principal）とは、SIDを付与され、認証を経てアクセス制御の対象になり得るエンティティのことで、ユーザー、コンピューター（マシンアカウント）、グループ、および一部のサービスアカウントが該当する。Windowsのアクセス制御は、プリンシパルのSIDをアクセストークンに載せ、それをオブジェクトのセキュリティ記述子内のDACLと突き合わせることで許可/拒否を判定する。ドメイン環境ではプリンシパルはActive Directoryに格納され、フォレスト全体でSIDにより一意に識別される。プリンシパルを正しく理解することは、権限昇格や横展開が「どのSIDが何にアクセスできるか」に帰着するため、SOC分析の基礎となる。",
+    "body": "セキュリティプリンシパル(Security Principal)とは、SIDを付与され、認証を経てアクセス制御の主体になり得るエンティティで、ユーザー、コンピューター(マシンアカウント)、セキュリティグループ、および組込みの特殊アカウントが該当する。Windowsのアクセス制御は、プリンシパルのSID群をアクセストークンに載せ、オブジェクトのセキュリティ記述子内のDACLと突き合わせて許可/拒否を判定する。重要な点として、トークンに載りアクセス制御に効くのはセキュリティ有効グループのSIDのみで、配布(distribution)グループはメール配信専用でSIDによる権限付与には使われない。組込みのwell-knownプリンシパルにはSYSTEM(S-1-5-18)、LocalService(S-1-5-19)、NetworkService(S-1-5-20)、Everyone(S-1-1-0)、Authenticated Users(S-1-5-11)、Administrators(S-1-5-32-544)などがある。フォレスト/ドメイン信頼を越えた参照では、相手側プリンシパルがForeign Security Principals(FSP)コンテナにSIDとして格納される。権限昇格・横展開は結局「どのSIDが何にアクセスできるか」に帰着するため、プリンシパルの理解はSOC分析の基礎となる。",
     "points": [
-      "SIDを持ちアクセス制御の主体になり得るのがプリンシパル",
-      "種類: ユーザー / コンピューター / グループ / サービスアカウント",
-      "認証後、SID群はアクセストークンに格納される",
-      "DACL評価でトークン内SIDと突き合わせて可否判定"
+      "種類: ユーザー / コンピューター / セキュリティグループ / 組込み特殊アカウント(いずれもSID保有)",
+      "SIDでアクセス制御に効くのはセキュリティ有効グループのみ; 配布グループはトークン非搭載",
+      "well-knownプリンシパル: SYSTEM(S-1-5-18), LocalService(S-1-5-19), NetworkService(S-1-5-20)",
+      "Everyone(S-1-1-0), Authenticated Users(S-1-5-11), Administrators(S-1-5-32-544)",
+      "認証後、SID群はアクセストークンに格納→DACL評価で可否判定",
+      "信頼越えの参照は Foreign Security Principals(FSP)コンテナにSIDで格納"
     ],
     "related": [
       "sid",
@@ -409,13 +419,14 @@ AD.CONCEPTS.ja = [
     "en": "Security Identifier (SID)",
     "aka": "S-1-5-21-...-RID, objectSid",
     "cat": "identity",
-    "body": "SID（Security Identifier）は、セキュリティプリンシパルを一意に識別する可変長の値で、S-1-<識別子権限>-<サブ権限...>-<RID> という構造を持つ（例: S-1-5-21-<ドメイン識別子>-<RID>）。先頭の「S」はリテラル、「1」はリビジョン、「5」はNT Authorityを表す識別子権限で、ドメインアカウントでは 21 に続く3つの32ビット値がドメインを一意化する識別子、末尾のRIDが個々のプリンシパルを表す。ADオブジェクトでは objectSid 属性に格納され、名前変更やOU間移動を行ってもSIDは不変で、DACL/SACLやトークン、Kerberos PACの中で参照される。SIDの偽装や履歴（SID History）悪用は権限昇格・横展開の典型手口であり、分析上必ず理解すべき識別子である。",
+    "body": "SID(Security Identifier)は、セキュリティプリンシパルを一意に識別する可変長の値で、S-1-<識別子権限(authority)>-<サブ権限...>-<RID> という構造を持つ。先頭のSはリテラル、1はリビジョン、続く識別子権限は例えば1=World、5=NT Authority、16=Mandatory Label(整合性レベル)を表す。ドメインアカウントでは S-1-5-21 に続く3つの32ビット値がドメインを一意化する識別子、末尾のRIDが個々のプリンシパルを表す。RIDには予約値があり、500=Administrator、501=Guest、502=krbtgt、512=Domain Admins、513=Domain Users、518=Schema Admins、519=Enterprise Admins、520=Group Policy Creator Owners で、通常作成されるプリンシパルのRIDは1000以降となる。ADオブジェクトでは objectSid 属性に格納され、名前変更やOU間移動を行ってもSIDは不変で、DACL/SACL・アクセストークン・Kerberos PACの中で参照される。SIDの偽装や履歴(SID History)悪用は権限昇格・信頼越えの典型手口である。",
     "points": [
-      "構造: S-1-<権限>-<サブ権限>-<RID>、ドメインは S-1-5-21-...",
-      "S=リテラル、1=リビジョン、5=NT Authority",
-      "AD属性 objectSid に格納、名前変更・移動でも不変",
-      "DACL/SACL・アクセストークン・Kerberos PACで参照される",
-      "SID History悪用は権限昇格・信頼越えの手口"
+      "構造: S-1-<authority>-<サブ権限>-<RID>、ドメインは S-1-5-21-<ドメイン識別子>-RID",
+      "識別子権限の例: 1=World, 5=NT Authority, 16=Mandatory Label(整合性)",
+      "予約RID(アカウント): 500=Administrator, 501=Guest, 502=krbtgt",
+      "予約RID(グループ): 512=Domain Admins, 513=Domain Users, 519=Enterprise Admins, 518=Schema Admins, 520=GPCO",
+      "通常プリンシパルのRIDは1000以降; objectSid属性に格納され名前変更・移動でも不変",
+      "DACL/SACL・アクセストークン・Kerberos PACで参照; SID History悪用に注意"
     ],
     "related": [
       "rid",
@@ -431,13 +442,14 @@ AD.CONCEPTS.ja = [
     "en": "Relative Identifier (RID)",
     "aka": "500 Administrator, 512 Domain Admins, 502 krbtgt",
     "cat": "identity",
-    "body": "RID（Relative Identifier）は、SIDの末尾に付く相対的な数値で、同一ドメイン（またはローカルSAM）内でプリンシパルを一意に区別する部分である。既定のアカウントには固定RIDが割り当てられており、500=Administrator、501=Guest、502=krbtgt、512=Domain Admins、513=Domain Users、519=Enterprise Admins などは分析上必ず覚えるべき値である。1000未満は組み込み用に予約され、通常のユーザー・グループには1000以降が付与される。ドメインでは各DCがRID Master（FSMOの一つ）から割り当てられたRIDプールを消費してSIDを発行するため、RID枯渇や、SYSTEM権限でSAMを書き換えて低権限アカウントに末尾500を付与するRIDハイジャック攻撃（隠れた管理者化）も監視対象となる。",
+    "body": "RID（Relative Identifier）は、SIDの末尾に付く相対的な数値で、同一ドメイン（またはローカルSAM）内でプリンシパルを一意に区別する部分である（完全なSIDは S-1-5-21-<ドメイン識別子>-<RID>）。既定アカウントには固定RIDが割り当てられ、500=Administrator、501=Guest、502=krbtgt のほか、グループでは 512=Domain Admins、513=Domain Users、516=Domain Controllers、518=Schema Admins、519=Enterprise Admins、520=Group Policy Creator Owners、498=Enterprise RODCs、521=RODCs、526=Key Admins、527=Enterprise Key Admins など、Tier-0監視に必須の値が並ぶ。1000未満は組み込み予約で、通常のユーザー・グループには1000以降が付与される。各DCはRID Master（FSMOの一つ）から配布されたRIDプール（既定500刻み）を消費してSIDを発行するため、RID枯渇も運用監視対象になる。攻撃面では、SYSTEM権限でSAMハイブを改ざんし低権限アカウントの末尾RIDを500に書き換えるRIDハイジャック（隠れ管理者化）が既知で、Andariel等の実例がある。",
     "points": [
+      "完全SID構造: S-1-5-21-<ドメイン識別子>-<RID>、1000未満は組み込み予約",
       "固定RID: 500 Administrator / 501 Guest / 502 krbtgt",
-      "512 Domain Admins / 513 Domain Users / 519 Enterprise Admins",
-      "1000未満は組み込み予約、通常アカウントは1000以降",
-      "RID Master（FSMO）がDCにRIDプールを割り当て",
-      "RIDハイジャック(SAM改ざんで500付与)は隠れ管理者化の手口"
+      "グループ: 512 Domain Admins / 513 Domain Users / 516 Domain Controllers / 518 Schema Admins / 519 Enterprise Admins / 520 GPO Creator Owners",
+      "RODC/Key系: 498 Enterprise RODCs / 521 RODCs / 526 Key Admins / 527 Enterprise Key Admins",
+      "RID Master(FSMO)がRIDプール(既定500刻み)をDCへ配布し枯渇も監視対象",
+      "RIDハイジャック: HKLM\\SAM\\SAM\\Domains\\Account\\Users\\<RID>\\F の offset 0x30 を little-endian で 0x1F4(=500) に改ざん (要SYSTEM、Andariel事例)"
     ],
     "related": [
       "sid",
@@ -453,13 +465,14 @@ AD.CONCEPTS.ja = [
     "en": "Well-known SID",
     "aka": "S-1-1-0 Everyone, S-1-5-18 SYSTEM, S-1-5-32-544",
     "cat": "identity",
-    "body": "Well-known SID（既知のSID）は、すべてのWindowsシステムで値が一定に定められた特別なSIDで、汎用的なユーザー・グループ・論理的主体を表す。代表例として S-1-1-0（Everyone）、S-1-5-11（Authenticated Users）、S-1-5-18（Local System / SYSTEM）、S-1-5-19（Local Service）、S-1-5-20（Network Service）、および組み込みドメイン S-1-5-32 配下の S-1-5-32-544（Administrators）、S-1-5-32-545（Users）などがある。これらはドメインやマシンに依存せず一定なため、DACLやログ、トークン分析で即座に意味を読み取れることが重要である。特に Everyone や Authenticated Users を含む緩いACEは、意図しない広範アクセスを生む設定ミスの兆候として着目される。",
+    "body": "Well-known SID（既知のSID）は、すべてのWindowsで値が一定に定められた特別なSIDで、汎用的なユーザー・グループ・論理的主体を表す。ログオン文脈では S-1-1-0（Everyone）、S-1-5-7（Anonymous）、S-1-5-11（Authenticated Users）、S-1-5-2（Network）、S-1-5-4（Interactive）、S-1-5-9（Enterprise Domain Controllers）があり、サービス系は S-1-5-18（Local System / SYSTEM）/19（Local Service）/20（Network Service）である。組み込みドメイン S-1-5-32 配下には S-1-5-32-544（Administrators）/545（Users）に加え、権限昇格経路として重要な 548（Account Operators）/549（Server Operators）/550（Print Operators）/551（Backup Operators）/554（Pre-Windows 2000 Compatible Access）/555（Remote Desktop Users）が並ぶ。さらに完全性レベルは authority 16 で表され、S-1-16-4096（Low）/8192（Medium）/12288（High）/16384（System）が SACL 内のラベルとして使われる。値がドメイン・マシン非依存で一定なため、DACL/SACL・トークン・4662等のログを即座に読み解ける点が重要で、Everyone/Authenticated Users を含む緩ACEは設定ミスの兆候となる。",
     "points": [
-      "S-1-1-0 = Everyone、S-1-5-11 = Authenticated Users",
-      "S-1-5-18 = SYSTEM、S-1-5-19 = Local Service、S-1-5-20 = Network Service",
-      "組み込みドメイン S-1-5-32、S-1-5-32-544 = Administrators",
-      "値は全システムで一定でドメイン非依存",
-      "Everyone/Authenticated Users を含む緩ACEは設定ミスの兆候"
+      "ログオン文脈: S-1-1-0 Everyone / S-1-5-7 Anonymous / S-1-5-11 Authenticated Users / S-1-5-2 Network / S-1-5-4 Interactive / S-1-5-9 Enterprise DCs",
+      "サービス: S-1-5-18 SYSTEM / S-1-5-19 Local Service / S-1-5-20 Network Service",
+      "組み込み S-1-5-32: 544 Administrators / 545 Users / 548 Account Ops / 549 Server Ops / 551 Backup Ops / 555 Remote Desktop Users",
+      "昇格に直結する組み込み群: Backup/Server/Account/Print Operators, 554 Pre-Windows 2000 Compatible Access",
+      "完全性レベル(authority 16): S-1-16-4096 Low / 8192 Medium / 12288 High / 16384 System (SACLのラベル)",
+      "値はドメイン非依存で一定、緩ACE(Everyone/Authenticated Users)は設定ミスの兆候"
     ],
     "related": [
       "sid",
@@ -1035,13 +1048,14 @@ AD.CONCEPTS.ja = [
     "en": "User Object",
     "aka": "userAccountControl, memberOf, pwdLastSet, attributes",
     "cat": "objects",
-    "body": "ユーザーオブジェクト(objectClass=user)はADに登録された人間のアカウントで、認証・認可の主体(セキュリティプリンシパル)となる。objectSid、sAMAccountName、userPrincipalName、pwdLastSet(Windows FILETIME、0はログオン時変更必須)などの属性を持ち、ビットマスク属性 userAccountControl でアカウント状態(無効化・委任信頼・事前認証不要など)が制御される。memberOf はグループの member 属性から自動的に維持されるバックリンク(リンク属性)であり、権限監査ではこの2つを併せて確認する必要がある。",
+    "body": "ユーザーオブジェクト(objectClass=user、継承は top→person→organizationalPerson→user)は AD に登録された人間のアカウントで、認証・認可の主体(セキュリティプリンシパル)となる。objectSid、sAMAccountName、userPrincipalName、pwdLastSet(Windows FILETIME、0 は次回ログオン時変更必須)などの属性を持つ。要となる userAccountControl はビットマスクで、代表値は ACCOUNTDISABLE=0x2(無効)、PASSWD_NOTREQD=0x20、DONT_EXPIRE_PASSWORD=0x10000、NORMAL_ACCOUNT=0x200、TRUSTED_FOR_DELEGATION=0x80000(非制約委任)、DONT_REQ_PREAUTH=0x400000(事前認証不要=ASREP-Roasting 対象)、TRUSTED_TO_AUTH_FOR_DELEGATION=0x1000000(制約委任/プロトコル遷移)。特に委任系(0x80000/0x1000000)や事前認証不要(0x400000)のビットが立つアカウントは直接攻撃面になる。memberOf はグループの member 属性から自動維持されるバックリンク(リンク属性)であり、権限監査では UAC ビットと memberOf を併せて確認する必要がある。ログオン追跡には複製される lastLogonTimestamp と各 DC ローカルの lastLogon の違いにも注意する。",
     "points": [
-      "objectClass=user、RID(SIDの末尾)は通常1000以上",
-      "userAccountControl はビットマスク(例:ACCOUNTDISABLE=0x2)",
-      "pwdLastSet=0 は次回ログオン時パスワード変更必須",
-      "memberOf は member 属性から自動維持されるバックリンク",
-      "対象攻撃:Kerberoasting、ASREP-Roasting、パスワードスプレー"
+      "継承: top→person→organizationalPerson→user、RID(SID 末尾)は通常 1000 以上",
+      "UAC 主要ビット: ACCOUNTDISABLE=0x2、PASSWD_NOTREQD=0x20、DONT_EXPIRE_PASSWORD=0x10000",
+      "攻撃対応ビット: DONT_REQ_PREAUTH=0x400000(ASREP)、TRUSTED_FOR_DELEGATION=0x80000(非制約委任)、TRUSTED_TO_AUTH_FOR_DELEGATION=0x1000000(制約委任)",
+      "pwdLastSet=0 は次回ログオン時パスワード変更必須(FILETIME)",
+      "memberOf は member から自動維持されるバックリンク",
+      "SPN を持つユーザーは Kerberoasting、UAC 0x400000 は ASREP-Roasting の標的"
     ],
     "related": [
       "principal",
@@ -1354,7 +1368,8 @@ AD.CONCEPTS.ja = [
       "tgt",
       "st",
       "krbtgt",
-      "pac"
+      "pac",
+      "nopac"
     ]
   },
   {
@@ -1517,13 +1532,13 @@ AD.CONCEPTS.ja = [
     "en": "SSPI / SSP",
     "aka": "Negotiate, Kerberos/NTLM/Digest, security package",
     "cat": "auth",
-    "body": "SSPI (Security Support Provider Interface) は、Windows がアプリケーションに認証・完全性・機密性サービスを提供する統一 API で、その裏で実際の処理を担うプラグインを SSP (Security Support Provider) と呼ぶ。代表的 SSP には Kerberos、NTLM、Negotiate(SPNEGO)、Digest、Schannel(TLS)、CredSSP があり、Negotiate は Kerberos が使えれば Kerberos を、駄目なら NTLM を選択する。アプリは GSS-API に類する SSPI 呼び出しで認証を委ね、プロトコル差を意識しなくて済む。攻撃・防御の観点では、Negotiate 経由の NTLM フォールバックや、LSASS 内で SSP が扱う資格情報が主要な関心事となる。",
+    "body": "SSPI (Security Support Provider Interface) は、Windows がアプリケーションに認証・完全性・機密性サービスを提供する統一 API で、その裏で実際の処理を担うプラグインを SSP (Security Support Provider) と呼ぶ。代表的 SSP には Kerberos、NTLM、Negotiate(SPNEGO)、Digest、Schannel(TLS)、CredSSP があり、Negotiate は Kerberos が使えれば Kerberos を、駄目なら NTLM を選択する。SSP は %windir%\\System32 の DLL として実装され、LSASS が読み込む対象は HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\Security Packages(REG_MULTI_SZ、および OSConfig\\Security Packages)に列挙される。攻撃者はこの仕組みを悪用し、独自の悪性 SSP を登録して平文資格情報を窃取・永続化できる。ディスク永続化では mimikatz の mimilib.dll をドロップして Security Packages に登録し、捕捉した平文資格情報を C:\\Windows\\System32\\kiwissp.log に記録する。misc::memssp は再起動で消えるインメモリ注入で、既定ログは mimilsa.log となる。上記レジストリ値の変更や当該ログ生成の監視が防御の要となる(MITRE ATT&CK T1547.005)。",
     "points": [
-      "SSPI = API、SSP = 実装プラグイン",
-      "主な SSP: Kerberos / NTLM / Negotiate / Digest / Schannel / CredSSP",
-      "Negotiate(SPNEGO)が Kerberos↔NTLM を選択",
-      "LSASS が SSP と資格情報をホスト",
-      "Negotiate 経由の NTLM フォールバックが弱点"
+      "SSPI = API、SSP = 実装プラグイン(Kerberos/NTLM/Negotiate/Digest/Schannel/CredSSP)",
+      "Negotiate(SPNEGO)が Kerberos↔NTLM を選択、NTLM フォールバックが弱点",
+      "SSP DLL は %windir%\\System32、登録は HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\Security Packages(REG_MULTI_SZ)",
+      "悪性 SSP 永続化: mimilib.dll ドロップ→Security Packages 登録(kiwissp.log)/ misc::memssp はインメモリ(mimilsa.log)、T1547.005",
+      "検知: 当該レジストリ値の変更監視 + kiwissp.log / mimilsa.log の生成監視"
     ],
     "related": [
       "kerberos",
@@ -1552,7 +1567,8 @@ AD.CONCEPTS.ja = [
       "spn",
       "tgt",
       "uacflags",
-      "kerberos"
+      "kerberos",
+      "unconstrained"
     ]
   },
   {
@@ -1574,7 +1590,8 @@ AD.CONCEPTS.ja = [
       "kerberos",
       "st",
       "spn",
-      "pac"
+      "pac",
+      "nopac"
     ]
   },
   {
@@ -1637,7 +1654,8 @@ AD.CONCEPTS.ja = [
       "template",
       "pki",
       "pkinit",
-      "eku"
+      "eku",
+      "adcsesc"
     ]
   },
   {
@@ -1679,7 +1697,8 @@ AD.CONCEPTS.ja = [
       "ca",
       "eku",
       "san",
-      "authnz"
+      "authnz",
+      "adcsesc"
     ]
   },
   {
@@ -1744,7 +1763,8 @@ AD.CONCEPTS.ja = [
       "tgt",
       "pac",
       "adcs",
-      "certmapping"
+      "certmapping",
+      "adcsesc"
     ]
   },
   {
@@ -1942,7 +1962,8 @@ AD.CONCEPTS.ja = [
       "dpapi",
       "adds",
       "nthash",
-      "tenant"
+      "tenant",
+      "hybridauth"
     ]
   },
   {
@@ -2008,7 +2029,8 @@ AD.CONCEPTS.ja = [
       "lsass",
       "sysmon",
       "wef",
-      "etw"
+      "etw",
+      "eventlogclear"
     ]
   },
   {
@@ -2052,7 +2074,9 @@ AD.CONCEPTS.ja = [
       "auditpolicy",
       "process",
       "namedpipe",
-      "lsass"
+      "lsass",
+      "dnslogging",
+      "logonevents"
     ]
   },
   {
@@ -2095,7 +2119,8 @@ AD.CONCEPTS.ja = [
       "sam",
       "registry",
       "dcsync",
-      "dc"
+      "dc",
+      "ntfsart"
     ]
   },
   {
@@ -2221,7 +2246,8 @@ AD.CONCEPTS.ja = [
       "byovd",
       "credguard",
       "abusableprivs",
-      "procinjection"
+      "procinjection",
+      "vbs"
     ]
   },
   {
@@ -2242,7 +2268,8 @@ AD.CONCEPTS.ja = [
       "token",
       "tokentheft",
       "byovd",
-      "lsass"
+      "lsass",
+      "potato"
     ]
   },
   {
@@ -2374,7 +2401,8 @@ AD.CONCEPTS.ja = [
       "pth",
       "credman",
       "protectedusers",
-      "paw"
+      "paw",
+      "credssp"
     ]
   },
   {
@@ -2383,12 +2411,13 @@ AD.CONCEPTS.ja = [
     "en": "Windows Server Update Services",
     "aka": "WSUS, 更新配布",
     "cat": "os",
-    "body": "WSUSはMicrosoft更新プログラムを組織内に集中配布するサーバ機能で、クライアントとの通信は既定でHTTP 8530/HTTPS 8531を用いる。1台のWSUSサーバが配下の全クライアント/サーバに更新(=任意コード)をSYSTEM権限で配信できるため、ネットワーク分離を越えた横展開の踏み台になり、SharpWSUS/WSUSpenduは正規署名済みバイナリ(PsExec等)を悪性コマンド付きで承認・配信するWSUS注入攻撃を自動化する。SSL未強制のWSUSはWSUSpectによる中間者攻撃で偽更新を注入され得る。CVE-2025-59287(GetCookie/AuthorizationCookieのBinaryFormatter及びReportingWebServiceの安全でないデシリアライズによる未認証RCE、SYSTEM権限、CVSS9.8)は2025年10月に実際に悪用された。防御はWSUSのHTTPS/署名強制、8530/8531の遮断、迅速なパッチ適用。",
+    "body": "WSUSはMicrosoft更新プログラムを組織内に集中配布するサーバ機能で、クライアントとの通信は既定でHTTP 8530/HTTPS 8531を用い、クライアント側の接続先はレジストリ HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate の WUServer/WUStatusServer に、有効化フラグはサブキー \\AU の UseWUServer=1 に格納される。承認済み更新やターゲット情報はデータベースSUSDBで管理され、既定のWIDでは %WinDir%\\WID\\Data\\SUSDB.mdf/SUSDB_log.ldf に置かれる(別途SQL Server構成も可)。1台のWSUSサーバが配下の全クライアント/サーバに更新(=任意コード)をSYSTEM権限で配信できるためネットワーク分離を越えた横展開の踏み台になり、SharpWSUS/WSUSpenduは署名済み正規バイナリ(PsExec等)を悪性引数付きで承認・配信するWSUS注入を自動化し、SSL未強制のWSUSはWSuspicious/WSUSpectのMITMで偽更新を注入され得る。CVE-2025-59287(GetCookie/AuthorizationCookie及びReportingWebServiceのBinaryFormatterによる安全でないデシリアライズ、未認証RCE、SYSTEM、CVSS9.8)は2025年10月に実際に悪用された。検出はapprove/create+/payload:や/updateid:を含むコマンドライン、承認ユーザ\"WUS Server\"、削除後もWSUS web root配下に残る署名済みバイナリが手掛かりで、防御はHTTPS/署名強制・8530/8531インバウンド遮断・迅速なパッチ適用。",
     "points": [
       "通信は既定HTTP 8530/HTTPS 8531、更新はSYSTEM権限で実行され横展開に悪用",
-      "ツール: SharpWSUS, WSUSpendu, WSUSpect(SSL未強制時のMITM)",
-      "WSUS注入は署名済み正規バイナリ(PsExecなど)+悪性引数で承認・配信",
+      "クライアント設定はレジストリ HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate の WUServer/WUStatusServer、有効化はサブキー \\AU の UseWUServer=1。DBはSUSDB(既定WID: %WinDir%\\WID\\Data\\SUSDB.mdf、またはSQL Server)",
+      "ツール: SharpWSUS, WSUSpendu, WSuspicious/WSUSpect(SSL未強制時のMITM)。注入は署名済み正規バイナリ(PsExec等)+悪性引数で承認・配信",
       "CVE-2025-59287: WSUSの安全でないデシリアライズ(GetCookie/ReportingWebService)による未認証RCE(SYSTEM、CVSS9.8、2025年10月に実悪用)",
+      "検出: approve/create+/payload:/updateid: を含むコマンドライン、承認ユーザ\"WUS Server\"、WSUS web root配下に残る署名済みバイナリ、SUSDBの不審な承認",
       "対策: HTTPS/署名強制、8530/8531のインバウンド遮断、迅速なパッチ適用"
     ],
     "related": [
@@ -2821,11 +2850,13 @@ AD.CONCEPTS.ja = [
     "en": "msDS-KeyCredentialLink / Key Trust",
     "aka": "Shadow Credentials,KeyCredential,NGC key,Whisker",
     "cat": "objects",
-    "body": "msDS-KeyCredentialLinkは、ユーザーやコンピュータオブジェクトに紐づく公開鍵資格情報(KeyCredential、Windows Hello for Business/NGCのキートラスト用公開鍵)を格納する多値属性である。この属性への書込権限(GenericWrite/GenericAll等)を得た攻撃者は、自ら生成した鍵ペアの公開鍵を追加することで、対象プリンシパルとしてPKINITによるKerberos事前認証を行いTGTを取得できる。さらにPACに含まれるNTLMハッシュを復元するUnPAC-the-hashにより、パスワードを変更せずにNTハッシュを窃取できるため、ステルス性の高い乗っ取り・永続化手法(シャドウクレデンシャル)となる。Whisker、pyWhisker、DSInternals(Get-ADKeyCredential/Set-ADComputer等)やCertipy(shadowコマンド)が代表的なツールで、書込権限を持つプリンシパルのDACL監査と本属性の変更監視が防御の要である。",
+    "body": "msDS-KeyCredentialLinkは、ユーザーやコンピュータオブジェクトに紐づく公開鍵資格情報(KeyCredential、Windows Hello for Business/NGCのキートラスト用公開鍵)を格納する多値属性である。値はDN-Binary形式(LDAPでは B:<長さ>:<16進>:<DN> の書式)で、KEYCREDENTIALLINK_BLOB構造(バージョン0x00000200)としてDeviceID(GUID)、公開鍵素材(RSA/RawKeyMaterial)、KeyHash、作成日時等をエントリ単位で保持する。この属性への書込権限(GenericWrite/GenericAll等)を得た攻撃者は、自ら生成した鍵ペアの公開鍵を追加することで、対象プリンシパルとしてPKINITによるKerberos事前認証を行いTGTを取得できる。さらにPACに含まれるNTLMハッシュを復元するUnPAC-the-hashにより、パスワードを変更せずにNTハッシュを窃取できるため、ステルス性の高い乗っ取り・永続化手法(シャドウクレデンシャル)となる。検知は本属性への書込を捉えるSecurity Event ID 5136(ディレクトリオブジェクト変更、AttributeLDAPDisplayName=msDS-KeyCredentialLink)が中核だが、ユーザーオブジェクトはDirectory Service Changes監査だけでは記録されず、対象OUにSACLを設定する必要がある点に注意する。正当な書込元はKey Admins/Enterprise Key Admins/Domain Admins、および同期用のAzure AD Connect/AD FSサービスアカウントに限られるため、それ以外のプリンシパルによる変更を異常として相関検知するのが実務上の要となる。",
     "points": [
-      "キートラスト(PKINIT)用の公開鍵を格納する多値属性",
+      "キートラスト(PKINIT)用の公開鍵を格納する多値属性。値はDN-Binary(B:<len>:<hex>:<DN>)、KEYCREDENTIALLINK_BLOB(ver 0x200)にDeviceID(GUID)/公開鍵/KeyHashを保持",
       "書込権限(GenericWrite/GenericAll)→ シャドウクレデンシャル → PKINITで認証",
       "UnPAC-the-hashでNTハッシュも復元可能、パスワード変更不要",
+      "検知: Security Event ID 5136(AttributeLDAPDisplayName=msDS-KeyCredentialLink)。ユーザーオブジェクトはSACL設定が必須、値はB:828…パターン",
+      "正当な書込元はKey Admins/Enterprise Key Admins/Domain Admins・AD Connect/AD FSのみ→他プリンシパルの変更を相関検知",
       "ツール: Whisker / pyWhisker / DSInternals(Get-ADKeyCredential) / Certipy(shadow)"
     ],
     "related": [
@@ -3037,20 +3068,21 @@ AD.CONCEPTS.ja = [
     "en": "Active Directory Federation Services",
     "aka": "ADFS,token-signing certificate,claims provider",
     "cat": "cloud",
-    "body": "Active Directory Federation Services(ADFS)はオンプレADの認証をSAML/WS-Federation/OAuthで外部サービス連携(フェデレーション)に橋渡しするIdPで、発行するSAMLトークンをtoken-signing certificateの秘密鍵で署名する。この署名鍵と、それを保護するDKM(Distributed Key Management)マスターキーはADに保管されており、攻撃者がADFSサーバやDKM鍵を侵害してtoken-signing証明書の秘密鍵を窃取すると、任意ユーザー・任意クレーム(MFA済みを含む)を主張する有効なSAMLトークンを自由に偽造できる。これがGolden SAML攻撃(AADInternals等で実行、SolarWinds事件で悪用)であり、パスワードやMFAを回避してMicrosoft 365等のフェデレーション先へ永続的になりすませる。SOCはADFSサーバへのアクセス、DKM鍵の読み出し、異常なトークン発行を重点監視すべきである。",
+    "body": "Active Directory Federation Services(ADFS)はオンプレADの認証をSAML/WS-Federation/OAuthで外部サービスへ橋渡しするIdPで、発行するSAMLトークンをtoken-signing証明書の秘密鍵で署名する。このtoken-signing証明書とtoken-decryption証明書はADFS構成DBに暗号化保存され、その復号に使うDKM(Distributed Key Management)マスターキーはAD内の CN=ADFS,CN=Microsoft,CN=Program Data,DC=… コンテナ配下のグループ内contactオブジェクトの thumbnailPhoto 属性に格納される。攻撃者がDA権限やDRS(ディレクトリ複製)でこのDKM鍵を読み出しtoken-signing証明書を復号・エクスポートすると、任意ユーザー・任意クレーム(MFA/CAP済みを含む)を主張する有効なSAMLトークンを自由に偽造できる。これがGolden SAML攻撃(AADInternals/ADFSDump/ADFSpoofで実行、SolarWinds事件で悪用)で、パスワードやMFAを回避してMicrosoft 365等へ永続的になりすませる。SOCはDKMコンテナへのアクセス(SACL+Event 4662)、ADFS Adminログのトークン発行(Event 1200)、ADFSサービスアカウントの異常利用を重点監視すべきである。",
     "points": [
-      "SAMLトークンをtoken-signing証明書の秘密鍵で署名するオンプレIdP",
-      "署名鍵保護のDKMマスターキーはADに保管",
-      "Golden SAML: 署名鍵窃取で任意トークン偽造(MFA/CAP回避)",
-      "MITRE ATT&CK: T1606.002 (SAML Tokens)、SolarWinds事件で悪用",
-      "AADInternalsで悪用実証、ADFSサーバとDKM鍵の監視が要"
+      "SAMLトークンをtoken-signing証明書の秘密鍵で署名するオンプレIdP(T1606.002 SAML Tokens)",
+      "復号鍵DKMマスターキーの格納先: CN=ADFS,CN=Microsoft,CN=Program Data 配下 contactオブジェクトの thumbnailPhoto 属性",
+      "Golden SAML: DKM鍵→token-signing証明書窃取で任意トークン偽造(MFA/CAP回避・失効しにくい永続化)",
+      "実行ツール: AADInternals、ADFSDump/ADFSpoof。SolarWinds事件で悪用",
+      "監視: DKMコンテナのSACL監査(Event 4662)、ADFS Admin Event 1200(トークン発行)、DRS複製の異常"
     ],
     "related": [
       "goldensaml",
       "saml",
       "pki",
       "entra",
-      "condaccess"
+      "condaccess",
+      "hybridauth"
     ]
   },
   {
@@ -3137,7 +3169,9 @@ AD.CONCEPTS.ja = [
       "tokens",
       "prt",
       "condaccess",
-      "entralogs"
+      "entralogs",
+      "phishing",
+      "emailauth"
     ]
   },
   {
@@ -3245,7 +3279,8 @@ AD.CONCEPTS.ja = [
       "ntlm",
       "lsass",
       "creddump",
-      "ptt"
+      "ptt",
+      "remoteexec"
     ]
   },
   {
@@ -3341,13 +3376,14 @@ AD.CONCEPTS.ja = [
     "en": "Golden Ticket",
     "aka": "偽造TGT",
     "cat": "prim",
-    "body": "Golden Ticketは、krbtgtアカウントの鍵(NTハッシュまたはAES鍵)を入手した攻撃者が、KDCを介さずに任意の内容のTGT(チケット認可チケット)を偽造する攻撃である。TGTの暗号化とTGT内PAC署名にはkrbtgt鍵が用いられるため、これを知っていれば任意ユーザー・任意グループSID(例: Domain Admins RID 512)・長大な有効期間を持つTGTを自作でき、ドメイン内の全サービスへ実質無制限にアクセスできる。オフライン偽造のため事前認証や標的ユーザーのパスワード変更の影響を受けず、krbtgtパスワードを2回リセットしない限り無効化できないため強力な永続化手段となる。",
+    "body": "Golden Ticketは、krbtgtアカウントの鍵(NTハッシュまたはAES鍵)を入手した攻撃者が、KDCを介さずに任意の内容のTGT(チケット認可チケット)を偽造する攻撃である。TGTの暗号化とTGT内PAC署名にはkrbtgt鍵が用いられるため、これを知っていれば任意ユーザー・任意グループSID(例: Domain Admins RID 512)・長大な有効期間を持つTGTを自作でき、ドメイン内の全サービスへ実質無制限にアクセスできる。オフライン偽造のため事前認証や標的ユーザーのパスワード変更の影響を受けず、krbtgtパスワードを2回リセットしない限り無効化できない強力な永続化手段となる。検知面では、TGTがオフラインで偽造されるため先行するAS-REQ(イベント4768)が存在せず、対応する4768を伴わないTGS-REQ(4769)として観測される点が要となる。加えて4769のTicket Encryption Typeが0x17(AES運用環境でのRC4ダウングレード)や存在しない/不整合なアカウント名が異常兆候となり、さらにドメインの最大チケット有効期間を超える利用・更新(mimikatz既定は約10年。ただし有効期間自体は4769に記録されない)も手掛かりとなるが、実TGTを改変するDiamond Ticketはこの「4768無しの4769」ヒューリスティックを回避する。",
     "points": [
-      "MITRE ATT&CK: T1558.001 (Steal or Forge Kerberos Tickets: Golden Ticket)",
-      "偽造対象はTGT、署名鍵はkrbtgtの鍵(RC4ならNTハッシュ、検知回避にはAES256が使われる)",
-      "失効にはkrbtgtパスワードを短期間に連続2回リセットする必要がある",
-      "代表ツール: mimikatz kerberos::golden、Impacket ticketer.py",
-      "PACに任意SID/SID Historyを埋め込み権限を昇格可能"
+      "MITRE ATT&CK: T1558.001。偽造対象はTGT、署名鍵はkrbtgtの鍵(RC4ならNTハッシュ、AES運用の擬装や検知回避にはAES256)",
+      "PACに任意SID/SID History(例: Domain Admins RID 512)を埋め込み権限昇格、長大な有効期間で永続化",
+      "検知: オフライン偽造のため先行するAS-REQ(4768)が無く、対応する4768を伴わないTGS-REQ(4769)として現れる",
+      "検知: 4769のTicket Encryption Type 0x17(AES環境でのRC4ダウングレード)や存在しない/不整合なアカウント名。有効期間自体は4769に記録されないが、ポリシー超過の利用・更新は手掛かり(mimikatz既定は約10年)",
+      "失効にはkrbtgtパスワードを短時間で連続2回リセット(レプリケーション反映を待って実施)",
+      "代表ツール: mimikatz kerberos::golden、Impacket ticketer.py。実TGTを改変するDiamond Ticketは検知ヒューリスティックを回避"
     ],
     "related": [
       "krbtgt",
@@ -3464,7 +3500,8 @@ AD.CONCEPTS.ja = [
       "netntlm",
       "smbsigning",
       "epa",
-      "coercion"
+      "coercion",
+      "adcsesc"
     ]
   },
   {
@@ -3473,20 +3510,23 @@ AD.CONCEPTS.ja = [
     "en": "Authentication Coercion",
     "aka": "Coercion,forced authentication,PetitPotam,PrinterBug,MS-EFSRPC",
     "cat": "prim",
-    "body": "強制認証(Coercion)は、リモートのWindowsサーバーやドメインコントローラーに実装されたRPCメソッドを呼び出し、標的マシンアカウントに攻撃者制御のホストへNTLM/Kerberos認証を能動的に行わせる手法である。MS-EFSRPC(PetitPotam)、MS-RPRN印刷スプーラー(PrinterBug)、MS-DFSNM(DFSCoerce)、MS-FSRVP(ShadowCoerce)など複数のプロトコルにファイルパス/UNCパスを渡すAPIが存在し、UNC指定でSMB認証を誘発できる。誘発したマシンアカウント認証はNTLMリレーの入力として使われ、特にDCを標的にADCS ESC8やRBCDへ連鎖することでドメイン侵害に至る。",
+    "body": "強制認証(Coercion)は、リモートのWindowsサーバーやDCに実装されたRPCメソッドにUNC/ファイルパスを渡して呼び出し、標的マシンアカウントに攻撃者制御ホストへNTLM/Kerberos認証を能動的に行わせる手法である。MS-EFSRPC(PetitPotam)ではEfsRpcOpenFileRaw / EfsRpcEncryptFileSrv / EfsRpcAddUsersToFile 等、MS-RPRN(PrinterBug)では RpcRemoteFindFirstPrinterChangeNotificationEx など、ファイルパスを受け取るAPIが誘発点となり、既定ではTCP 445のSMB(LSARPC/EFSRPC名前付きパイプ)経由でマシンアカウント認証を発生させる。誘発した認証はNTLMリレーの入力に使われ、特にDCを標的にADCS ESC8やRBCDへ連鎖してドメイン侵害に至る。標的でWebClientサービス(WebDAV)が有効な場合はHTTPでコアースでき、Kerberos認証をLDAP等へクロスプロトコルリレーできる。PetitPotam系はCVE-2021-36942(2021年8月)でEFSRPCの無認証呼び出しが部分的に塞がれたが、他メソッド/他プロトコル(DFSNM/FSRVP)は残存する。",
     "points": [
       "MITRE ATT&CK: T1187 (Forced Authentication)",
       "主なベクタ: MS-EFSRPC(PetitPotam)、MS-RPRN(PrinterBug)、MS-DFSNM(DFSCoerce)、MS-FSRVP(ShadowCoerce)",
-      "代表ツール: PetitPotam、Coercer、SpoolSample、dfscoerce.py",
-      "典型的にDCのマシンアカウント認証を誘発しNTLMリレーへ供給",
-      "対策: 各RPCへのパッチ適用、RPCフィルタ、EPA/署名強制でリレー無効化"
+      "RPCメソッド例: EfsRpcOpenFileRaw / EfsRpcEncryptFileSrv(EFSRPC)、RpcRemoteFindFirstPrinterChangeNotificationEx(RPRN)",
+      "既定でTCP 445(SMB)経由; WebClient有効時はHTTPコアースでKerberosをLDAPへリレー可",
+      "PetitPotamはCVE-2021-36942で部分緩和; 対策はパッチ+RPCフィルタ+EPA/SMB署名でリレー無効化",
+      "代表ツール: PetitPotam, Coercer, SpoolSample, dfscoerce.py"
     ],
     "related": [
       "ntlmrelay",
       "rpc",
       "smb",
       "machineacct",
-      "adcs"
+      "adcs",
+      "unconstrained",
+      "printnightmare"
     ]
   },
   {
@@ -3574,7 +3614,8 @@ AD.CONCEPTS.ja = [
       "adfs",
       "entra",
       "tokens",
-      "entraconnect"
+      "entraconnect",
+      "hybridauth"
     ]
   },
   {
@@ -3583,12 +3624,13 @@ AD.CONCEPTS.ja = [
     "en": "Password Spraying",
     "aka": "Password Spray, スプレー攻撃",
     "cat": "prim",
-    "body": "多数のアカウントに対し、少数(多くは1つ)の推測パスワードを横断的に試すことでアカウントロックアウトを回避する認証攻撃。1アカウントへ多数のパスワードを試すブルートフォースと逆で、ロックアウト閾値の観測周期をまたいで「低頻度・広範囲」に試行するため個々のアカウントでは失敗が目立ちにくい。標的はSMB/LDAP/Kerberos AS-REQ等のオンプレ認証や、OWA/EWS、AD FS、Entra IDのサインインエンドポイントなど広範。検知は単一送信元からの多数アカウントに対する4625(失敗ログオン)の相関、Entraサインインログのエラーコード分析、条件付きアクセス/MFA/スマートロックアウトが要点。",
+    "body": "多数のアカウントに対し、少数(多くは1つ)の推測パスワードを横断的に試すことでアカウントロックアウトを回避する認証攻撃。1アカウントへ多数のパスワードを試すブルートフォースと逆で、ロックアウト閾値の観測周期をまたいで低頻度・広範囲に試行するため個々のアカウントでは失敗が目立ちにくい。標的はSMB/LDAP/Kerberos AS-REQ等のオンプレ認証や、OWA/EWS、AD FS、Entra IDのサインインエンドポイントに及ぶ。オンプレ検知は単一送信元から多数アカウントへの失敗を相関するのが要点で、NTLM系は4625/4776、Kerberos系は4771(事前認証失敗、失敗コード0x18=不正パスワード)を短時間窓で集計する。Entra IDではサインインログのResultType(50126=ユーザー名/パスワード不正、50053=アカウントロックアウト)を分析し、条件付きアクセス/MFA/スマートロックアウトで緩和する。",
     "points": [
       "MITRE ATT&CK: T1110.003(Brute Force: Password Spraying)",
       "特徴: 1パスワード×多アカウント。ロックアウト回避のため低速・広範",
-      "標的例: SMB/LDAP/Kerberos, OWA/EWS, AD FS, Entra ID",
-      "検知: 4625の送信元相関、Entraサインインログ、不可能移動",
+      "標的例: SMB/LDAP/Kerberos AS-REQ, OWA/EWS, AD FS, Entra ID",
+      "オンプレ検知: 4625/4776(NTLM)、4771(Kerberos, 失敗コード0x18)を送信元で相関",
+      "Entra検知: サインインログ ResultType 50126(資格情報不正)/50053(ロックアウト)、不可能移動",
       "緩和: MFA、スマートロックアウト、条件付きアクセス、パスワード強度"
     ],
     "related": [
@@ -3596,7 +3638,9 @@ AD.CONCEPTS.ja = [
       "ntlm",
       "authnz",
       "entralogs",
-      "condaccess"
+      "condaccess",
+      "lockoutpolicy",
+      "logonevents"
     ]
   },
   {
@@ -3662,7 +3706,9 @@ AD.CONCEPTS.ja = [
       "byovd",
       "edr",
       "etw",
-      "asr"
+      "asr",
+      "reflectiveload",
+      "ppidspoof"
     ]
   },
   {
@@ -3684,7 +3730,8 @@ AD.CONCEPTS.ja = [
       "edr",
       "lsass",
       "userkernel",
-      "wdac"
+      "wdac",
+      "vbs"
     ]
   },
   {
@@ -3706,7 +3753,9 @@ AD.CONCEPTS.ja = [
       "xdr",
       "sysmon",
       "etw",
-      "byovd"
+      "byovd",
+      "sandbox",
+      "memforensics"
     ]
   },
   {
@@ -3815,7 +3864,8 @@ AD.CONCEPTS.ja = [
       "mde",
       "siem",
       "threathunting",
-      "iocioa"
+      "iocioa",
+      "deteng"
     ]
   },
   {
@@ -3837,7 +3887,9 @@ AD.CONCEPTS.ja = [
       "edr",
       "procinjection",
       "mde",
-      "wdac"
+      "wdac",
+      "obfuscation",
+      "reflectiveload"
     ]
   },
   {
@@ -3920,7 +3972,8 @@ AD.CONCEPTS.ja = [
       "ppl",
       "creddump",
       "pth",
-      "byovd"
+      "byovd",
+      "vbs"
     ]
   },
   {
@@ -3962,7 +4015,9 @@ AD.CONCEPTS.ja = [
       "mitreattack",
       "advhunting",
       "siem",
-      "sysmon"
+      "sysmon",
+      "deteng",
+      "pyramid"
     ]
   },
   {
@@ -3982,7 +4037,8 @@ AD.CONCEPTS.ja = [
       "threathunting",
       "mitreattack",
       "edr",
-      "advhunting"
+      "advhunting",
+      "pyramid"
     ]
   },
   {
@@ -4002,7 +4058,9 @@ AD.CONCEPTS.ja = [
       "iocioa",
       "threathunting",
       "killchain",
-      "edr"
+      "edr",
+      "pyramid",
+      "purpleteam"
     ]
   },
   {
@@ -4024,7 +4082,9 @@ AD.CONCEPTS.ja = [
       "killchain",
       "iocioa",
       "threathunting",
-      "mitreattack"
+      "mitreattack",
+      "ransomware",
+      "malwaretypes"
     ]
   },
   {
@@ -4089,7 +4149,8 @@ AD.CONCEPTS.ja = [
       "c2",
       "threathunting",
       "iocioa",
-      "lolbin"
+      "lolbin",
+      "ransomware"
     ]
   },
   {
@@ -4142,13 +4203,13 @@ AD.CONCEPTS.ja = [
     "en": "Authentication Policies & Silos",
     "aka": "Authentication Policy Silo,AllowedToAuthenticateFrom,claims",
     "cat": "soc",
-    "body": "認証ポリシーと認証ポリシーサイロは、Windows Server 2012 R2以降で導入されたKerberos保護機構で、アカウントのTGT有効期間(TGT lifetime、既定短縮可)や、そのアカウントがどのホストから認証できるか(AllowedToAuthenticateFrom条件)を制御する。サイロはユーザ・コンピュータ・サービスアカウントをまとめる論理コンテナで、割り当てたポリシーによりメンバーを一括管理し、silo claim(サイロクレーム)を発行してクレーム対応リソースのアクセス制御に利用できる。AllowedToAuthenticateFromの評価にはKerberos Armoring(FAST)が必須で、KDCは認証元ホストの装甲TGT(armored TGT)を用いてアクセスチェックを行うため、DCとクライアント両方でGPOによるarmoring有効化が必要となる。Protected Usersグループと併用し、Tier 0アカウントを特定のPAW/管理ホストからのみ認証可能に制限することで、資格情報の横展開を強力に抑止できる。",
+    "body": "認証ポリシーと認証ポリシーサイロは、Windows Server 2012 R2以降で導入されたKerberos保護機構で、アカウントのTGT有効期間(既定短縮・非更新化)や認証元ホスト(AllowedToAuthenticateFrom条件)を制御する。サイロはユーザ・コンピュータ・サービスアカウントを束ねる論理コンテナで、アカウントへの割り当てはmsDS-AssignedAuthNPolicySilo(サイロ)/msDS-AssignedAuthNPolicy(ポリシー直付け)属性、サイロが参照する適用ポリシーはmsDS-UserAuthNPolicy/msDS-ComputerAuthNPolicy/msDS-ServiceAuthNPolicy属性に保持され、許可条件はms-DS-User(Computer/Service)-Allowed-To-Authenticate-From/ToにSDDL式で格納される。AllowedToAuthenticateFromの評価にはKerberos Armoring(FAST)が必須で、DCとクライアント両方でGPOによるarmoring/claims有効化とWin2012R2以上のドメイン機能レベルが要る。Protected Usersグループと併用し、Tier 0アカウントを特定PAW/管理ホストからのみ認証可能に制限することで資格情報の横展開を強力に抑止する。監視は監査失敗イベント4820(装甲TGTが装置制限で拒否)/4821(サービスチケットが拒否)/4822(Protected Users所属でNTLM拒否)/4823(NTLM認証が制限により拒否)と、DC運用ログのAuthentication Policy失敗イベント105(強制モード)/305(監査モード)を用いる。",
     "points": [
-      "Windows Server 2012 R2以降、TGT有効期間と認証元ホストを制御",
-      "AllowedToAuthenticateFrom評価にはKerberos Armoring(FAST)が必須",
-      "サイロ=User/Computer/Serviceを束ねる論理コンテナ+silo claim発行",
-      "Protected Users併用でTier 0を特定ホストからのみ認証に制限",
-      "要ドメイン機能レベルWin2012R2、KDC/クライアント両方でclaims/armoring有効化"
+      "TGT有効期間(非更新)と認証元ホストを制御、要ドメイン機能レベルWin2012R2・KDC/クライアント両方でclaims/armoring(FAST)有効化",
+      "割り当て属性: msDS-AssignedAuthNPolicySilo / msDS-AssignedAuthNPolicy、サイロ参照ポリシー: msDS-User(Computer/Service)AuthNPolicy",
+      "許可条件はms-DS-User(Computer/Service)-Allowed-To-Authenticate-From/To(SDDL式)に格納",
+      "監視: 4820(TGT拒否)/4821(サービスチケット拒否)/4822(Protected Users所属NTLM拒否)・4823(NTLM制限拒否)、DC運用ログ105(強制)/305(監査モード)",
+      "Protected Users併用でTier 0を特定PAW/管理ホストからのみ認証に制限し横展開を抑止"
     ],
     "related": [
       "kerberos",
@@ -4287,7 +4348,8 @@ AD.CONCEPTS.ja = [
       "dcsync",
       "ntlm",
       "dc",
-      "replication"
+      "replication",
+      "zerologon"
     ]
   },
   {
@@ -4499,7 +4561,8 @@ AD.CONCEPTS.ja = [
       "kdc",
       "tgt",
       "kerberoast",
-      "passwordspray"
+      "passwordspray",
+      "logonevents"
     ]
   },
   {
@@ -4552,20 +4615,22 @@ AD.CONCEPTS.ja = [
     "en": "Prefetch",
     "aka": "*.pf, Prefetch, run count, last run time, PECmd",
     "cat": "logging",
-    "body": "Prefetchは、アプリ起動高速化のためWindowsが生成するキャッシュファイル（C:\\Windows\\Prefetch\\<実行ファイル名>-<パスのハッシュ>.pf）で、実行の強力な証拠となる貴重なフォレンジックアーティファクトである。各.pfには実行回数（run count）、直近の実行時刻（Win8以降は最大8回分）、起動時に参照されたファイル・ディレクトリ一覧が含まれ、いつ・何回・どこから実行されたかの再構成に使える。同名バイナリでもパスが異なればハッシュが変わるため別エントリとなり、ファイル数上限はWin8以降で1024、XP〜Win7で128である（Win10/11では.pf自体がMAM圧縮）。ProcessHollowingやLOLBin悪用の調査で実行有無・回数の裏付けに用いられ、解析にはPECmd等を使う。",
+    "body": "Prefetchは、アプリ起動高速化のためWindowsが生成するキャッシュファイル（C:\\Windows\\Prefetch\\<実行ファイル名>-<パスのハッシュ>.pf）で、実行の強力な証拠となる貴重なフォレンジックアーティファクトである。各.pfには実行回数（run count）、直近の実行時刻（Win8以降は最大8回分）、起動時に参照されたファイル・ディレクトリ一覧が含まれ、いつ・何回・どこから実行されたかの再構成に使える。同名バイナリでもパスが異なればハッシュが変わるため別エントリとなり、ファイル数上限はWin8以降で1024、XP〜Win7で128である。動作はレジストリHKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\\PrefetchParameters の EnablePrefetcher（0=無効/1=アプリのみ/2=ブートのみ/3=両方、クライアントOSは既定3）で制御され、値0への改変はアンチフォレンジックの痕跡となる。重要な注意点として、Windows Serverは既定値2（ブートのみ＝アプリ実行時のPrefetchは生成されない）のため、.pfの不在は非実行の証明にならない。Win10/11では.pf自体がMAMコンテナ内でXPRESS Huffman（COMPRESSION_FORMAT_XPRESS_HUFF, 0x0004）圧縮されており、PECmd等で解凍・解析する。",
     "points": [
       "配置: C:\\Windows\\Prefetch\\NAME-HASH.pf、実行の強力な証拠",
-      "実行回数と直近実行時刻（Win8+で最大8件）を保持",
-      "上限ファイル数: Win8+ 1024 / XP〜7 128、Win10/11はMAM圧縮",
-      "ハッシュは実行パスに基づくためパス違いは別.pf",
-      "解析ツール: PECmd（Eric Zimmerman）"
+      "制御レジストリ: ...\\Memory Management\\PrefetchParameters\\EnablePrefetcher（クライアント既定3、0=無効化=改ざん痕跡）",
+      "Windows Serverは既定値2(ブートのみ/アプリPrefetch無効) → .pf不在=非実行ではない点に注意",
+      "実行回数と直近実行時刻（Win8+で最大8件）、上限 Win8+ 1024 / XP〜7 128",
+      "Win10/11はMAMコンテナ内でXPRESS Huffman(0x0004)圧縮、解析はPECmd(Eric Zimmerman)"
     ],
     "related": [
       "shimcache",
       "amcache",
       "threathunting",
       "iocioa",
-      "lolbin"
+      "lolbin",
+      "userart",
+      "ntfsart"
     ]
   },
   {
@@ -4574,20 +4639,21 @@ AD.CONCEPTS.ja = [
     "en": "DLL Search-Order Hijacking / Sideloading",
     "aka": "DLL search-order hijacking, phantom DLL, DLL sideloading, proxy DLL",
     "cat": "prim",
-    "body": "DLLハイジャック／サイドローディングは、正規プロセスがロードするDLLの検索順序や不在を悪用し、攻撃者のDLLを先に読み込ませて任意コードを正規署名済みプロセスのコンテキストで実行させる手法である。代表的な亜種に、検索順序ハイジャック（DLL search-order hijacking）、本来存在しないDLL名を突く幻DLL（phantom/ghost DLL）、正規の署名済みEXEに攻撃DLLを同梱ディレクトリから読み込ませるサイドローディング、正規DLLへエクスポートを転送するプロキシDLLがある。SafeDllSearchModeやKnownDLLsといった保護があるが、多くのLOLBin/署名バイナリが悪用可能で、EDR回避や永続化に用いられる（MITRE ATT&CK T1574.001/002）。",
+    "body": "DLLハイジャック／サイドローディングは、正規プロセスがロードするDLLの検索順序や不在を悪用し、攻撃者のDLLを先に読み込ませて任意コードを正規署名済みプロセスのコンテキストで実行させる手法である。SafeDllSearchMode有効（既定）時の標準検索順序は、(1)既にメモリにロード済みのDLL →(2)KnownDLLs（HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs 登録分）→(3)実行ファイルのディレクトリ →(4)システムディレクトリ(System32)→(5)16bitシステムディレクトリ(System)→(6)Windowsディレクトリ →(7)カレントディレクトリ(CWD)→(8)PATH環境変数、の順で、攻撃者は(3)以降の書込可能ディレクトリに悪性DLLを植える。代表的な亜種に、検索順序ハイジャック、本来存在しないDLL名を突く幻DLL（phantom/ghost DLL）、正規署名済みEXEに攻撃DLLを同梱ディレクトリから読み込ませるサイドローディング、正規DLLへエクスポートを転送するプロキシDLLがある。SafeDllSearchMode（HKLM\\System\\CurrentControlSet\\Control\\Session Manager\\SafeDllSearchMode を0で無効化するとCWDが前方に繰り上がる）やKnownDLLsが保護となるが、多くのLOLBin/署名バイナリが悪用可能で、EDR回避や永続化に用いられる（MITRE ATT&CK T1574.001/002）。",
     "points": [
-      "署名済み正規プロセスに悪性DLLを読み込ませ実行・防御回避",
+      "検索順序(Safe有効): メモリ→KnownDLLs→アプリDir→System32→System(16bit)→Windows→CWD→PATH",
+      "攻撃点はアプリDir以降の書込可能ディレクトリへの悪性DLL植込み(binary planting)",
       "亜種: search-order / phantom(ghost) / sideloading / proxy DLL",
-      "緩和: SafeDllSearchMode、KnownDLLs、完全パス指定ロード",
-      "MITRE ATT&CK: T1574.001（検索順序）/ T1574.002（サイドロード）",
-      "proxy DLLは正規DLLへエクスポートを転送して機能維持"
+      "緩和: KnownDLLsレジストリ登録、SafeDllSearchMode=1(既定/CWD降格)、完全パス指定ロード",
+      "MITRE ATT&CK: T1574.001（検索順序）/ T1574.002（サイドロード）、proxy DLLは正規DLLへエクスポート転送"
     ],
     "related": [
       "lolbin",
       "asep",
       "procinjection",
       "motw",
-      "byovd"
+      "byovd",
+      "dll"
     ]
   },
   {
@@ -4631,7 +4697,8 @@ AD.CONCEPTS.ja = [
       "kerberoast",
       "dcsync",
       "tiermodel",
-      "threathunting"
+      "threathunting",
+      "discovery"
     ]
   },
   {
@@ -4697,7 +4764,8 @@ AD.CONCEPTS.ja = [
       "condaccess",
       "fido2",
       "entraidp",
-      "aitm"
+      "aitm",
+      "phishing"
     ]
   },
   {
@@ -4763,7 +4831,8 @@ AD.CONCEPTS.ja = [
       "ir",
       "mde",
       "advhunting",
-      "xdr"
+      "xdr",
+      "mttdmttr"
     ]
   },
   {
@@ -4772,13 +4841,13 @@ AD.CONCEPTS.ja = [
     "en": "User-mode API Hooking / Unhooking",
     "aka": "EDR userland hooks, ntdll unhooking, IAT/inline hook, module stomping",
     "cat": "soc",
-    "body": "ユーザーモードAPIフックは、EDRがntdll.dllやkernel32.dll等の重要API（例: NtAllocateVirtualMemory、NtProtectVirtualMemory）の先頭にjmp命令を挿入するインラインフックや、IAT書き換えを行い、呼び出しを自社の監視スタブへ迂回させて挙動を可視化する仕組み。攻撃者側は「アンフック」により、ディスク上やKnownDlls等から取得したクリーンなntdllコピーで改ざん済みコードセクションを上書きし、EDRの監視を無効化する。フックを迂回する直接システムコール（direct/indirect syscall）やモジュールストンピングも関連手法。防御側はセルフフックの整合性監視やカーネルコールバックで補完する。",
+    "body": "ユーザーモードAPIフックは、EDRがntdll.dllやkernel32.dll等の重要API（例: NtAllocateVirtualMemory、NtProtectVirtualMemory）の先頭にjmp命令を挿入するインラインフックや、IAT書き換えを行い、呼び出しを自社の監視スタブへ迂回させて挙動を可視化する仕組み。x64のクリーンなsyscallスタブは `4C 8B D1`(mov r10,rcx) `B8 <SSN>`(mov eax,システムサービス番号) … `0F 05`(syscall) `C3`(ret) という定型バイト列を持ち、フック時は先頭が `E9`(相対jmp)や `FF 25`(間接jmp)へ書き換わるため、これが検知アーティファクトとなる。攻撃者側は「アンフック」により、ディスク上やKnownDlls等から取得したクリーンなntdllコピーで改ざん済み.textセクションを上書きしてEDRの監視を無効化し、フックを迂回する直接/間接システムコール（Hell's Gate/Halo's Gate/SysWhispers等でSSNを動的解決）やモジュールストンピングも併用する。防御側はメモリ上の.textとディスク上の正本のバイト/ハッシュ比較、セルフフックの整合性監視、カーネルコールバックで補完する。",
     "points": [
-      "フック方式: インラインフック(jmpパッチ)、IAT/EATフック",
-      "監視対象例: Nt* メモリ/プロセス操作APIをユーザーランドで捕捉",
-      "アンフック: クリーンなntdll(ディスク/KnownDlls)で.textを復元",
-      "回避併用: direct/indirect syscall、モジュールストンピング",
-      "カーネルコールバックはユーザーモードフック回避に対する補完策"
+      "フック方式: インラインフック(先頭に E9 相対jmp / FF 25 間接jmp をパッチ)、IAT/EATフック",
+      "クリーンなx64 syscallスタブ: 4C 8B D1(mov r10,rcx) / B8 <SSN>(mov eax,SSN) / 0F 05(syscall) / C3(ret)",
+      "検知: メモリ上ntdll .text とディスク/KnownDlls の正本をバイト・ハッシュ比較し、先頭のjmp改変を検出",
+      "アンフック: クリーンntdllで.textを復元。direct/indirect syscallはHell's/Halo's Gate・SysWhispersでSSNを動的解決",
+      "カーネルコールバックやETW/スタックウォークがユーザーモードフック回避への補完策"
     ],
     "related": [
       "edr",
@@ -4882,20 +4951,21 @@ AD.CONCEPTS.ja = [
     "en": "Sigma Rules",
     "aka": "Sigma, generic detection rule format, sigma-to-KQL, detection-as-code",
     "cat": "soc",
-    "body": "Sigmaは、ログベースの検知ロジックをSIEM製品に依存しない汎用フォーマットで記述するためのYAMLベースのオープン標準である。logsource（対象ログ種別）とdetection（フィールド一致条件とcondition）を記述し、pySigma / sigma-cli等のコンバータでMicrosoft Sentinel（KQL）、Splunk（SPL）、Elastic（Lucene/EQL/ES|QL）等の各バックエンドクエリへ変換できる。ネットワーク検知のSnortやファイル検知のYARAに対し「ログ検知のためのSigma」と位置づけられ、detection-as-codeとして検知ルールをGit管理・共有する用途で広く使われる。",
+    "body": "Sigmaは、ログベースの検知ロジックをSIEM製品に依存しない汎用フォーマットで記述するためのYAMLベースのオープン標準である。ルールは title / id(UUID) / status / level / tags などのメタデータと、logsource（対象ログ種別: category・product・service）、detection（検索識別子＋condition）から成る。フィールド値には修飾子をパイプで付与でき（|contains, |startswith, |endswith, |re 正規表現, |base64/|base64offset, |all, |windash 等）、conditionは and/or/not と `1 of selection*` / `all of them` / `1 of them` / near 等で検索識別子を論理結合する。status は stable/test/experimental/deprecated/unsupported、level は informational/low/medium/high/critical の語彙を用いる。pySigma / sigma-cli とパイプライン(フィールドマッピング)でMicrosoft Sentinel(KQL)、Splunk(SPL)、Elastic(Lucene/EQL/ES|QL)等へ変換し、detection-as-codeとしてGit管理・共有する。",
     "points": [
-      "YAML記述、logsource + detection(condition)が中核構造",
-      "pySigma / sigma-cli でKQL・SPL・EQL等へバックエンド変換",
-      "MITRE ATT&CKのtags（technique ID）を付与して整理するのが一般的",
-      "SnortやYARAと並ぶ、汎用検知ルール共有のデファクト",
-      "検知ルールのバージョン管理・CI（detection-as-code）に適する"
+      "ルール骨子: メタデータ(title/id=UUID/status/level/tags) + logsource(category/product/service) + detection(識別子+condition)",
+      "フィールド修飾子(パイプ): |contains・|startswith・|endswith・|re・|base64/|base64offset・|all・|windash",
+      "condition演算子: and/or/not、`1 of selection*`・`all of them`・`1 of them`・near で識別子を結合",
+      "語彙: status=stable/test/experimental/deprecated/unsupported、level=informational/low/medium/high/critical",
+      "pySigma/sigma-cli＋パイプラインでKQL・SPL・EQL等へ変換し、ATT&CK tagsを付与してdetection-as-codeで運用"
     ],
     "related": [
       "siem",
       "advhunting",
       "threathunting",
       "iocioa",
-      "mitreattack"
+      "mitreattack",
+      "deteng"
     ]
   },
   {
@@ -4939,7 +5009,9 @@ AD.CONCEPTS.ja = [
       "soar",
       "siem",
       "cti",
-      "iocioa"
+      "iocioa",
+      "mttdmttr",
+      "memforensics"
     ]
   },
   {
@@ -4961,7 +5033,8 @@ AD.CONCEPTS.ja = [
       "iocioa",
       "threathunting",
       "c2",
-      "killchain"
+      "killchain",
+      "diamondmodel"
     ]
   },
   {
@@ -4984,6 +5057,957 @@ AD.CONCEPTS.ja = [
       "tiermodel",
       "privgroups",
       "breakglass"
+    ]
+  },
+  {
+    "id": "proctree",
+    "term": "正常なプロセスツリー(プロセス系譜)",
+    "en": "Normal Process Tree / Process Ancestry",
+    "aka": "process ancestry, parent-child, PPID, System/smss/csrss/wininit/services/lsass",
+    "cat": "os",
+    "body": "Windows起動時の中核プロセスは決まった親子関係(系譜)で生成され、この「正常形」を知ることが異常検知の土台になる。System(PID 4、カーネル)→smss.exe(セッションマネージャ)→各セッションのcsrss.exeとwininit.exe(セッション0)/winlogon.exe(対話セッション)。wininit.exeの子がservices.exe(SCM)とlsass.exeで、services.exeが多数のsvchost.exe(必ず-k <グループ>引数付き)やspoolsv.exe等を起動する。対話ログオンではwinlogon→userinit(即終了)→explorer.exeとなり、ユーザーのcmd/powershellはexplorer配下に生える。SOCではこの基準線からの逸脱—lsass.exeの親がwininit以外、svchost.exeが引数なし/services.exe以外の親、WINWORD.EXEやOUTLOOK.EXEがpowershell.exeを起動、等—を強い異常シグナルとして扱う。",
+    "points": [
+      "中核系譜: System(4)→smss→wininit→services.exe/lsass.exe(セッション0)",
+      "svchost.exeは必ずservices.exeの子で -k <サービスグループ> 引数付き",
+      "対話: winlogon→userinit(即終了)→explorer.exe→ユーザーのcmd/powershell",
+      "異常例: lsass親がwininit以外、Office製品→powershell、引数なしsvchost",
+      "監視: Sysmon EID1 / Security 4688(親プロセス名・PPID・コマンドライン)"
+    ],
+    "related": [
+      "process",
+      "service",
+      "lsass",
+      "sysmon",
+      "ev4688"
+    ]
+  },
+  {
+    "id": "dll",
+    "term": "DLL(動的リンクライブラリ)",
+    "en": "Dynamic Link Library",
+    "aka": "exports, LoadLibrary, DLL search order, sideloading",
+    "cat": "os",
+    "body": "DLLは複数プロセスが共有する再利用可能なコード/データのモジュールで、エクスポート関数を介して呼び出される。プロセスは静的インポート(PEのインポートテーブル)または実行時のLoadLibrary/GetProcAddressで読み込む。名前だけで指定されたDLLはWindowsの「DLL検索順序」(アプリのディレクトリ→System32→…→PATH)に従って探索されるため、この順序の隙を突くのがDLLサーチオーダーハイジャックやDLLサイドローディング(正規署名EXEに悪性DLLを同梱)である。rundll32.exeは任意DLLの指定エクスポートを実行するLOLBinとして悪用される。SOCでは署名のないDLLの異常な場所からのロードや、既知プロセスによる予期しないDLL読込(Sysmon EID7=Image Loaded)を監視する。",
+    "points": [
+      "エクスポート関数を静的インポート or LoadLibrary/GetProcAddressで解決",
+      "DLL検索順序の隙→サーチオーダーハイジャック/サイドローディング",
+      "rundll32.exeで任意DLLエクスポートを実行(LOLBin)",
+      "監視: Sysmon EID7(Image Loaded)、署名なし/非標準パスのDLL"
+    ],
+    "related": [
+      "dllhijack",
+      "peformat",
+      "process",
+      "lolbin",
+      "sysmon"
+    ]
+  },
+  {
+    "id": "peformat",
+    "term": "PE ファイル形式",
+    "en": "Portable Executable (PE) Format",
+    "aka": "PE header, MZ, sections, IAT, entry point, .text/.data/.rsrc, Authenticode",
+    "cat": "os",
+    "body": "PE(Portable Executable)はWindowsのEXE/DLL/SYS等の実行ファイル形式で、マルウェアトリアージの基本知識となる。先頭のDOSヘッダ(MZシグネチャ)からPE/NTヘッダへつながり、セクション(.text=コード、.data=データ、.rsrc=リソース、.reloc等)、インポートテーブル(使用APIの一覧)、エクスポートテーブル、エントリポイントを含む。アナリストはインポートAPI(例:VirtualAlloc/CreateRemoteThread=注入示唆)、疑わしいセクション名やRWX属性、高エントロピー(パッカー/暗号化の兆候)、コンパイル時刻、埋め込みリソース、Authenticode署名の有無/失効から悪性度を推定する。",
+    "points": [
+      "構造: DOS(MZ)→NTヘッダ→セクション(.text/.data/.rsrc/.reloc)",
+      "インポートAPI(IAT)は挙動推定の手がかり(注入・暗号・通信API)",
+      "高エントロピー/異常セクション=パッカー・暗号化の兆候",
+      "Authenticode署名の有無・失効を確認"
+    ],
+    "related": [
+      "dll",
+      "procinjection",
+      "yara",
+      "sandbox"
+    ]
+  },
+  {
+    "id": "bits",
+    "term": "BITS(バックグラウンド インテリジェント転送サービス)",
+    "en": "Background Intelligent Transfer Service",
+    "aka": "bitsadmin, BITSAdmin, BITS jobs, Start-BitsTransfer, T1197",
+    "cat": "os",
+    "body": "BITSはWindows標準の帯域制御付きファイル転送サービスで、Windows Update等が利用する。攻撃者はbitsadmin.exeやPowerShellのStart-BitsTransferを使い、正規のシステムサービス経由でペイロードをダウンロード(AV/プロキシ検査を透過)したり、BITSジョブのSetNotifyCmdLineで転送完了時に任意コマンドを実行させ永続化する。ジョブはユーザー単位で保存され再起動をまたいで再試行するため、隠れた持続化に悪用される(MITRE ATT&CK T1197)。SOCではbitsadminのコマンドライン、異常なBITSジョブ、BITS-Client運用ログ(EID 59/60/16403)やsvchost経由の異常な外部通信を監視する。",
+    "points": [
+      "正規サービス経由のダウンロードでAV/プロキシ検査を回避(T1197)",
+      "SetNotifyCmdLineで転送完了時にコマンド実行→永続化",
+      "ジョブはユーザー単位で永続・再試行し隠れやすい",
+      "監視: bitsadminコマンドライン、BITS-Client運用ログ(59/60/16403)"
+    ],
+    "related": [
+      "lolbin",
+      "service",
+      "schtask",
+      "c2"
+    ]
+  },
+  {
+    "id": "mutex",
+    "term": "ミューテックス(Mutant)",
+    "en": "Mutex / Mutant Object",
+    "aka": "mutant, named mutex, single-instance marker, vaccine",
+    "cat": "os",
+    "body": "ミューテックス(カーネルオブジェクト名はMutant)は本来スレッド/プロセス間の排他制御に使う同期オブジェクトだが、マルウェアは「多重感染防止マーカー」として固有名の名前付きミューテックスを作成することが多い。同名ミューテックスが既存なら自身を終了することで二重実行を防ぐ。この固有名は強力なホストIOCとなり(例:特定ボットネットの既知ミューテックス名)、YARA/EDRでの検知や、先回りして同名を作成し感染を阻止するワクチンに利用される。SOCではSysmonでは直接取得しづらいが、EDRのカーネルテレメトリやメモリフォレンジック(ハンドル列挙)で観測する。",
+    "points": [
+      "Mutant=排他制御用の同期オブジェクト、名前付きで生成可能",
+      "マルウェアが多重感染防止マーカーに悪用→固有名は強力なホストIOC",
+      "ワクチン(先回り作成)で感染阻止に応用可能",
+      "取得: EDRカーネルテレメトリ/メモリ解析(ハンドル列挙)"
+    ],
+    "related": [
+      "handle",
+      "namedpipe",
+      "yara",
+      "iocioa"
+    ]
+  },
+  {
+    "id": "vbs",
+    "term": "VBS / HVCI(仮想化ベースセキュリティ)",
+    "en": "Virtualization-Based Security / HVCI",
+    "aka": "Virtualization-Based Security, Hypervisor-protected Code Integrity, VSM, VTL, lsaiso, Core Isolation, Memory Integrity",
+    "cat": "os",
+    "body": "VBS(Virtualization-Based Security)はHyper-Vハイパーバイザで通常OS(VTL0)から隔離した安全領域(VTL1/Secure Kernel)を作り、資格情報や整合性検証をそこで守る仕組み。この上でCredential Guardはlsass.exeの秘密(NTLMハッシュ/Kerberos鍵)をlsaiso.exe(隔離LSA)へ退避し、SYSTEM権限のマルウェアでも平文/ハッシュを直接読めなくする。HVCI(Hypervisor-protected Code Integrity、別名メモリ整合性)はカーネルへのコード署名検証を隔離環境で強制し、未署名/改ざんドライバのロードを阻止—BYOVD対策の要となる。Windows 11では既定での有効化が進む。",
+    "points": [
+      "ハイパーバイザでVTL0(通常OS)とVTL1(Secure Kernel)を分離",
+      "Credential Guard: 資格情報をlsaiso.exeへ隔離し直接ダンプを阻止",
+      "HVCI(メモリ整合性): カーネルコード署名を強制→BYOVD対策の要",
+      "Windows 11で既定有効化が進行"
+    ],
+    "related": [
+      "credguard",
+      "byovd",
+      "lsass",
+      "secureboot",
+      "ppl"
+    ]
+  },
+  {
+    "id": "ntfsart",
+    "term": "NTFS フォレンジックアーティファクト",
+    "en": "NTFS Forensic Artifacts ($MFT / USN Journal / $LogFile)",
+    "aka": "MFT, Master File Table, USN Journal, $J, $LogFile, timestomping, MFTECmd",
+    "cat": "logging",
+    "body": "NTFSはファイル操作の痕跡を複数のメタデータファイルに残し、DFIRの中核証跡になる。$MFT(マスターファイルテーブル)は全ファイル/ディレクトリのエントリで、作成/更新/MFT更新/アクセスの各タイムスタンプ(標準情報($SI)と$FILE_NAME($FN)の2組=タイムストンピング検知に有効)、常駐する小ファイルの中身、削除エントリを保持する。$UsnJrnl:$J(USNジャーナル)はファイルの作成/削除/リネーム/書込みを時系列で記録し、削除済みファイルの存在証明に使える。$LogFileはトランザクションログ。攻撃者による自己削除やファイル生成・改ざんの再構成に不可欠で、KAPE等で収集しMFTECmd等で解析する。",
+    "points": [
+      "$MFT: 全ファイルのエントリ+2組のMACタイムスタンプ($SI/$FN)",
+      "タイムストンピング(時刻改ざん)は$SIと$FNの矛盾で検知",
+      "$UsnJrnl:$J: 作成/削除/リネームの時系列→削除済みファイルの証明",
+      "収集/解析: KAPE、MFTECmd、$SI/$FN のMACb比較"
+    ],
+    "related": [
+      "shimcache",
+      "amcache",
+      "prefetch",
+      "vss",
+      "userart"
+    ]
+  },
+  {
+    "id": "userart",
+    "term": "ユーザー活動アーティファクト",
+    "en": "User-Activity Artifacts (LNK / Jump List / ShellBags / RunMRU)",
+    "aka": "LNK files, Jump Lists, ShellBags, RunMRU, RecentDocs, UserAssist, OpenSavePidlMRU",
+    "cat": "logging",
+    "body": "ユーザーのファイル/フォルダ操作やプログラム実行は、レジストリとファイルの各所に痕跡を残し、対話的操作の再構成に使う。LNK(ショートカット)とジャンプリストは開いたファイルのパス・タイムスタンプ・ボリューム情報を保持し、外部USBや削除済みファイルの利用を示す。ShellBags(レジストリ)は閲覧したフォルダの表示設定を残しフォルダアクセス履歴を示す。RunMRU(Win+R実行履歴)、OpenSavePidlMRU(ファイルダイアログ履歴)、RecentDocs、UserAssist(GUIプログラム実行回数)なども対話操作の裏付けになる。これらは実行証跡(prefetch/amcache)と組み合わせ、「誰が・何を・いつ操作したか」を立証する。",
+    "points": [
+      "LNK/ジャンプリスト: 開いたファイルのパス・時刻・ボリューム(USB痕跡)",
+      "ShellBags: フォルダ閲覧履歴(削除済みフォルダも)",
+      "RunMRU/UserAssist/RecentDocs: 対話的実行・操作の裏付け",
+      "実行系(prefetch/amcache)と併用し操作主体・時系列を立証"
+    ],
+    "related": [
+      "ntfsart",
+      "prefetch",
+      "amcache",
+      "shimcache"
+    ]
+  },
+  {
+    "id": "triage",
+    "term": "トリアージと FP/TP/FN",
+    "en": "Alert Triage & FP/TP/FN",
+    "aka": "false positive, true positive, false negative, true negative, alert fatigue, tuning, 誤検知, 検知漏れ",
+    "cat": "soc",
+    "body": "トリアージはSOCに流入する大量アラートを優先度付けし、正検知(TP)か誤検知(FP)かを迅速に判定してエスカレーション/クローズする一次分析活動である。判定は混同行列で整理される—TP(真陽性:実際の脅威を正しく検知)、FP(偽陽性:脅威でないのに発報=誤検知)、FN(偽陰性:脅威を見逃し=検知漏れ、最も危険)、TN(真陰性:正常を正常と判定)。FPが多いとアラート疲れ(alert fatigue)を招き重要な脅威を見落とすため、検知ルールのチューニング(閾値・除外・コンテキスト付与)が継続的に必要。ジュニアアナリストの中核業務であり、エンリッチメント(資産・ユーザー・脅威情報の付加)で判定精度を高める。",
+    "points": [
+      "TP=正検知 / FP=誤検知 / FN=検知漏れ(最も危険) / TN=真陰性",
+      "流れ: 発報→エンリッチ→検証→エスカレ or クローズ",
+      "FP多発=アラート疲れ→重大脅威の見落とし。チューニングが必須",
+      "エンリッチメント(資産/ユーザー/脅威情報)で判定精度を上げる"
+    ],
+    "related": [
+      "siem",
+      "iocioa",
+      "threathunting",
+      "ir",
+      "ueba"
+    ]
+  },
+  {
+    "id": "pyramid",
+    "term": "痛みのピラミッド",
+    "en": "Pyramid of Pain",
+    "aka": "Pyramid of Pain, David Bianco, indicator value",
+    "cat": "soc",
+    "body": "David Biancoが提唱した、防御側が各種インジケータをブロックした際に「攻撃者にどれだけの痛み(変更コスト)を与えるか」を6段階で表すモデル。下から、ハッシュ値(自明・即変更可)、IPアドレス(容易)、ドメイン名(やや手間)、ネットワーク/ホストアーティファクト(面倒)、ツール(困難)、TTP(戦術・技術・手順=最も困難)。下位のIOCは攻撃者が瞬時に変えられるため防御効果が薄く陳腐化しやすい一方、上位のTTPを検知・遮断すると攻撃者は手口自体の再設計を迫られ最大の痛みを与えられる。IOAやMITRE ATT&CKベースの挙動検知が上位に位置し、脅威ハンティングや検知エンジニアリングの優先度指針となる。",
+    "points": [
+      "6段階(下→上): ハッシュ→IP→ドメイン→アーティファクト→ツール→TTP",
+      "下位IOCは変更容易で陳腐化、上位ほど攻撃者の痛みが大きい",
+      "TTP検知(IOA/ATT&CK)が最も効果的で回避されにくい",
+      "検知エンジニアリング/ハンティングの優先度指針"
+    ],
+    "related": [
+      "iocioa",
+      "mitreattack",
+      "threathunting",
+      "cti"
+    ]
+  },
+  {
+    "id": "yara",
+    "term": "YARA ルール",
+    "en": "YARA Rules",
+    "aka": "YARA, pattern matching, malware classification, strings + condition, VirusTotal",
+    "cat": "soc",
+    "body": "YARAはマルウェアを分類・検知するためのパターンマッチングツール/ルール記述言語で、「パターンマッチングのスイスアーミーナイフ」と称される。ルールはmeta(説明・作者)、strings(検索する文字列・16進バイト列・正規表現)、condition(発火条件:文字列の組合せ・出現数・ファイルオフセット・PE構造条件)の3ブロックで構成される。EDR、サンドボックス、メールゲートウェイ、メモリスキャン(YARA on memory)、脅威ハンティングで広く使われ、ファミリ単位の検知や亜種の網羅に強い。VirusTotalが開発を主導し、CTIフィードでルールが共有される。過剰に緩いルールはFP、狭すぎると亜種を取り逃すため精度設計が肝要。",
+    "points": [
+      "構造: meta / strings(文字列・hex・正規表現) / condition(発火条件)",
+      "用途: EDR・サンドボックス・メモリスキャン・脅威ハンティング",
+      "ファミリ/亜種の網羅に強い、CTIで共有(VirusTotal主導)",
+      "緩すぎ=FP、狭すぎ=見逃し。精度設計が重要"
+    ],
+    "related": [
+      "sandbox",
+      "iocioa",
+      "cti",
+      "sigma",
+      "peformat"
+    ]
+  },
+  {
+    "id": "sandbox",
+    "term": "サンドボックス(動的解析)",
+    "en": "Malware Sandbox / Detonation",
+    "aka": "detonation, dynamic analysis, Cuckoo, CAPE, ANY.RUN, Joe Sandbox, 自動デトネーション",
+    "cat": "soc",
+    "body": "サンドボックスは隔離された使い捨て仮想環境で検体を実際に実行(デトネーション)し、挙動を観測する動的マルウェア解析基盤。API呼び出し、生成・改変ファイル、レジストリ操作、プロセス生成、ネットワーク通信(C2先・DNS)を記録し、IOC/IOAやYARA適合を自動抽出する。メールゲートウェイやEDRが疑わしい添付/実行ファイルを自動デトネーションして判定に使う。マルウェアはVM検出(デバイス名・CPUコア数・MACベンダ)、スリープ/時間差、ユーザー操作待ち、環境チェックといったサンドボックス回避を行うため、解析側はステルス化やユーザー操作の模倣で対抗する。代表例: Defender自動デトネーション、Joe Sandbox、ANY.RUN、Cuckoo/CAPE。",
+    "points": [
+      "隔離VMで実行し挙動(API/ファイル/レジストリ/通信)を自動抽出",
+      "メール/EDRの自動デトネーションで未知検体を判定",
+      "回避: VM検出・スリープ・ユーザー操作待ち・環境チェック",
+      "代表: Defender、Joe Sandbox、ANY.RUN、Cuckoo/CAPE"
+    ],
+    "related": [
+      "yara",
+      "iocioa",
+      "c2",
+      "edr"
+    ]
+  },
+  {
+    "id": "mttdmttr",
+    "term": "MTTD / MTTR / 滞留時間",
+    "en": "MTTD / MTTR / Dwell Time",
+    "aka": "Mean Time to Detect, Mean Time to Respond, dwell time, M-Trends, KPI",
+    "cat": "soc",
+    "body": "SOC/インシデント対応の有効性を測る時間指標。MTTD(平均検知時間)は侵害発生から検知までの平均、MTTR(平均対応/復旧時間)は検知から封じ込め・復旧までの平均。滞留時間(dwell time)は攻撃者が最初に侵入してから検知(または排除)されるまで環境内に潜伏していた期間で、Mandiant M-Trendsが業界中央値を毎年公表している(グローバル中央値は10日(CY2023)→11日(CY2024)→14日(CY2025)と直近は長期化傾向)。検知経路で大きく差が出て、内部検知は短く、外部組織からの通知は長い(=検知能力の内製化が鍵)。これらの短縮がSOC投資(EDR/自動化/SOAR/ハンティング)の主目的であり、KPIとして経営報告にも使われるが、数値は文脈依存で単独では良否を判断しない。",
+    "points": [
+      "MTTD=検知まで / MTTR=対応・復旧まで / 滞留時間=潜伏期間",
+      "M-Trends中央値: 10日(CY23)→11日(CY24)→14日(CY25)と長期化傾向",
+      "内部検知は短く外部通知は長い—検知の内製化が滞留短縮の鍵",
+      "SOC投資(EDR/SOAR/ハンティング)のKPI。数値は文脈依存"
+    ],
+    "related": [
+      "ir",
+      "soar",
+      "edr",
+      "killchain",
+      "cti"
+    ]
+  },
+  {
+    "id": "diamondmodel",
+    "term": "ダイヤモンドモデル",
+    "en": "Diamond Model of Intrusion Analysis",
+    "aka": "Diamond Model, adversary-capability-infrastructure-victim, pivoting",
+    "cat": "soc",
+    "body": "侵入分析のダイヤモンドモデルは、あらゆる侵害イベントを4つの中核要素—敵対者(Adversary)、能力(Capability:マルウェア/エクスプロイト等のTTP)、インフラ(Infrastructure:C2・ドメイン・IP)、被害者(Victim)—の関係として表現するフレームワーク。4頂点は辺で結ばれ、1つの頂点(例:あるC2 IP)から他の頂点(それを使う敵対者や別の被害者)へ分析を軸旋回(ピボット)できるのが強み。時系列を追うキルチェーンやTTPを体系化するATT&CKと相補的に使われ、CTIの構造化・相関・アトリビューション(攻撃者帰属)に用いられる。",
+    "points": [
+      "4頂点: 敵対者・能力(TTP)・インフラ(C2)・被害者",
+      "1頂点から他頂点へピボット(相関・アトリビューション)",
+      "キルチェーン(時系列)・ATT&CK(TTP)と相補的",
+      "CTIの構造化・脅威アクター追跡に活用"
+    ],
+    "related": [
+      "cti",
+      "killchain",
+      "mitreattack",
+      "iocioa"
+    ]
+  },
+  {
+    "id": "credssp",
+    "term": "CredSSP",
+    "en": "Credential Security Support Provider",
+    "aka": "CredSSP, Restricted Admin, Remote Credential Guard, NLA, CVE-2018-0886",
+    "cat": "auth",
+    "body": "CredSSPはネットワーク経由でユーザー資格情報を委任する認証プロバイダ(SSP)で、主にRDPのNLA(ネットワークレベル認証)で使われ、クライアントの資格情報をサーバへ安全に渡す。RDP接続時にサーバ側のlsassへ平文相当の資格情報が渡るため、侵害済みサーバへRDPすると資格情報を奪われる(=Restricted Admin/Remote Credential Guardで委任を抑止できる)。2018年のCVE-2018-0886はCredSSPの論理的欠陥で、中間者攻撃者がRDPセッション内で任意コード実行を可能にした(パッチ+EncryptionOracleRemediationレジストリの強制で対処)。SOCではRDPの認証方式、Restricted Admin/RCGの有無、CredSSP関連の暗号エラーを確認する。",
+    "points": [
+      "RDPのNLAで資格情報をサーバへ委任するSSP",
+      "侵害サーバへのRDPは資格情報窃取リスク→Restricted Admin/RCGで抑止",
+      "CVE-2018-0886: MITMによるRCE(EncryptionOracleRemediationで対処)",
+      "関連防御: Remote Credential Guard、Restricted Admin mode"
+    ],
+    "related": [
+      "rdp",
+      "delegation",
+      "sspi",
+      "credguard",
+      "kerberos"
+    ]
+  },
+  {
+    "id": "nopac",
+    "term": "noPac / sAMAccountName スプーフィング",
+    "en": "noPac / sAMAccountName Spoofing",
+    "aka": "CVE-2021-42278, CVE-2021-42287, sAMAccountName spoofing",
+    "cat": "prim",
+    "body": "標準ドメインユーザーを一撃でドメイン管理者相当へ昇格させる2つのCVEの連鎖。既定のms-DS-MachineAccountQuota=10で誰でもマシンアカウントを作成でき、CVE-2021-42278(SAM名検証の不備)によりそのsAMAccountNameを末尾$なしでDC名(例:DC01)へ改名できる。このアカウントでTGTを取得後、アカウントを削除/改名すると、CVE-2021-42287(KDC/PAC混同)によりKDCが「DC01」を解決できず末尾に$を補完して実在DC(DC01$)へフォールバックし、DCになりすましたサービスチケットを発行—DCSync等でドメイン全体を掌握できる。片方だけのパッチでは連鎖は途切れない。",
+    "points": [
+      "CVE-2021-42278(SAM名検証不備)+CVE-2021-42287(KDC PAC混同)の連鎖",
+      "前提: MachineAccountQuota>0で標準ユーザーがマシンアカウント作成可",
+      "監視: 4741(作成)/4742(変更)/4781(名前変更—旧名末尾$→新名がDC名)",
+      "対策: KB5008102+KB5008380(2021/11)、MAQを0に、Kerberos監査"
+    ],
+    "related": [
+      "kerberos",
+      "machineacct",
+      "maq",
+      "dcsync",
+      "s4u"
+    ]
+  },
+  {
+    "id": "zerologon",
+    "term": "Zerologon",
+    "en": "Zerologon",
+    "aka": "CVE-2020-1472, Netlogon, MS-NRPC, AES-CFB8",
+    "cat": "prim",
+    "body": "CVE-2020-1472。Netlogonリモートプロトコル(MS-NRPC)の認証計算がAES-128-CFB8をIV全ゼロで用いる欠陥。クライアントチャレンジを全ゼロにすると約1/256の確率でセッション鍵が全ゼロ暗号文を生むため、認証情報を持たない攻撃者がDCへのネットワーク到達性だけで数百回の試行(数秒)でNetrServerAuthenticate2/3を成立させられる。続いてNetrServerPasswordSet2でAD上のDCマシンアカウントのパスワードを空に設定し、DCSync等でドメインを完全掌握する(ローカルレジストリの秘密は変わらずDCが不整合で不安定化するため復旧が必要)。",
+    "points": [
+      "Netlogon MS-NRPCのAES-CFB8+IV全ゼロ欠陥(CVE-2020-1472)",
+      "未認証でDCマシンアカウントのパスワードを空に→ドメイン掌握",
+      "監視: 4742(DCマシンアカウント変更/Anonymous)、5827/5829、Netlogon RPC急増",
+      "対策: 2020/8パッチ+2021/2既定で強制モード(5827で拒否記録)"
+    ],
+    "related": [
+      "netlogon",
+      "machineacct",
+      "dcsync",
+      "dc",
+      "rpc"
+    ]
+  },
+  {
+    "id": "printnightmare",
+    "term": "PrintNightmare",
+    "en": "PrintNightmare",
+    "aka": "CVE-2021-1675, CVE-2021-34527, Print Spooler, RpcAddPrinterDriverEx, spoolsv",
+    "cat": "prim",
+    "body": "Windows印刷スプーラ(spoolsv.exe)のドライバインストール経路の欠陥。RpcAddPrinterDriverExがドライバ導入者を適切に制限せず、認証済みユーザーが攻撃者用の「ドライバ」DLL(多くはUNC/SMB経由)をSYSTEM権限のスプーラにロードさせる。CVE-2021-1675は当初ローカル権限昇格として6月に修正されたが、同関数がリモートでも悪用可能と判明しMicrosoftは別個のCVE-2021-34527(SYSTEM権限でのリモートコード実行)を割当てた。結果、SYSTEMへのLPEとドメイン全体へのRCEが成立する。",
+    "points": [
+      "spoolsvのRpcAddPrinterDriverEx悪用でSYSTEM RCE/LPE",
+      "CVE-2021-1675(LPE)とCVE-2021-34527(RCE)は別個",
+      "監視: PrintService/Admin EID316、spoolsvの子プロセス、spool\\drivers配下の新規DLL",
+      "注意: Point-and-Print NoWarningNoElevationOnInstall=1はパッチを無効化"
+    ],
+    "related": [
+      "coercion",
+      "service",
+      "dllhijack",
+      "smb",
+      "rpc"
+    ]
+  },
+  {
+    "id": "potato",
+    "term": "Potato 系 / SeImpersonate 悪用",
+    "en": "Potato Family / SeImpersonate Abuse",
+    "aka": "JuicyPotato, RoguePotato, PrintSpoofer, GodPotato, EfsPotato, SeImpersonatePrivilege",
+    "cat": "prim",
+    "body": "SeImpersonatePrivilege(および SeAssignPrimaryTokenPrivilege)を悪用したSYSTEMへのローカル権限昇格。攻撃者はSYSTEM権限のWindowsコンポーネントを攻撃者制御のエンドポイント(名前付きパイプ・ローカルRPC・DCOM/OXIDリゾルバ)へ認証させ、得られたSYSTEMトークンをSeImpersonateで偽装して任意プロセスをSYSTEMとして起動する。変種は誘発手段の違いだけ—JuicyPotato(旧OXIDリゾルバ、Win10 1809/Server2019で死亡)、RoguePotato(リモートOXID/135)、PrintSpoofer(spoolssパイプ)、GodPotato(汎用DCOM/RPC、Win8-11/2012-2022で有効)、EfsPotato(MS-EFSR)。IISアプリプールやMSSQLサービスアカウントは既定でSeImpersonateを持つため、Webシェル/SQLi→SYSTEMの定番踏み台になる。",
+    "points": [
+      "SeImpersonate保有サービスがSYSTEMトークンを奪取→SYSTEM昇格(T1134)",
+      "特権悪用でCVEなし(特権自体はパッチ対象外)だが個別の誘発経路は逐次緩和。GodPotato/EfsPotato等は現行でも有効",
+      "定番文脈: IISアプリプール/MSSQL(w3wp.exe/sqlservr.exe配下)",
+      "監視: 4673/4674(特権使用)、異常な名前付きパイプ(Sysmon17/18)、サービス→SYSTEMシェル"
+    ],
+    "related": [
+      "abusableprivs",
+      "token",
+      "tokentheft",
+      "namedpipe",
+      "coercion"
+    ]
+  },
+  {
+    "id": "skeletonkey",
+    "term": "スケルトンキー",
+    "en": "Skeleton Key",
+    "aka": "Skeleton Key, misc::skeleton, master password, DC LSASS patch, T1556.001",
+    "cat": "prim",
+    "body": "ドメインコントローラのlsass.exeをメモリ上でパッチ(Mimikatz misc::skeleton)し、RC4検証経路を細工することで、任意のドメインアカウントに対しハードコードされたマスターパスワード(既定\"mimikatz\")での認証を通す資格情報バイパス/持続化。各アカウントの本来のパスワードも並行して有効なままなので利用者は異常に気づかない。前提としてドメイン管理者権限とSeDebugPrivilege(LSASS注入)が必要で、認証を担う全DCへ適用する必要がある。メモリ上のみのためDC再起動で消える(再注入が必要)。RC4(etype 0x17)のみに作用し、AES強制環境では成立しない。",
+    "points": [
+      "DCのLSASSをメモリパッチしマスターパスワードを注入(T1556.001)",
+      "前提: DA+SeDebug、全DCへ適用、再起動で消滅(非永続)",
+      "RC4のみ—AES強制(RC4無効化)で成立不可。RunAsPPLでLSASS注入を妨害(Credential GuardはDC非対応)",
+      "監視: 4673/4611、注入後のRC4(0x17)ログオン、LSASSアクセス(Sysmon10)"
+    ],
+    "related": [
+      "lsass",
+      "kerberos",
+      "etype",
+      "creddump",
+      "ppl"
+    ]
+  },
+  {
+    "id": "timeroast",
+    "term": "Timeroasting",
+    "en": "Timeroasting",
+    "aka": "Timeroast, MS-SNTP, trustroasting, computer account, hashcat 31300",
+    "cat": "prim",
+    "body": "Secura(Tom Tervoort)が2023年に公表した、MicrosoftのSNTP認証拡張(MS-SNTP)を悪用するオフラインパスワードクラック手法。完全に未認証の攻撃者が、認証子フィールドにコンピュータアカウントのRIDだけを載せた細工NTP/SNTP要求をDCへ送ると、DCはコンピュータアカウントのNTハッシュ(MD4)を鍵としたMD5クリプトチェックサムを返す—認証もログもなしに。RIDを列挙して1アカウント1チェックサムを収集し、オフラインでクラックする。マシンアカウントの既定パスワードは120文字ランダムで事実上解けないが、弱い/手動設定のコンピュータ・信頼アカウント(アプライアンス・レガシー参加・事前準備アカウント)が本当のリスク。hashcatモード31300。",
+    "points": [
+      "未認証でRIDごとにコンピュータアカウントのクラック材料を収集(ログなし)",
+      "リスクは弱い/手動設定のコンピュータ・信頼アカウントのみ(既定は強固)",
+      "CVEなし—MS-SNTPの設計弱点。hashcat 31300でオフラインクラック",
+      "監視困難(通常NTPに酷似)。対策はパスワード強度とNTP露出制限"
+    ],
+    "related": [
+      "rid",
+      "machineacct",
+      "kerberoast",
+      "nthash",
+      "tdo"
+    ]
+  },
+  {
+    "id": "uacbypass",
+    "term": "UAC バイパス",
+    "en": "UAC Bypass",
+    "aka": "fodhelper, eventvwr, ICMLuaUtil, auto-elevate, UACME, T1548.002",
+    "cat": "prim",
+    "body": "中程度整合性のプロセスからUAC同意プロンプトなしに高整合性プロセスを得る手法群。自動昇格(autoElevate=true)する署名済みMSバイナリと、それらが信頼するHKCUの状態を悪用する。古典的なfodhelperはHKCU\\Software\\Classes\\ms-settings\\shell\\open\\commandに空のDelegateExecuteでペイロードを書き込み、fodhelper.exe(高整合性へ自動昇格)がms-settingsハンドラを乗っ取られたHKCUキーから解決して実行する。eventvwr.exe(mscfile)やcomputerdefaults.exe/sdclt.exeも同様。ICMLuaUtilはCOMベースのバイパス。Microsoftは「UACはセキュリティ境界ではない」との立場で多くは仕様扱い=現行でも有効。",
+    "points": [
+      "自動昇格バイナリ+HKCUクラス乗っ取りで無警告に高整合性化(T1548.002)",
+      "代表: fodhelper(ms-settings)/eventvwr(mscfile)/ICMLuaUtil(COM)",
+      "監視: HKCU\\...\\shell\\open\\commandへの書込(Sysmon13)、fodhelper→シェル",
+      "Microsoftは仕様扱い—多くは未修正。Always Notify+管理者権限剥奪で緩和"
+    ],
+    "related": [
+      "uac",
+      "integrity",
+      "registry",
+      "abusableprivs",
+      "lolbin"
+    ]
+  },
+  {
+    "id": "logonevents",
+    "term": "ログオンイベント(4624/4625/4634/4648)",
+    "en": "Logon Events 4624 / 4625 / 4634 / 4648",
+    "aka": "4624, 4625, 4634, 4647, 4648, logon success/failure, Logon Type",
+    "cat": "logging",
+    "body": "SOCのトリアージで最も多用されるホスト側テレメトリ。4624=ログオン成功、4625=ログオン失敗、4634/4647=ログオフ、4648=明示的資格情報でのログオン(runas/横展開の痕跡)。各イベントはログオンタイプ(2=対話/3=ネットワーク/9=NewCredentials/10=RDP/5=サービス等)、アカウント名、送信元IP・ワークステーション名、ログオンID(LUID)を含み、横展開・総当たり・不審ログオン調査の起点になる。特に「Type3の失敗(4625)が多数の異なるアカウントで少数ずつ」=パスワードスプレー、「Type10成功の異常な送信元」=RDP侵害、「4648の連鎖」=資格情報を使った横展開の兆候として読む。DC側の4768/4769等はKerberos、こちらは各ホストのローカル/ネットワークログオンを捉える。",
+    "points": [
+      "4624成功/4625失敗/4634-4647ログオフ/4648明示的資格情報",
+      "鍵はLogon Type+送信元IP+アカウント(横展開/スプレー/RDP侵害の判別)",
+      "Type3失敗が多アカウント少数=スプレー、Type10異常送信元=RDP侵害",
+      "DC側4768/4769(Kerberos)と補完—こちらはホスト側ログオン"
+    ],
+    "related": [
+      "logontype",
+      "authevents",
+      "acctmgmtevents",
+      "passwordspray",
+      "rdp"
+    ]
+  },
+  {
+    "id": "acctmgmtevents",
+    "term": "アカウント/グループ管理イベント",
+    "en": "Account & Group Management Events",
+    "aka": "4720, 4722, 4725, 4726, 4728, 4732, 4756, 4738, 4740, group membership change",
+    "cat": "logging",
+    "body": "アカウントの作成・変更やグループ加入を捉える、永続化・権限付与検知の中核ログ(Securityログ)。4720=ユーザー作成、4722=有効化、4725/4726=無効化/削除、4738=アカウント変更、4740=ロックアウト。グループ加入は4728(グローバル)/4732(ローカル)/4756(ユニバーサル)で、特に「Domain Adminsに追加」「Enterprise Adminsに追加」は最優先アラート。4720直後に4728でDomain Admins加入=攻撃者による特権アカウント作成の典型シグネチャ。4740のロックアウト多発は主に単一アカウントへの総当たりや設定不備を示す(慎重なスプレーは閾値を避けるため4740を出しにくい)。SIEMでは特権グループの加入・アカウント作成をユーザー/資産コンテキストで相関する。",
+    "points": [
+      "4720作成/4738変更/4725-4726無効化・削除/4740ロックアウト",
+      "グループ加入: 4728(グローバル)/4732(ローカル)/4756(ユニバーサル)",
+      "最優先: Domain/Enterprise Admins等の特権グループ加入",
+      "4720→4728(DA加入)=特権アカウント作成の典型シグネチャ"
+    ],
+    "related": [
+      "logonevents",
+      "privgroups",
+      "group",
+      "sidhistory",
+      "adminsdholder"
+    ]
+  },
+  {
+    "id": "eventlogclear",
+    "term": "イベントログ消去・改ざん",
+    "en": "Event Log Clearing / Tampering (1102 / 104)",
+    "aka": "1102, 104, wevtutil cl, Clear-EventLog, anti-forensics, T1070.001",
+    "cat": "logging",
+    "body": "攻撃者が痕跡隠蔽(アンチフォレンジック)としてイベントログを消去・改ざんする行為で、それ自体が高シグナルの侵害指標(MITRE T1070.001)。Securityログの全消去はEvent ID 1102(監査ログがクリアされた)、System/その他ログの消去は104として記録される。wevtutil cl、Clear-EventLog、PowerShell/API経由のクリア、個別イベント削除ツール(Invoke-Phant0m等でスレッド停止)やログサービス停止も含む。正規のログローテーションと区別するため、消去の主体・時刻・直前の活動を相関する。WEF/SIEMへ即時転送していればローカル消去後も証跡が残るため、集中ログ化が最重要の対策となる。",
+    "points": [
+      "Security全消去=1102、System等=104(それ自体が侵害指標T1070.001)",
+      "手段: wevtutil cl / Clear-EventLog / ログサービス停止 / スレッド停止",
+      "対策: WEF/SIEMへ即時転送すればローカル消去後も証跡が残る",
+      "消去の主体・時刻・直前活動を相関し正規ローテーションと区別"
+    ],
+    "related": [
+      "eventlog",
+      "wef",
+      "etwbypass",
+      "siem"
+    ]
+  },
+  {
+    "id": "dnslogging",
+    "term": "DNS ログ / DNS 解析ログ",
+    "en": "DNS Logging / DNS Analytical Log",
+    "aka": "DNS analytical log, DNS debug log, Sysmon 22, C2, DGA, DNS tunneling",
+    "cat": "logging",
+    "body": "DNSクエリのログはC2コールバック・DGA(ドメイン生成アルゴリズム)・DNSトンネリングによる持ち出しを捉える重要テレメトリ。取得源はWindows DNSサーバの解析ログ(Analytical Log)やデバッグログ、エンドポイント側のSysmon Event ID22(DNSクエリ)、DNSファイアウォール/リゾルバのログ。検知観点は、高頻度・高エントロピー・ランダム文字列のサブドメイン(DGA/トンネリング)、長大なTXT/NULLレコード応答、新規登録ドメイン(NRD)への通信、既知C2ドメインとの照合、単一ホストからの異常なクエリ量。プロセス紐付け(Sysmon22はQueryName+Image)により、どのプロセスが不審な名前解決を行ったかを特定できる。",
+    "points": [
+      "用途: C2コールバック/DGA/DNSトンネリング(持ち出し)の検知",
+      "取得源: DNSサーバ解析ログ、Sysmon EID22(QueryName+Image)、リゾルバログ",
+      "観点: 高エントロピーサブドメイン、長大TXT/NULL、新規登録ドメイン(NRD)",
+      "プロセス紐付けで不審な名前解決の主体を特定"
+    ],
+    "related": [
+      "sysmon",
+      "c2",
+      "networktelemetry",
+      "adidns"
+    ]
+  },
+  {
+    "id": "networktelemetry",
+    "term": "ネットワーク監視データ",
+    "en": "Network Telemetry (NSM / Zeek / NetFlow / PCAP)",
+    "aka": "NSM, Zeek, Bro, NetFlow, IPFIX, PCAP, proxy logs, JA3, JA4",
+    "cat": "logging",
+    "body": "エンドポイント中心の可視化を補完する、SOCのネットワーク側テレメトリ。フルパケットキャプチャ(PCAP)は最も詳細だが保管コストが高い。Zeek(旧Bro)は接続・DNS・HTTP・TLS・ファイル転送等をメタデータ(conn.log等)に構造化するNSMの定番。NetFlow/IPFIXは送受信元IP・ポート・バイト数等のフローサマリで大量トラフィックの俯瞰・ビーコン検知に有効。プロキシ/WebゲートウェイログはURL・ユーザーエージェント・宛先を捉えC2やダウンロードを分析する。TLS普及で中身は見えにくくなったが、JA3/JA4フィンガープリント、SNI、証明書、通信の周期性(ビーコニング)といったメタデータから悪性通信を推定する。",
+    "points": [
+      "階層: PCAP(詳細/高コスト)→Zeekメタデータ→NetFlow(俯瞰)→プロキシ",
+      "Zeek=接続/DNS/HTTP/TLSを構造化、NetFlow=フローサマリでビーコン検知",
+      "TLS時代はJA3/JA4・SNI・証明書・周期性で悪性推定",
+      "エンドポイント(EDR)とネットワーク(NSM)の両輪で可視化"
+    ],
+    "related": [
+      "dnslogging",
+      "c2",
+      "sysmon",
+      "exfil"
+    ]
+  },
+  {
+    "id": "emailauth",
+    "term": "メール認証(SPF/DKIM/DMARC)",
+    "en": "Email Authentication (SPF / DKIM / DMARC)",
+    "aka": "SPF, DKIM, DMARC, ARC, spoofing, header analysis, Authentication-Results",
+    "cat": "logging",
+    "body": "送信者ドメインのなりすまし(スプーフィング)を検証するメール認証の3本柱で、フィッシング/BECのヘッダ解析トリアージの必須知識。SPF(Sender Policy Framework)は送信元IPが当該ドメインの許可送信サーバかをDNSのTXTで検証。DKIM(DomainKeys Identified Mail)は送信側が本文/ヘッダにデジタル署名し、受信側がDNS公開鍵で改ざん・正当性を検証。DMARCはSPF/DKIMの「アライメント」(Fromドメインとの一致)を評価し、失敗時のポリシー(none/quarantine/reject)とレポートを規定する。解析ではAuthentication-Resultsヘッダのpass/fail、Return-Path・From・Reply-Toの不一致、正規ドメインに酷似したルックアライク(homoglyph)を確認する。DMARC=rejectでも、正規ドメインの侵害や表示名詐称・類似ドメインは防げない点に注意。",
+    "points": [
+      "SPF=送信IP検証 / DKIM=署名検証 / DMARC=アライメント+ポリシー",
+      "解析: Authentication-Results、From/Return-Path/Reply-Toの不一致",
+      "類似ドメイン(homoglyph)・表示名詐称・正規ドメイン侵害は認証を通り得る",
+      "BEC/フィッシングのヘッダトリアージの基礎"
+    ],
+    "related": [
+      "phishing",
+      "entralogs",
+      "illicitconsent",
+      "aitm"
+    ]
+  },
+  {
+    "id": "ransomware",
+    "term": "ランサムウェア / 二重恐喝",
+    "en": "Ransomware & Double Extortion",
+    "aka": "ransomware, double extortion, RaaS, human-operated, data leak site",
+    "cat": "soc",
+    "body": "現在最大のインシデント種別。現代の人手による(human-operated)ランサムウェアは単なる暗号化ではなく、初期侵入→探索→権限昇格→横展開→データ持ち出し→暗号化という運用型キルチェーンを踏み、暗号化前にデータを窃取して「支払わなければ公開する」二重恐喝(さらにDDoSや顧客通知を加えた多重恐喝)を行う。RaaS(Ransomware-as-a-Service)によりアフィリエイトが分業で実行し、正規管理ツール(PsExec/GPO/PDQ)で全社展開する。SOCの勝機は暗号化(最終段)ではなく前段—初期アクセス、Cobalt Strike等のC2、資格情報窃取、探索コマンド、バックアップ(VSS)削除、大量アウトバウンド—の早期検知にある。滞留時間の短縮とオフライン/不変バックアップが被害を左右する。",
+    "points": [
+      "運用型キルチェーン: 侵入→探索→昇格→横展開→持ち出し→暗号化",
+      "二重恐喝: 暗号化+窃取データ公開の脅迫(多重恐喝へ発展)",
+      "RaaSで分業、正規ツール(PsExec/GPO/PDQ)で全社展開",
+      "検知は前段(C2/資格情報/探索/VSS削除/大量送信)で—暗号化は手遅れ"
+    ],
+    "related": [
+      "killchain",
+      "c2",
+      "remoteexec",
+      "exfil",
+      "vss"
+    ]
+  },
+  {
+    "id": "malwaretypes",
+    "term": "マルウェア分類",
+    "en": "Malware Taxonomy (RAT / Loader / Infostealer / Wiper)",
+    "aka": "RAT, loader, dropper, infostealer, stealer, wiper, botnet, rootkit, bootkit",
+    "cat": "soc",
+    "body": "観測した挙動を機能で分類し、影響範囲(スコープ)と対応優先度を素早く判断するための語彙。主な型: ドロッパー/ローダー(次段ペイロードを取得・実行する初期段)、RAT(Remote Access Trojan、遠隔操作)、インフォスティーラー(ブラウザ資格情報・Cookie・暗号資産を窃取、近年のアラート量を席巻)、バンキングトロジャン、ボット/ボットネット(C2配下の群)、ランサムウェア(暗号化・恐喝)、ワイパー(破壊)、ルートキット/ブートキット(隠蔽・持続)、クリプトマイナー。1検体が複数機能を持つことも多い。特にスティーラーが盗んだセッションCookieはMFAを迂回するため、感染=単なる駆除でなく資格情報・トークンの失効(セッション無効化)まで対応する必要がある。",
+    "points": [
+      "型: ローダー/ドロッパー・RAT・スティーラー・ボット・ランサム・ワイパー・ルートキット",
+      "インフォスティーラーが近年のアラート量を席巻(Cookie/資格情報窃取)",
+      "スティーラーのセッションCookie窃取はMFAを迂回",
+      "分類→影響範囲と対応(駆除+資格情報/トークン失効)を判断"
+    ],
+    "related": [
+      "c2",
+      "procinjection",
+      "tokentheft",
+      "sandbox",
+      "ir"
+    ]
+  },
+  {
+    "id": "phishing",
+    "term": "フィッシング / 標的型メール / BEC",
+    "en": "Phishing / Spearphishing & BEC",
+    "aka": "phishing, spearphishing, BEC, business email compromise, quishing, T1566",
+    "cat": "soc",
+    "body": "最大の初期アクセス経路であり、SOCの日常トリアージ対象。無差別フィッシング、特定個人を狙う標的型(spearphishing)、正規/侵害アカウントを装い送金や情報を詐取するBEC(ビジネスメール詐欺)に大別される(MITRE T1566)。手口は悪性リンク(認証情報窃取ページ/AiTMプロキシ)、悪性添付(マクロ/ISO/LNK/HTML密輸)、QRコード(quishing)、返信スレッド乗っ取り等。解析ではメール認証(SPF/DKIM/DMARC)、送信元・ヘッダ、URL/添付のサンドボックス、着弾範囲(誰に届き誰がクリックしたか)を調べ、クリック済みなら資格情報リセット・トークン失効・エンドポイント隔離へ展開する。ユーザー報告と自動検知の両輪で回す。",
+    "points": [
+      "型: 無差別/標的型(spearphishing)/BEC(送金・情報詐取)(T1566)",
+      "手口: 悪性リンク(AiTM)・添付(マクロ/ISO/LNK/HTML密輸)・quishing",
+      "解析: メール認証・ヘッダ・URL/添付サンドボックス・着弾範囲",
+      "クリック後: 資格情報リセット・トークン失効・端末隔離"
+    ],
+    "related": [
+      "emailauth",
+      "aitm",
+      "illicitconsent",
+      "sandbox",
+      "mfafatigue"
+    ]
+  },
+  {
+    "id": "vulnmgmt",
+    "term": "脆弱性管理(CVE/CVSS/EPSS/KEV)",
+    "en": "Vulnerability Management (CVE / CVSS / EPSS / KEV)",
+    "aka": "CVE, CVSS, EPSS, CISA KEV, patch management, known exploited vulnerabilities",
+    "cat": "soc",
+    "body": "脆弱性を識別・評価・優先度付けして修復に結びつける規律で、アナリストが脅威と検知網羅を対応づける基礎語彙。CVE=個別脆弱性の一意識別子。CVSS=深刻度スコア(0-10、基本値)だが「悪用されやすさ」は表さない。EPSS=今後30日以内に実際に悪用される確率の予測。CISA KEV(Known Exploited Vulnerabilities)=現に悪用が確認された脆弱性の一覧で、実運用の修復優先度の要となる。実務では「CVSS高」だけでなく「KEV掲載+EPSS高+自組織で露出/資産価値が高い」を掛け合わせて優先する。SOCは新規KEV/大型CVEに対し、自組織の露出確認と検知ルール/ハンティングの有無を即座に照合する。",
+    "points": [
+      "CVE=識別子 / CVSS=深刻度 / EPSS=悪用確率 / KEV=悪用確認済みリスト",
+      "CVSS高≠悪用されやすい—KEV+EPSS+自組織の露出で優先度を決める",
+      "新規KEV/大型CVEは露出確認と検知網羅の照合を即実施",
+      "脆弱性管理と検知エンジニアリング/脅威ハンティングを連携"
+    ],
+    "related": [
+      "cti",
+      "mitreattack",
+      "deteng",
+      "threathunting"
+    ]
+  },
+  {
+    "id": "obfuscation",
+    "term": "難読化・パッキング・エンコード",
+    "en": "Obfuscation, Packing & Encoding",
+    "aka": "Base64, PowerShell -enc, packer, crypter, entropy, deobfuscation, T1027",
+    "cat": "soc",
+    "body": "検知回避・解析妨害のためにペイロードやコマンドを変形する手法群(MITRE T1027)。コマンドライン難読化(PowerShellの-EncodedCommand/Base64、文字列連結・逆順・環境変数展開、Invoke-Obfuscation)、パッカー/クリプター(実行ファイルを圧縮・暗号化しメモリ上で復号=高エントロピー化)、エンコード多段(Base64+gzip+XOR)などがある。SOCの観点では、Base64/長大なエンコード文字列を含むコマンドライン、異常に高いPEエントロピー、AMSIが復元した平文スクリプト(スクリプトブロックログ)から実体を捉える。難読化そのものが弱い異常シグナルであり、デオブフスケーション(復号・整形)がトリアージの一手となる。",
+    "points": [
+      "手段: コマンド難読化(PS -enc/Base64)、パッカー/クリプター、多段エンコード",
+      "検知: 長大Base64コマンドライン、高PEエントロピー、AMSI復元後の平文",
+      "難読化の存在自体が弱い異常シグナル(T1027)",
+      "デオブフスケーション(復号・整形)がトリアージの一手"
+    ],
+    "related": [
+      "amsi",
+      "pslogging",
+      "peformat",
+      "lolbin",
+      "yara"
+    ]
+  },
+  {
+    "id": "memforensics",
+    "term": "メモリフォレンジック",
+    "en": "Memory Forensics (RAM Analysis / Volatility)",
+    "aka": "Volatility, RAM analysis, memory dump, fileless, malfind, WinPmem",
+    "cat": "soc",
+    "body": "物理メモリ(RAM)のダンプを解析し、ディスクに痕跡を残さないファイルレス/注入コードや、隠蔽されたプロセス・接続を復元するDFIR手法。代表ツールはVolatility(3系)で、実行中プロセス一覧・親子関係、隠蔽/アンリンクされたプロセス(psscan)、ネットワーク接続(netscan)、注入コード領域(malfind=RWXの無名メモリ)、ロード済みDLL/ドライバ、コマンド履歴、資格情報の痕跡などを抽出する。EDRが見逃した/改ざんされた事象の裏取りや、暗号化前のマルウェア設定・鍵の回収に有効。取得はライブ(WinPmem等)またはハイバネーション/クラッシュダンプから行い、揮発性が高いため保全順序(order of volatility)上は優先度が高い。",
+    "points": [
+      "RAMダンプから注入コード・隠蔽プロセス・接続・資格情報痕跡を復元",
+      "Volatility: pslist/psscan(隠蔽)、malfind(RWX注入)、netscan",
+      "ファイルレス/EDR回避の裏取り、マルウェア設定・鍵の回収に有効",
+      "揮発性が高く保全順序で優先—ライブ取得(WinPmem)等"
+    ],
+    "related": [
+      "procinjection",
+      "reflectiveload",
+      "ntfsart",
+      "ir"
+    ]
+  },
+  {
+    "id": "purpleteam",
+    "term": "レッド/ブルー/パープルチーム",
+    "en": "Red / Blue / Purple Team & Adversary Emulation",
+    "aka": "red team, blue team, purple team, Atomic Red Team, Caldera, adversary emulation",
+    "cat": "soc",
+    "body": "セキュリティ組織の役割分担。レッドチームは攻撃者を模して侵入・検知回避を試み、ブルーチームは検知・防御・対応を担う。パープルチームは両者を協調させ、攻撃技術(TTP)を実行しながらリアルタイムで検知の有無を確認し、ギャップを検知ルールへ即時反映する共同演習を指す。攻撃エミュレーション(adversary emulation)はMITRE ATT&CKのTTPを再現して検知網羅を客観評価する営みで、Atomic Red Team(技術単位の軽量テスト)やMITRE Caldera(自動化)が使われる。SOCにとっては、Sigma/ハンティング/検知ルールが「実際に発火するか」を検証し、机上でなく実測で検知能力を高める手段となる。",
+    "points": [
+      "レッド=攻撃側 / ブルー=防御側 / パープル=両者協調で検知ギャップを即修正",
+      "攻撃エミュレーション: ATT&CK TTP再現で検知網羅を客観評価",
+      "ツール: Atomic Red Team(軽量)、MITRE Caldera(自動化)",
+      "検知ルール/ハンティングを実測で検証・改善する手段"
+    ],
+    "related": [
+      "mitreattack",
+      "sigma",
+      "deteng",
+      "threathunting"
+    ]
+  },
+  {
+    "id": "deteng",
+    "term": "検知エンジニアリング",
+    "en": "Detection Engineering / Detection-as-Code",
+    "aka": "detection engineering, detection-as-code, tuning, FP reduction, coverage",
+    "cat": "soc",
+    "body": "脅威に対する検知ロジックを設計・実装・検証・運用・改善する規律。単発のルール作成でなく、ソフトウェア開発のようにバージョン管理(Git)・テスト・CI/CD・レビューを伴う「検知のコード化(Detection-as-Code)」として運用するのが現代的潮流。作業はユースケース定義→データソース確認→ロジック記述(Sigma/KQL/EQL等)→FP/FN検証→チューニング(除外・閾値・コンテキスト付与)→ATT&CKへのマッピングでカバレッジ管理、というライフサイクルを回す。誤検知(FP)の抑制とカバレッジの網羅を両立させ、脅威ハンティングで見つかった手口を再現可能な検知へ昇華させる。SOCの成熟度を左右する中核機能である。",
+    "points": [
+      "検知ロジックの設計→実装→検証→チューニング→運用のライフサイクル",
+      "Detection-as-Code: Git/テスト/CI/CD/レビューで検知を管理",
+      "ATT&CKマッピングでカバレッジ可視化、FP抑制と網羅を両立",
+      "ハンティングの発見を再現可能な検知へ昇華"
+    ],
+    "related": [
+      "sigma",
+      "advhunting",
+      "threathunting",
+      "mitreattack",
+      "triage"
+    ]
+  },
+  {
+    "id": "remoteexec",
+    "term": "リモートサービス実行・管理共有",
+    "en": "Remote Service Execution & Admin Shares",
+    "aka": "PsExec, SMBExec, WMIExec, DCOM, ADMIN$, C$, IPC$, lateral movement, T1021",
+    "cat": "prim",
+    "body": "Windowsの定番横展開パターン。管理共有(ADMIN$=%windir%、C$=システムドライブ、IPC$=プロセス間通信)へSMB(445)で接続し、リモートでコードを実行する。PsExecはADMIN$へサービスバイナリを設置しSCM経由でサービスとして起動(新規サービスEvent 7045/4697)。WMIExecはWMI(DCOM/Win32_Process.Create)で、SMBExecはサービス+名前付きパイプで、DCOM実行はMMC20/ShellWindows等のCOMオブジェクトで、いずれも認証済み管理者権限を前提にSYSTEMまたは当該ユーザー権限で実行する。検知は管理共有アクセス(5140/5145)、新規サービス(7045)、ネットワークログオン(4624 Type3)、親プロセス(services.exe/WmiPrvSE.exe)配下の不審な子プロセスを相関する。Pass-the-Hash等と組み合わさることが多い。",
+    "points": [
+      "管理共有(ADMIN$/C$/IPC$)へSMB接続しリモート実行(T1021)",
+      "PsExec=サービス(7045)、WMIExec=Win32_Process、DCOM=COMオブジェクト",
+      "監視: 5140/5145(共有)、7045/4697(サービス)、4624 Type3、WmiPrvSE配下の子",
+      "Pass-the-Hash/資格情報窃取と併用されることが多い"
+    ],
+    "related": [
+      "smb",
+      "service",
+      "wmi",
+      "pth",
+      "proctree"
+    ]
+  },
+  {
+    "id": "discovery",
+    "term": "探索・列挙(Discovery)",
+    "en": "Discovery / Reconnaissance",
+    "aka": "net, nltest, whoami, systeminfo, LDAP recon, situational awareness, T1087, T1018",
+    "cat": "prim",
+    "body": "侵入後、攻撃者が環境を把握するための情報収集段階(MITRE TA0007)。組込みコマンド(whoami /all、net user/group/localgroup、net view、nltest /dclist・/domain_trusts、systeminfo、ipconfig、tasklist、query user)やLDAPクエリ、SPN列挙、共有列挙、null/匿名セッションでのドメイン情報取得などが典型。単発では正常管理と紛れるが、短時間に多数の探索コマンドが連続する「バースト」は初期段階の強い検知機会となる。BloodHound等の自動列挙は大量のLDAP/SAMR/セッション照会を生む。SOCはコマンドライン(Sysmon1/4688)やLDAP/SAMRの異常量、非管理者端末からのドメイン列挙を相関して早期に捉える。",
+    "points": [
+      "組込み: whoami/net/nltest/systeminfo/tasklist/query、LDAP・SPN・共有列挙",
+      "単発は正常と紛れるが、探索コマンドのバーストは強い検知機会",
+      "BloodHound等は大量のLDAP/SAMR/セッション照会を生成",
+      "監視: コマンドライン(Sysmon1/4688)、LDAP/SAMR異常量、匿名セッション"
+    ],
+    "related": [
+      "bloodhound",
+      "ldap",
+      "proctree",
+      "remoteexec",
+      "adws"
+    ]
+  },
+  {
+    "id": "ppidspoof",
+    "term": "親プロセスID偽装(PPID Spoofing)",
+    "en": "Parent Process ID (PPID) Spoofing",
+    "aka": "PPID spoofing, parent spoofing, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, T1134.004",
+    "cat": "prim",
+    "body": "プロセス生成時に本来の親と異なるプロセスを親に見せかける防御回避手法(MITRE T1134.004)。CreateProcessのUpdateProcThreadAttribute(PROC_THREAD_ATTRIBUTE_PARENT_PROCESS)で任意の既存プロセス(例:explorer.exe)を親に指定でき、実際の生成元を隠してプロセスツリー(系譜)ベースの検知を欺く。加えてトークンも指定プロセスから継承され得るため権限昇格にも悪用される。「正常なプロセスツリー」ヒューリスティックだけに頼るとこれで回避されるため、SOCはSysmon Event 1のParentProcessIdと実際の生成関係の齟齬、偽装親から不整合な整合性レベル/セッションで起動される子、EDRのカーネルコールバックが捉える真の生成元を用いて検知する。",
+    "points": [
+      "CreateProcessの親プロセス属性で任意プロセスを親に偽装(T1134.004)",
+      "proctree(系譜)ヒューリスティックを欺き、トークン継承で昇格も",
+      "単純な親子検知の弱点—EDRカーネルテレメトリで真の生成元を捕捉",
+      "齟齬(親と不整合な整合性/セッションの子)を相関"
+    ],
+    "related": [
+      "proctree",
+      "procinjection",
+      "token",
+      "sysmon"
+    ]
+  },
+  {
+    "id": "reflectiveload",
+    "term": "リフレクティブ/インメモリ実行",
+    "en": "Reflective / In-Memory Loading & Shellcode",
+    "aka": "reflective DLL, in-memory, fileless, Assembly.Load, execute-assembly, IEX, T1620",
+    "cat": "prim",
+    "body": "ディスクにファイルを書かずメモリ上でコードをロード・実行するファイルレス実行手法(MITRE T1620ほか)。リフレクティブDLL注入(ローダーがOSのLoadLibraryを介さずDLLを自前でメモリ展開)、シェルコードの直接実行、.NETのAssembly.Load/Cobalt Strikeのexecute-assembly(アセンブリをメモリで実行)、PowerShellのIEX(ダウンロード文字列を直接実行)などが該当する。ディスクベースのAVやMOTW/署名検査を回避し、C2のポストエクスプロイトの標準手段となっている。検知はディスクではなくメモリと挙動—RWXの無名メモリ領域、既知プロセスからの不審なメモリ確保、AMSI(.NET/PSのインメモリを可視化)、ETW、EDRのメモリスキャンに依存する。",
+    "points": [
+      "ディスク不使用でメモリ上にロード/実行(ファイルレス、T1620)",
+      "例: リフレクティブDLL、execute-assembly、PowerShell IEX、直接シェルコード",
+      "AV/MOTW/署名を回避—C2ポストエクスプロイトの標準",
+      "検知: RWX無名メモリ、AMSI/ETW、EDRメモリスキャン(ディスクでなく挙動)"
+    ],
+    "related": [
+      "procinjection",
+      "amsi",
+      "memforensics",
+      "c2",
+      "peformat"
+    ]
+  },
+  {
+    "id": "exfil",
+    "term": "データ持ち出し・ステージング",
+    "en": "Data Exfiltration & Staging",
+    "aka": "exfiltration, staging, archive, rar/7zip, rclone, cloud upload, T1041, T1567, T1074",
+    "cat": "prim",
+    "body": "多くの侵入の最終目的である情報の外部持ち出し段階(MITRE TA0010)。典型は「ステージング(T1074)→圧縮/暗号化→送出」の流れで、まず対象データを1か所に集約しrar/7zip/zipで圧縮(しばしばパスワード付き)してから、C2チャネル経由(T1041)、正規クラウドストレージ/Web(T1567、mega・dropbox・rclone等)、DNS/ICMPトンネリング、メール等で送出する。二重恐喝ランサムの前段でもある。検知は、大容量の圧縮ファイル生成、rclone/megacmd等のツール、単一ホストからの異常な大量アウトバウンド、通常業務外の宛先/時間帯、DLPアラート、DNS/HTTPの異常量を相関する。持ち出し(送信)を検知できれば暗号化前に止められる可能性がある。",
+    "points": [
+      "流れ: ステージング(集約)→圧縮/暗号化(rar/7zip)→送出",
+      "経路: C2(T1041)/クラウド・Web(T1567、rclone等)/トンネリング/メール",
+      "二重恐喝ランサムの前段—ここで止めれば暗号化前に阻止できる",
+      "検知: 大容量圧縮生成、異常アウトバウンド量、DLP、異常な宛先/時間"
+    ],
+    "related": [
+      "ransomware",
+      "c2",
+      "networktelemetry",
+      "dnslogging",
+      "bits"
+    ]
+  },
+  {
+    "id": "adcsesc",
+    "term": "AD CS ドメイン昇格(ESC)",
+    "en": "AD CS Domain Escalation (ESC1–ESC16)",
+    "aka": "ESC1, ESC8, ESC13, Certified Pre-Owned, SpecterOps, certificate abuse",
+    "cat": "pki",
+    "body": "SpecterOpsが体系化したAD CS(証明書サービス)のドメイン昇格手法群(ESC1〜ESC16)。テンプレートやCAの設定不備を突き、低権限ユーザーが高権限アカウントの証明書を取得してPKINITで認証し昇格する。代表例: ESC1(登録者がsubject任意指定可+クライアント認証EKU→任意ユーザーになりすまし証明書)、ESC2(Any Purpose EKU)、ESC3(登録代理)、ESC4(テンプレートACL弱設定)、ESC6(EDITF_ATTRIBUTESUBJECTALTNAME2でSANを任意付与)、ESC7(CA権限)、ESC8(Web登録エンドポイントへのNTLMリレー)、ESC9/ESC10(証明書マッピングの弱さ)、ESC11(ICPRリレー)、ESC13(発行ポリシーOIDによるグループ付与)。取得証明書は失効やパスワード変更に影響されず永続的な足がかりになる。監視はEvent 4886/4887(証明書要求/発行)、異常なSAN、Web登録へのNTLM認証。",
+    "points": [
+      "テンプレ/CAの設定不備で低権限→高権限証明書を取得しPKINIT認証",
+      "代表: ESC1(SAN任意)/ESC6(CA側SAN)/ESC8(Web登録へNTLMリレー)/ESC13(OID→グループ)",
+      "証明書は失効/パスワード変更に強く永続的な足がかり",
+      "監視: 4886/4887(要求/発行)、異常SAN、Web登録へのNTLM"
+    ],
+    "related": [
+      "adcs",
+      "template",
+      "san",
+      "pkinit",
+      "ntlmrelay"
+    ]
+  },
+  {
+    "id": "hybridauth",
+    "term": "ハイブリッド認証方式(PHS/PTA/フェデレーション)",
+    "en": "Hybrid Authentication (PHS / PTA / Federation)",
+    "aka": "Password Hash Sync, Pass-through Authentication, Federation, ADFS, PTA agent",
+    "cat": "cloud",
+    "body": "オンプレADとEntra IDを連携する際のサインイン方式で、それぞれ攻撃対象領域が異なるため区別が重要。PHS(パスワードハッシュ同期)はADのパスワードハッシュのハッシュをEntraへ同期しクラウド側で認証—Entra Connect同期サーバとMSOL_同期アカウントが高価値標的。PTA(パススルー認証)はオンプレのPTAエージェントが認証を中継しクラウドにハッシュを置かない—が、悪性PTAエージェントを仕込むと平文資格情報を傍受できる。フェデレーション(ADFS等)はオンプレのIdPがSAML/トークンに署名—トークン署名証明書を盗めばGolden SAMLで任意ユーザーになりすませる。いずれもEntra Connectサーバの侵害はテナント全体の侵害に直結するTier0資産である。監視はサインインログの認証方式、同期アカウント、ADFS署名証明書アクセス。",
+    "points": [
+      "PHS=ハッシュ同期(クラウド認証)/PTA=エージェント中継/フェデレーション=IdP署名",
+      "PHS: 同期サーバ・MSOLアカウントが標的、PTA: 悪性エージェントで資格情報傍受",
+      "フェデレーション: トークン署名証明書窃取→Golden SAML",
+      "Entra Connectサーバはテナント全体に直結するTier0資産"
+    ],
+    "related": [
+      "entraconnect",
+      "adfs",
+      "goldensaml",
+      "seamlesssso",
+      "prt"
+    ]
+  },
+  {
+    "id": "intunemdm",
+    "term": "Intune / MDM の悪用",
+    "en": "Intune / MDM as Attack Surface",
+    "aka": "Intune, MDM, device management, script push, cloud-to-device, remediation",
+    "cat": "cloud",
+    "body": "Intune等のMDM(モバイルデバイス管理)は、管理下の全エンドポイントへアプリ・構成・スクリプトを配布できる強力な管理面であり、侵害されると「クラウド→全端末」の一斉展開経路になる。Intune管理者(またはGlobal Admin/Intune Administratorロール)を奪取した攻撃者は、PowerShellスクリプトやWin32アプリ、修復(remediation)スクリプトを全デバイスまたは特定グループにSYSTEM権限でプッシュし、横展開・ランサム展開・資格情報窃取を面で実行できる。オンプレのGPO悪用のクラウド版に相当する。監視はIntuneのスクリプト/アプリ割当の変更(監査ログ)、新規デバイス構成プロファイル、権限ロールの付与、短時間での多数デバイスへの配布を相関する。",
+    "points": [
+      "MDMは全管理端末へアプリ/スクリプトをSYSTEMで配布=クラウド版GPO悪用",
+      "Intune/Global Admin奪取→全端末へランサム/横展開を一斉実行",
+      "監視: スクリプト/アプリ割当変更、構成プロファイル、ロール付与",
+      "Tier0相当の管理面として厳格なアクセス制御・特権管理を"
+    ],
+    "related": [
+      "entraroles",
+      "gpoabuse",
+      "condaccess",
+      "devicejoin",
+      "pim"
+    ]
+  },
+  {
+    "id": "unconstrained",
+    "term": "制約なし委任",
+    "en": "Unconstrained Delegation",
+    "aka": "unconstrained delegation, TrustedForDelegation, TGT capture, printer bug",
+    "cat": "auth",
+    "body": "Kerberos委任の最も危険な形態。TrustedForDelegationフラグを持つホストへユーザーがKerberos認証すると、そのユーザーのTGTがホストのメモリ(LSA)に転送・保存される。攻撃者がこのホストを侵害すると、認証してきた任意ユーザー(管理者含む)のTGTを収集し、なりすませる。決定打はプリンタバグ(MS-RPRN)やPetitPotam(MS-EFSR)等の強制認証(coercion)で、DCのマシンアカウントを制約なし委任ホストへ認証させTGTを奪えば、DCSyncによりドメイン全体を掌握できる。制約付き委任/RBCDと異なり委任先の制限がないため被害が甚大。対策はDC/機微アカウントをProtected Users・「委任できない」設定にし、不要な制約なし委任を廃し、強制認証経路を塞ぐこと。監視はTrustedForDelegation属性の付与、coercionの兆候。",
+    "points": [
+      "TrustedForDelegationホストは認証者のTGTをメモリに保持→侵害で収集・なりすまし",
+      "coercion(プリンタバグ/PetitPotam)でDCのTGTを奪取→DCSyncでドメイン掌握",
+      "制約付き/RBCDと違い委任先無制限で被害甚大",
+      "対策: Protected Users・委任不可設定・不要委任の廃止・強制認証遮断"
+    ],
+    "related": [
+      "delegation",
+      "s4u",
+      "coercion",
+      "tgt",
+      "protectedusers"
+    ]
+  },
+  {
+    "id": "lockoutpolicy",
+    "term": "アカウントロックアウト/パスワードポリシー",
+    "en": "Account Lockout & Password Policy (incl. Fine-Grained PSO)",
+    "aka": "lockout threshold, password policy, Fine-Grained Password Policy, PSO, 4740, 4625",
+    "cat": "adstruct",
+    "body": "パスワードの複雑性・長さ・有効期限やロックアウトの閾値を定める設定で、認証系アラートの正しい解釈に不可欠。既定ではドメインに単一のパスワードポリシー(Default Domain Policy)が適用されるが、Fine-Grained Password Policy(PSO=Password Settings Object)で特定グループ/ユーザーに個別ポリシーを割り当てられる(例:管理者に厳格な要件)。ロックアウト閾値は「N回失敗でM分ロック」を定め、超過でEvent 4740が発生する。攻撃者はこのロックアウトを避けるため、多数アカウントに少数回ずつ試すパスワードスプレー(ロックアウトを誘発しにくい)を選ぶ。逆に単一アカウントへの総当たりは4625多発+4740を生む。SOCはロックアウト嵐/失敗パターンからスプレーvs総当たりvs設定不整合を判別する。",
+    "points": [
+      "Default Domain Policyの単一適用+PSO(Fine-Grained)で個別割当",
+      "ロックアウト閾値超過=Event 4740、失敗=4625",
+      "スプレー=多アカウント少数試行(ロックアウト回避)、総当たり=単一に多数",
+      "4625/4740のパターンからスプレー/総当たり/設定問題を判別"
+    ],
+    "related": [
+      "passwordspray",
+      "logonevents",
+      "protectedusers",
+      "gpo"
     ]
   }
 ];
