@@ -1,5 +1,5 @@
 window.AD = window.AD || {};
-AD.I18N = AD.I18N || { ja: {}, en: {} };
+AD.I18N = AD.I18N || { ja: {} };
 AD.I18N.ja.phases = [
     { id: "recon",     idx: "01", name: "偵察・列挙",           en: "Recon / Enum",           desc: "ドメインの構造・ユーザー・権限関係・攻撃経路を、正規プロトコル（LDAP/Kerberos/SMB）を使って合法的に近い形で収集する段階。ここでの静けさが後段の成否を分ける。" },
     { id: "credaccess",idx: "02", name: "資格情報アクセス",     en: "Credential Access",      desc: "Kerberos やホスト上のメモリ・ディスクから、パスワードハッシュ・チケット・平文・鍵を奪う。AD 侵害の心臓部。" },

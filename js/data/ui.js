@@ -1,10 +1,10 @@
 /*
- * ui.js — interface strings for each language. AD.I18N[lang].ui holds every
- * user-facing label; data (attacks/scenarios/phases/groups) live in the
- * i18n.<lang>.js files. Keep keys identical across languages.
+ * ui.js — interface strings for the attack-map page. AD.I18N.ja.ui holds every
+ * user-facing label; the data itself (attacks / scenarios / phases / groups)
+ * lives in the sibling js/data/*.js files. Japanese-only.
  */
 window.AD = window.AD || {};
-AD.I18N = AD.I18N || { ja: {}, en: {} };
+AD.I18N = AD.I18N || { ja: {} };
 
 AD.I18N.ja.ui = {
   searchPh: "手法 / MITRE / ツール…",
@@ -14,7 +14,6 @@ AD.I18N.ja.ui = {
   viewPurpleTi: "攻撃・防御の両方を表示",
   viewBlueTi: "防御(Blue)側を強調表示",
   themeAl: "配色テーマを切替（ダーク／ライト）",
-  langAl: "言語を切替 / Switch language",
   clearFilter: "× 絞り込み解除",
   conceptsLink: "📖 用語集",
   legRed: "RedTeam / 攻撃",

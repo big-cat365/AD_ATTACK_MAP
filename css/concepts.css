@@ -3,9 +3,9 @@
    (topbar, hero, spine, footer, modal are shared). This file only adds the
    category nav, concept cards, and the inline-figure (.fig) styling. */
 
-/* top-bar link that matches .iconbtn */
-
-/* ---------- category nav ---------- */
+/* ==========================================================================
+   CATEGORY NAV
+   ========================================================================== */
 .cat-nav { display: flex; flex-direction: column; gap: 6px; }
 .cat-group { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
 .cat-node { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--panel); color: var(--ink-2); border: 0; cursor: pointer; font-size: 13.5px; font-family: inherit; text-align: left; transition: background .16s, color .16s; }
@@ -23,15 +23,19 @@
 .cat-sub .cat-sub-term { font-weight: 500; }
 .cat-sub .cat-sub-en { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
 
-/* ---------- section ---------- */
+/* ==========================================================================
+   SECTIONS
+   ========================================================================== */
 .c-section { margin: 40px 0 8px; scroll-margin-top: 96px; }
 .c-section.hide { display: none; }
 .c-sec-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 18px; }
 .c-sec-head h2 { font-family: var(--mono); font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
 .c-sec-count { font-family: var(--mono); font-size: 12px; color: var(--faint); }
 
-/* ---------- card grid ----------
-   CSS Grid (was CSS multi-column masonry). Multi-column must balance every
+/* ==========================================================================
+   CARD GRID
+   ========================================================================== */
+/* CSS Grid (was CSS multi-column masonry). Multi-column must balance every
    card's height before it can paint the first column, which cost ~216ms for
    300+ cards. Grid lays out incrementally and pairs well with
    content-visibility, so off-screen rows are skipped → near-instant first paint. */
@@ -46,6 +50,9 @@
 @keyframes cflash { 0% { border-color: var(--defense); box-shadow: 0 0 0 3px var(--defense-glow); } 100% { border-color: var(--line); box-shadow: var(--shadow); } }
 @media (prefers-reduced-motion: reduce) { .c-card.flash { animation: none; } }
 
+/* ==========================================================================
+   CARD INTERNALS
+   ========================================================================== */
 .c-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .c-head h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.25; }
 .c-en { font-family: var(--mono); font-size: 11.5px; color: var(--defense); }
@@ -62,7 +69,9 @@
 .rel-chip { font-family: var(--sans); font-size: 11.5px; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 999px; padding: 2px 10px; margin: 0 5px 5px 0; cursor: pointer; transition: color .15s, border-color .15s; }
 .rel-chip:hover { color: var(--defense); border-color: var(--defense-line); }
 
-/* ---------- inline figure ---------- */
+/* ==========================================================================
+   FIGURES
+   ========================================================================== */
 .c-fig { margin: 12px 0 2px; padding: 10px; background: var(--ground-2); border: 1px solid var(--line-soft); border-radius: var(--radius); cursor: zoom-in; transition: border-color .16s; }
 .c-fig:hover, .c-fig:focus-visible { border-color: var(--defense-line); outline: none; }
 .c-fig[data-figlazy] { min-height: 120px; }
@@ -94,4 +103,7 @@
 
 .m-eyebrow { font-family: var(--mono); font-size: 12px; color: var(--defense); margin: 0 0 4px; }
 
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
 @media (max-width: 640px) { .c-grid { column-width: auto; columns: 1; } }

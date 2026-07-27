@@ -1,6 +1,6 @@
 /*
  * concepts.js — renderer + interaction for the concepts/glossary page.
- * Reads AD.CONCEPTS[lang] (data), AD.CONCEPTS_UI[lang], AD.CONCEPT_CATS, AD.FIGS.
+ * Reads AD.CONCEPTS.ja (data), AD.CONCEPTS_UI.ja, AD.CONCEPT_CATS, AD.FIGS.
  * Self-contained (classic script, file:// friendly). Reuses AD.esc from
  * util.js and the shared UI runtime (i18n, theme, debounce, prefetch, lazy
  * fill, overlay, bootstrap) from core.js.
@@ -9,14 +9,13 @@ window.AD = window.AD || {};
 (function (AD) {
   "use strict";
   var esc = AD.esc;
-  var lang = "ja";
-  var byId = {};        // id -> concept (current language)
+  var byId = {};        // id -> concept
   var UI, CATS = AD.CONCEPT_CATS;
 
-  function catLabel(c) { return lang === "ja" ? c.ja : c.en; }
+  function catLabel(c) { return c.ja; }
 
   function renderNav() {
-    var data = AD.CONCEPTS[lang] || [];
+    var data = AD.CONCEPTS.ja || [];
     document.getElementById("catnav").innerHTML = CATS.map(function (c) {
       var items = data.filter(function (t) { return t.cat === c.id; });
       if (!items.length) return "";
@@ -90,7 +89,7 @@ window.AD = window.AD || {};
   }
 
   function renderMain() {
-    var data = AD.CONCEPTS[lang] || [];
+    var data = AD.CONCEPTS.ja || [];
     byId = {}; data.forEach(function (t) { byId[t.id] = t; });
     var html = CATS.map(function (c) {
       var items = data.filter(function (t) { return t.cat === c.id; });
@@ -111,13 +110,8 @@ window.AD = window.AD || {};
     applyFilter();
   }
 
-  function setLang(l) {
-    if (!AD.CONCEPTS || !AD.CONCEPTS[l]) l = "ja";
-    lang = l;
-    UI = AD.CONCEPTS_UI[l];
-    document.documentElement.lang = l;
-    var lb = document.getElementById("langBtn");
-    if (lb) lb.textContent = (l === "ja" ? "EN" : "日本語");
+  function loadData() {
+    UI = AD.CONCEPTS_UI.ja;
     render();
   }
 
@@ -182,7 +176,8 @@ window.AD = window.AD || {};
 
   function init() {
     wire();
-    setLang("ja");
+    loadData();
+    AD.backToTop.mount();
     AD.prefetchWhenIdle(["index.html", "js/data/attacks.js", "js/data/scenarios.js",
       "js/data/phases.js", "js/data/ui.js", "js/diagram.js", "js/views.js",
       "js/modal.js", "js/app.js", "js/components.js"]);

@@ -238,6 +238,63 @@ window.AD = window.AD || {};
     return { open: open, close: close, isOpen: isOpen };
   })();
 
+  /**
+   * Floating "back to top" button, shared by both pages. Built entirely from
+   * JS (no markup in the HTML) and appended to <body> on mount(). Visibility
+   * is driven by the `show` class rather than the `hidden` attribute so the
+   * CSS opacity/transform transition can run. `update()` is public because
+   * the automated regression harness cannot dispatch real scroll events —
+   * it drives visibility checks by calling update() directly.
+   */
+  AD.backToTop = (function () {
+    var api = { el: null };
+    var mounted = false;
+    var threshold = 600;
+
+    function scrollY() {
+      return window.scrollY || document.documentElement.scrollTop || 0;
+    }
+
+    api.update = function () {
+      if (!api.el) return;
+      api.el.classList.toggle("show", scrollY() > threshold);
+    };
+
+    function onClick() {
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+      if (api.el) api.el.blur();
+    }
+
+    api.mount = function (opts) {
+      if (mounted) return; // idempotent
+      if (!document.body) return;
+      opts = opts || {};
+      threshold = (opts.threshold == null) ? 600 : opts.threshold;
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "to-top";
+      btn.id = "toTop";
+      btn.setAttribute("aria-label", "ページ上部へ戻る");
+      btn.title = "ページ上部へ戻る";
+      btn.innerHTML = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>';
+      btn.addEventListener("click", onClick);
+
+      document.body.appendChild(btn);
+      api.el = btn;
+      mounted = true;
+
+      var onScrollResize = AD.rafThrottle(api.update);
+      window.addEventListener("scroll", onScrollResize, { passive: true });
+      window.addEventListener("resize", onScrollResize, { passive: true });
+
+      api.update();
+    };
+
+    return api;
+  })();
+
   /** Run `fn` once the DOM is ready (immediately if already past `loading`). */
   AD.onReady = function (fn) {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn);

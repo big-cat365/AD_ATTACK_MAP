@@ -1,5 +1,5 @@
 window.AD = window.AD || {};
-AD.I18N = AD.I18N || { ja: {}, en: {} };
+AD.I18N = AD.I18N || { ja: {} };
 AD.I18N.ja.attacks = [
   {
     "name": "BloodHound / SharpHound Collection",

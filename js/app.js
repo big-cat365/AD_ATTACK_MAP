@@ -1,6 +1,6 @@
 /*
- * app.js — interaction layer + bootstrap. Owns transient UI state (language,
- * active view, severity filter, search) and wires DOM events to the modules.
+ * app.js — interaction layer + bootstrap. Owns transient UI state (active
+ * view, severity filter, search) and wires DOM events to the modules.
  * Loaded last, after the DOM and all other modules. Shared UI plumbing
  * (theme toggle, debounce, prefetch, i18n, bootstrap) lives in core.js.
  */
@@ -9,19 +9,13 @@ window.AD = window.AD || {};
   "use strict";
 
   var TOTAL = 0;
-  var lang = "ja";
   var activeSev = new Set();
 
-  /* ---- language ---- */
-  function setLang(l) {
-    if (!AD.I18N[l]) l = "ja";
-    lang = l;
-    var d = AD.I18N[l];
+  /* ---- bootstrap ---- */
+  function loadData() {
+    var d = AD.I18N.ja;
     AD.ATTACKS = d.attacks; AD.SCENARIOS = d.scenarios; AD.PHASES = d.phases; AD.GROUP_ORDER = d.groupOrder; AD.UI = d.ui;
     TOTAL = AD.ATTACKS.length;
-    document.documentElement.lang = l;
-    var lb = document.getElementById("langBtn");
-    if (lb) lb.textContent = (l === "ja" ? "EN" : "日本語");
     AD.applyI18n(AD.UI);
     AD.views.render();
     applyFilter();
@@ -145,8 +139,9 @@ window.AD = window.AD || {};
 
   function init() {
     wire();
-    setLang("ja");
+    loadData();
     setView("purple");
+    AD.backToTop.mount();
     AD.prefetchWhenIdle(["concepts.html", "css/concepts.css", "js/data/concept-ui.js",
       "js/data/concept-figs.js", "js/data/concepts.js", "js/concepts.js"]);
   }

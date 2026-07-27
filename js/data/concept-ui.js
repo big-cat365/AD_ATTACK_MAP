@@ -6,16 +6,16 @@
 window.AD = window.AD || {};
 
 AD.CONCEPT_CATS = [
-  { id: "os",       ja: "Windows OS 基礎",            en: "Windows OS Fundamentals" },
-  { id: "identity", ja: "識別子とセキュリティ記述子",   en: "Identifiers & Security Descriptors" },
-  { id: "adstruct", ja: "Active Directory 構造",       en: "Active Directory Structure" },
-  { id: "objects",  ja: "オブジェクトとグループ",       en: "Objects & Groups" },
-  { id: "auth",     ja: "認証プロトコル",              en: "Authentication" },
-  { id: "pki",      ja: "証明書・PKI",                en: "Certificates & PKI" },
-  { id: "cloud",    ja: "クラウド / ハイブリッド",       en: "Cloud / Hybrid (Entra)" },
-  { id: "logging",  ja: "ログと監視",                 en: "Logging & Monitoring" },
-  { id: "prim",     ja: "攻撃プリミティブ・手口",       en: "Attack Primitives & Tradecraft" },
-  { id: "soc",      ja: "検知・防御 / SOC運用",         en: "Detection & Defense (SOC)" }
+  { id: "os",       ja: "Windows OS 基礎" },
+  { id: "identity", ja: "識別子とセキュリティ記述子" },
+  { id: "adstruct", ja: "Active Directory 構造" },
+  { id: "objects",  ja: "オブジェクトとグループ" },
+  { id: "auth",     ja: "認証プロトコル" },
+  { id: "pki",      ja: "証明書・PKI" },
+  { id: "cloud",    ja: "クラウド / ハイブリッド" },
+  { id: "logging",  ja: "ログと監視" },
+  { id: "prim",     ja: "攻撃プリミティブ・手口" },
+  { id: "soc",      ja: "検知・防御 / SOC運用" }
 ];
 
 AD.CONCEPTS_UI = {
@@ -23,7 +23,6 @@ AD.CONCEPTS_UI = {
     title: "AD / Windows 用語・概念リファレンス",
     searchPh: "用語 / 英語名 / 別名…",
     searchAl: "用語・英語名・別名で検索",
-    langAl: "言語を切替 / Switch language",
     themeAl: "配色テーマを切替（ダーク／ライト）",
     backMap: "🗺 攻撃マップ",
     tocTitle: "▸ カテゴリ — クリックで展開",

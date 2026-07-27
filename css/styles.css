@@ -1,6 +1,18 @@
 @charset "utf-8";
 
-:root {
+/* styles.css — shared stylesheet for the attack map (index.html) and the
+   concepts glossary (concepts.html). concepts.css (loaded only on the
+   glossary page) adds glossary-only rules on top of the tokens and
+   components defined here. */
+
+/* ==========================================================================
+   DESIGN TOKENS
+   ========================================================================== */
+
+/* Dark = the default world. Applies with no data-theme attribute set
+   (regardless of OS preference) and whenever data-theme="dark" is forced. */
+:root,
+:root[data-theme="dark"] {
     /* cool-biased neutrals — dark is the primary world */
     --ground: #0a0d14;
     --ground-2: #0d111b;
@@ -32,13 +44,19 @@
     --sev-med: #7f8a9e;
 
     --shadow: 0 1px 2px rgba(0,0,0,0.26);
-    --radius: 5px;
-    --mono: "Cascadia Code", "JetBrains Mono", ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
-    --sans: "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, -apple-system, sans-serif;
   }
 
+  /* Light palette. NOTE: this palette is intentionally written TWICE — once
+     inside the @media block below (applies when the OS prefers light and no
+     theme is forced) and once as the explicit [data-theme="light"] override
+     right after it. Plain CSS cannot share one declaration block across a
+     media query and a top-level rule. If you change a value here, change the
+     matching value in the other block too — they must stay in sync. */
   @media (prefers-color-scheme: light) {
-    :root {
+    /* :not([data-theme="dark"]) is required here: without it, this block
+       would re-apply the light palette even when data-theme="dark" is
+       forced on an OS-light machine. */
+    :root:not([data-theme="dark"]) {
       --ground: #eef1f7;
       --ground-2: #e7ebf3;
       --panel: #ffffff;
@@ -66,25 +84,49 @@
       --shadow: 0 1px 2px rgba(20,30,50,0.05);
     }
   }
-  /* explicit toggle overrides win in both directions */
-  :root[data-theme="dark"] {
-    --ground: #0a0d14; --ground-2: #0d111b; --panel: #141a26; --panel-2: #1a2130;
-    --line: #262f40; --line-soft: #1c2433; --ink: #d7deec; --ink-2: #aab4c8; --muted: #7c889e; --faint: #808ca2;
-    --offense: #f24c5c; --offense-dim: #b8404c; --offense-glow: rgba(242,76,92,0.14); --offense-line: rgba(242,76,92,0.32);
-    --defense: #33bdd6; --defense-dim: #2f94a6; --defense-glow: rgba(51,189,214,0.13); --defense-line: rgba(51,189,214,0.30);
-    --purple: #9b83f9; --purple-dim: #7a66d6; --purple-glow: rgba(155,131,249,0.16);
-    --sev-crit: #f0a13a; --sev-high: #c98f4a; --sev-med: #7f8a9e;
-    --shadow: 0 1px 2px rgba(0,0,0,0.26);
-  }
+  /* Same light palette as above (kept in sync — see note above). This
+     selector has the same specificity as :root:not([data-theme="dark"])
+     above, so it must come AFTER the media query in source order to
+     correctly win when data-theme="light" is forced on an OS-light machine;
+     it simply doesn't match at all when the OS prefers dark. */
   :root[data-theme="light"] {
-    --ground: #eef1f7; --ground-2: #e7ebf3; --panel: #ffffff; --panel-2: #f5f7fb;
-    --line: #d5dbe7; --line-soft: #e3e8f0; --ink: #1a2130; --ink-2: #3a4459; --muted: #5b6577; --faint: #5f6a7d;
-    --offense: #d61f30; --offense-dim: #b23543; --offense-glow: rgba(214,31,48,0.08); --offense-line: rgba(214,31,48,0.28);
-    --defense: #0b7f9b; --defense-dim: #2c7d90; --defense-glow: rgba(11,127,155,0.08); --defense-line: rgba(11,127,155,0.26);
-    --purple: #6b4fe0; --purple-dim: #7a66d6; --purple-glow: rgba(107,79,224,0.10);
-    --sev-crit: #a05c10; --sev-high: #8a611c; --sev-med: #556070;
+    --ground: #eef1f7;
+    --ground-2: #e7ebf3;
+    --panel: #ffffff;
+    --panel-2: #f5f7fb;
+    --line: #d5dbe7;
+    --line-soft: #e3e8f0;
+    --ink: #1a2130;
+    --ink-2: #3a4459;
+    --muted: #5b6577;
+    --faint: #5f6a7d;
+    --offense: #d61f30;
+    --offense-dim: #b23543;
+    --offense-glow: rgba(214, 31, 48, 0.08);
+    --offense-line: rgba(214, 31, 48, 0.28);
+    --defense: #0b7f9b;
+    --defense-dim: #2c7d90;
+    --defense-glow: rgba(11, 127, 155, 0.08);
+    --defense-line: rgba(11, 127, 155, 0.26);
+    --purple: #6b4fe0;
+    --purple-dim: #7a66d6;
+    --purple-glow: rgba(107, 79, 224, 0.10);
+    --sev-crit: #a05c10;
+    --sev-high: #8a611c;
+    --sev-med: #556070;
     --shadow: 0 1px 2px rgba(20,30,50,0.05);
   }
+
+  /* theme-independent tokens (identical in both themes) */
+  :root {
+    --radius: 5px;
+    --mono: "Cascadia Code", "JetBrains Mono", ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+    --sans: "Segoe UI", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, -apple-system, sans-serif;
+  }
+
+  /* ==========================================================================
+     BASE + LAYOUT
+     ========================================================================== */
 
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -102,7 +144,9 @@
 
   .wrap { max-width: 1360px; margin: 0 auto; padding: 0 20px; }
 
-  /* ---------- top bar ---------- */
+  /* ==========================================================================
+     TOP BAR
+     ========================================================================== */
   .topbar {
     position: sticky; top: 0; z-index: 50;
     backdrop-filter: blur(12px);
@@ -156,13 +200,13 @@
   .clearbtn:hover { color: var(--ink); border-color: var(--muted); }
   .clearbtn[hidden] { display: none; }
 
-  /* ---------- hero ---------- */
+  /* ==========================================================================
+     HERO + STATS
+     ========================================================================== */
   .hero { padding: 48px 0 22px; border-bottom: 1px solid var(--line-soft); }
   .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
   .eyebrow .rt { color: var(--offense); } .eyebrow .bt { color: var(--defense); }
   h1.title { font-family: var(--mono); font-weight: 700; font-size: clamp(26px, 3.6vw, 40px); line-height: 1.08; margin: 0 0 14px; letter-spacing: -0.01em; text-wrap: balance; }
-  .lede { max-width: 66ch; color: var(--ink-2); font-size: 15px; margin: 0 0 6px; }
-  .lede b { color: var(--ink); font-weight: 600; }
 
   /* stat tiles */
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 30px 0 8px; }
@@ -170,8 +214,6 @@
   .stat .n { font-family: var(--mono); font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
   .stat .l { font-size: 12px; color: var(--muted); margin-top: 8px; letter-spacing: 0.02em; }
   .stat.crit .n { color: var(--sev-crit); }
-  .stat.red .n { color: var(--offense); }
-  .stat.blue .n { color: var(--defense); }
 
   /* legend */
   .legend { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 26px 0 4px; font-size: 12.5px; color: var(--muted); align-items: center; }
@@ -180,7 +222,9 @@
   .sw.off { background: var(--offense); } .sw.def { background: var(--defense); } .sw.pur { background: var(--purple); }
   .legend .diamond { color: var(--sev-crit); font-size: 11px; }
 
-  /* ---------- kill-chain spine ---------- */
+  /* ==========================================================================
+     KILL-CHAIN SPINE
+     ========================================================================== */
   .spine-sec { padding: 34px 0 8px; }
   .spine-title { font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
   .spine { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; align-items: stretch; overflow-x: auto; padding-bottom: 8px; }
@@ -205,7 +249,9 @@
   .phase-node:last-child .arrow { display: none; }
   .phase-node[aria-expanded="true"] .arrow { transform: translateY(-50%) rotate(90deg); }
 
-  /* ---------- kill-chain spine TOC (phase accordion panel) ---------- */
+  /* ==========================================================================
+     SPINE TOC — phase accordion panel
+     ========================================================================== */
   .spine-toc { margin-top: 10px; }
   .spine-toc[hidden] { display: none; }
   .ptoc { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 12px 14px 14px; }
@@ -228,7 +274,9 @@
   @keyframes cardflash { 0% { border-color: var(--defense); box-shadow: 0 0 0 3px var(--defense-glow); } 100% { } }
   @media (prefers-reduced-motion: reduce) { .card.flash { animation: none; } }
 
-  /* ---------- phase sections ---------- */
+  /* ==========================================================================
+     PHASE + GROUP HEADINGS
+     ========================================================================== */
   main { padding: 10px 0 40px; }
   .phase-block { padding: 34px 0 8px; scroll-margin-top: 76px; }
   .phase-head { display: flex; align-items: baseline; gap: 14px; margin: 0 0 4px; flex-wrap: wrap; }
@@ -241,13 +289,18 @@
   .group-label { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 22px 0 12px; display: flex; align-items: center; gap: 10px; }
   .group-label::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
 
+  /* ==========================================================================
+     CARD GRID
+     ========================================================================== */
   /* CSS Grid (was multi-column masonry). Grid lays out incrementally, keeps
      lazily-filled cards from re-balancing/jumping the whole column on scroll,
      and pairs cleanly with .card's content-visibility for a fast first paint. */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start; }
   .gcount { font-family: var(--mono); color: var(--faint); font-size: 11px; }
 
-  /* ---------- attack card ---------- */
+  /* ==========================================================================
+     CARD
+     ========================================================================== */
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
     overflow: hidden; box-shadow: var(--shadow); position: relative;
@@ -274,6 +327,9 @@
   .tag.mitre { color: var(--ink-2); border-color: var(--line); }
   .tag.cve { color: var(--sev-crit); border-color: color-mix(in srgb, var(--sev-crit) 40%, var(--line)); }
 
+  /* ==========================================================================
+     LANES + HUNT BLOCKS
+     ========================================================================== */
   /* offense / defense split */
   .split { display: grid; grid-template-columns: 1fr; }
   .lane { padding: 12px 16px 13px 16px; transition: opacity .28s, filter .28s; }
@@ -301,6 +357,9 @@
   .plat-mdi { background: var(--defense); color: #06222a; }
   .plat-sentinel { background: #b98cff; color: #12071f; }
   .plat-entra { background: #f2c14e; color: #2a1f00; }
+  /* Umbrella product for MDE/MDI — kept in the same blue/teal family but at
+     a distinct hue/value so the badge still reads as its own platform. */
+  .plat-defender-xdr { background: #4d84d1; color: #041129; }
   /* CrowdStrike Falcon block (distinct red accent) + dialect badges */
   .hunt.cs { border-color: rgba(226, 74, 74, 0.34); }
   .hunt.cs > summary { color: #e2685a; }
@@ -308,7 +367,6 @@
   .plat-event-search { background: #e2685a; color: #2a0808; }
   .plat-logscale { background: #f2955a; color: #2a1400; }
   .plat-identity-protection { background: #e2b85a; color: #2a1f00; }
-  .plat-falcon { background: #e2685a; color: #2a0808; }
   .hunt pre.kql { margin: 0; padding: 9px 10px; background: var(--ground-2); border: 1px solid var(--line-soft); border-radius: 5px; overflow-x: auto; }
   .hunt pre.kql code { display: block; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--ink); white-space: pre; background: none; border: 0; padding: 0; border-radius: 0; }
   .lane p { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
@@ -326,18 +384,18 @@
   body[data-view="blue"] .card:hover .lane.off, body[data-view="blue"] .card:focus-within .lane.off { opacity: 1; filter: none; }
 
   /* hidden by filter/search */
-  .card.hide, .phase-block.hide, .group.hide { display: none; }
+  .card.hide, .phase-block.hide { display: none; }
   .noresult { text-align: center; color: var(--muted); font-family: var(--mono); padding: 60px 0; display: none; }
   .noresult.show { display: block; }
 
   /* severity filter chips */
-  .filterbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 0; }
-  .filterbar .fl { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--faint); margin-right: 2px; }
   .chip { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 4px 11px; cursor: pointer; transition: all .16s; }
   .chip[aria-pressed="true"] { color: var(--ink); border-color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
   .chip.crit[aria-pressed="true"] { color: var(--sev-crit); border-color: var(--sev-crit); background: color-mix(in srgb, var(--sev-crit) 12%, transparent); }
 
-  /* footer */
+  /* ==========================================================================
+     FOOTER
+     ========================================================================== */
   footer { border-top: 1px solid var(--line); margin-top: 30px; padding: 28px 0 60px; color: var(--muted); font-size: 13px; }
   footer .fgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 22px; }
   footer h4 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 10px; }
@@ -345,6 +403,9 @@
   footer a:hover { text-decoration: underline; }
   footer .disc { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--faint); max-width: 92ch; }
 
+  /* ==========================================================================
+     UTILITIES + STATES
+     ========================================================================== */
   /* reveal animation */
   .reveal { opacity: 0; transform: translateY(12px); }
   .reveal.in { opacity: 1; transform: none; transition: opacity .5s ease, transform .5s ease; }
@@ -352,13 +413,19 @@
 
   :focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; border-radius: 4px; }
 
-  /* ---------- attack-flow sequence diagram ---------- */
+  /* ==========================================================================
+     DIAGRAM — attack-flow sequence diagram
+     ========================================================================== */
   .k-attack  { --kc: var(--offense); }
   .k-auth    { --kc: #6f86c9; }
   .k-data    { --kc: var(--purple); }
   .k-move    { --kc: #e0863a; }
   .k-defense { --kc: var(--defense); }
-  :root[data-theme="light"] .k-auth, :root:not([data-theme="dark"]) .k-auth { --kc: #4a63b8; }
+  /* NOTE: deliberately scoped to the EXPLICIT light theme only. Do not add
+     :root:not([data-theme="dark"]) here — that selector also matches the
+     default (no-attribute) state, which would apply the light-tuned blue on
+     OS-dark machines. See the theming note in the DESIGN TOKENS section. */
+  :root[data-theme="light"] .k-auth { --kc: #4a63b8; }
 
   .diagram { margin: 12px 0 4px; border: 1px solid var(--line-soft); border-radius: 5px; background: var(--ground-2); }
   .diagram-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px 2px; }
@@ -372,8 +439,6 @@
   .diagram { cursor: pointer; }
   .diagram:hover { border-color: var(--muted); }
   .diagram:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
-  .dscroll.empty { min-height: 64px; display: grid; place-items: center; }
-  .dscroll.empty::after { content: "…"; color: var(--faint); font-family: var(--mono); }
 
   svg.seq { display: block; }
   svg.seq text { font-family: var(--sans); }
@@ -384,6 +449,8 @@
   svg.seq .slabel { fill: var(--ink-2); font-size: 10px; }
   svg.seq .snum { fill: #fff; font-size: 9px; font-weight: 700; font-family: var(--mono); }
   svg.seq .arrow { stroke: var(--kc); stroke-width: 1.8; fill: none; }
+  /* Currently matches nothing (every defense step so far happens to render
+     as a self-box), but a cross-actor defense step is legal data — keep. */
   svg.seq .arrow.k-defense { stroke-dasharray: 5 4; }
   svg.seq .ahead { fill: var(--kc); stroke: none; }
   svg.seq .badge { fill: var(--kc); stroke: none; }
@@ -396,7 +463,9 @@
   i.ln { width: 15px; height: 0; border-top: 2px solid var(--kc); display: inline-block; }
   i.ln.k-defense { border-top-style: dashed; }
 
-  /* ---------- modal ---------- */
+  /* ==========================================================================
+     MODAL
+     ========================================================================== */
   .modal[hidden] { display: none; }
   .modal { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; }
   .modal-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--ground) 72%, transparent); backdrop-filter: blur(6px); }
@@ -423,6 +492,28 @@
   .m-lane .mono { font-family: var(--mono); font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 5px; padding: 2px 6px; display: inline-block; }
   @media (max-width: 620px) { .m-lanes { grid-template-columns: 1fr; } .modal-body { padding: 20px 18px 24px; } }
 
+  /* ==========================================================================
+     BACK TO TOP
+     ========================================================================== */
+  /* z-index 40: below .topbar (50) and .modal (100), above ordinary page content. */
+  .to-top {
+    position: fixed; right: 20px; bottom: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+    box-shadow: var(--shadow); cursor: pointer;
+    opacity: 0; visibility: hidden; transform: translateY(8px); pointer-events: none;
+    transition: opacity .18s, transform .18s, visibility .18s, border-color .18s, color .18s;
+  }
+  .to-top.show { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
+  .to-top:hover { color: var(--ink); border-color: var(--muted); }
+  .to-top:focus-visible { opacity: 1; visibility: visible; pointer-events: auto; outline: 2px solid var(--purple); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .to-top { transition: none; } }
+
+  /* ==========================================================================
+     RESPONSIVE
+     ========================================================================== */
   @media (max-width: 640px) {
     .grid { grid-template-columns: 1fr; }
     .brand span { display: none; }
@@ -431,4 +522,5 @@
     .search { flex: 1 1 100%; order: 5; }
     .topbar-filters { padding: 0 14px 8px; }
     .segmented button { padding: 6px 11px; }
+    .to-top { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
   }
