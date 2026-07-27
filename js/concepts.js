@@ -1,7 +1,9 @@
 /*
  * concepts.js — renderer + interaction for the concepts/glossary page.
  * Reads AD.CONCEPTS[lang] (data), AD.CONCEPTS_UI[lang], AD.CONCEPT_CATS, AD.FIGS.
- * Self-contained (classic script, file:// friendly). Reuses AD.esc from util.js.
+ * Self-contained (classic script, file:// friendly). Reuses AD.esc from
+ * util.js and the shared UI runtime (i18n, theme, debounce, prefetch, lazy
+ * fill, overlay, bootstrap) from core.js.
  */
 window.AD = window.AD || {};
 (function (AD) {
@@ -10,14 +12,6 @@ window.AD = window.AD || {};
   var lang = "ja";
   var byId = {};        // id -> concept (current language)
   var UI, CATS = AD.CONCEPT_CATS;
-
-  function applyUiStrings() {
-    document.querySelectorAll("[data-t]").forEach(function (el) { if (UI[el.getAttribute("data-t")] != null) el.textContent = UI[el.getAttribute("data-t")]; });
-    document.querySelectorAll("[data-t-html]").forEach(function (el) { if (UI[el.getAttribute("data-t-html")] != null) el.innerHTML = UI[el.getAttribute("data-t-html")]; });
-    document.querySelectorAll("[data-t-ph]").forEach(function (el) { el.setAttribute("placeholder", UI[el.getAttribute("data-t-ph")]); });
-    document.querySelectorAll("[data-t-al]").forEach(function (el) { el.setAttribute("aria-label", UI[el.getAttribute("data-t-al")]); });
-    document.title = UI.title + " — AD Attack Map";
-  }
 
   function catLabel(c) { return lang === "ja" ? c.ja : c.en; }
 
@@ -47,9 +41,6 @@ window.AD = window.AD || {};
     return '<div class="c-fig" data-fig="' + id + '" data-figlazy="1" title="' + esc(UI.figHint) + '" tabindex="0" role="button" aria-label="' + esc(UI.figHint) + '"></div>';
   }
 
-  /** IntersectionObserver instance for lazy inline-figure fill (re-created per render). */
-  var figIo = null;
-
   /** Fill one figure placeholder with its SVG (once). Idempotent. */
   function fillFig(el) {
     if (!el || !el.hasAttribute("data-figlazy")) return;
@@ -58,45 +49,13 @@ window.AD = window.AD || {};
     el.removeAttribute("data-figlazy");
   }
 
-  /** Observe still-empty figure placeholders and fill them as they near the viewport. */
+  /** AD.lazy handle for the current render's figures; torn down and
+   *  recreated on each render() so re-renders never leak listeners. */
+  var figLazyHandle = null;
+
+  /** Delegates to the current lazy-fill handle (kept for the public API / regression harness). */
   function fillFigsNear(buffer) {
-    buffer = (buffer == null) ? 1000 : buffer;
-    var vh = window.innerHeight || document.documentElement.clientHeight || 0;
-    var figs = document.querySelectorAll(".c-fig[data-figlazy]");
-    for (var i = 0; i < figs.length; i++) {
-      var r = figs[i].getBoundingClientRect();
-      if (r.bottom > -buffer && r.top < vh + buffer) fillFig(figs[i]);
-    }
-    if (!document.querySelector(".c-fig[data-figlazy]")) {
-      window.removeEventListener("scroll", onFigScroll);
-      window.removeEventListener("resize", onFigScroll);
-    }
-  }
-  var figRaf = false;
-  function onFigScroll() {
-    if (figRaf) return;
-    figRaf = true;
-    var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
-    raf(function () { figRaf = false; fillFigsNear(1000); });
-  }
-  function setupFigLazy() {
-    var figs = Array.prototype.slice.call(document.querySelectorAll(".c-fig[data-figlazy]"));
-    if (!figs.length) return;
-    fillFigsNear(900);
-    if ("IntersectionObserver" in window) {
-      if (figIo) figIo.disconnect();
-      figIo = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (!entry.isIntersecting) return;
-          fillFig(entry.target);
-          figIo.unobserve(entry.target);
-        });
-      }, { root: null, rootMargin: "1000px 0px", threshold: 0 });
-      figs.forEach(function (el) { figIo.observe(el); });
-    }
-    window.addEventListener("scroll", onFigScroll, { passive: true });
-    window.addEventListener("resize", onFigScroll, { passive: true });
-    AD._fillFigsNear = fillFigsNear; // test hook
+    if (figLazyHandle) figLazyHandle.fillNear(buffer);
   }
 
   function relatedChips(rel) {
@@ -143,7 +102,14 @@ window.AD = window.AD || {};
     document.getElementById("main").innerHTML = html;
   }
 
-  function render() { applyUiStrings(); renderNav(); renderMain(); setupFigLazy(); applyFilter(); }
+  function render() {
+    AD.applyI18n(UI, { title: UI.title + " — AD Attack Map" });
+    renderNav();
+    renderMain();
+    if (figLazyHandle) figLazyHandle.destroy();
+    figLazyHandle = AD.lazy({ selector: ".c-fig[data-figlazy]", fill: fillFig, buffer: 1000, initialBuffer: 900 });
+    applyFilter();
+  }
 
   function setLang(l) {
     if (!AD.CONCEPTS || !AD.CONCEPTS[l]) l = "ja";
@@ -173,49 +139,26 @@ window.AD = window.AD || {};
     if (rc) rc.innerHTML = "<b>" + visible + "</b> " + esc(UI.count);
   }
 
-  /* ---- theme ---- */
-  function toggleTheme() {
-    var cur = document.documentElement.getAttribute("data-theme");
-    var sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var now = cur ? cur : (sysDark ? "dark" : "light");
-    document.documentElement.setAttribute("data-theme", now === "dark" ? "light" : "dark");
-  }
-
   /* ---- figure modal ---- */
-  var lastFocus = null;
   function openFig(id) {
     var svg = AD.FIGS && AD.FIGS[id];
     if (!svg) return;
     var t = byId[id];
-    document.getElementById("modal-body").innerHTML =
-      (t ? '<p class="m-eyebrow">' + esc(t.en) + '</p><h2 id="m-title">' + esc(t.term) + "</h2>" : "") +
+    var html = (t ? '<p class="m-eyebrow">' + esc(t.en) + '</p><h2 id="m-title">' + esc(t.term) + "</h2>" : "") +
       '<div class="m-fig">' + svg + "</div>";
-    var m = document.getElementById("modal");
-    m.hidden = false; document.body.style.overflow = "hidden";
-    lastFocus = document.activeElement;
-    m.querySelector(".modal-x").focus();
+    AD.overlay.open(html);
   }
-  function closeFig() {
-    var m = document.getElementById("modal");
-    m.hidden = true; document.body.style.overflow = "";
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
-  }
-  function isOpen() { return !document.getElementById("modal").hidden; }
 
   function gotoCard(id) {
     var el = document.getElementById("c-" + id);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    AD.flashScrollTo(el);
   }
 
-  function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
-
   function wire() {
-    document.getElementById("q").addEventListener("input", debounce(applyFilter, 90));
-    document.getElementById("themeBtn").addEventListener("click", toggleTheme);
+    document.getElementById("q").addEventListener("input", AD.debounce(applyFilter, 90));
+    document.getElementById("themeBtn").addEventListener("click", AD.theme.toggle);
     document.addEventListener("click", function (e) {
-      if (e.target.closest("[data-close]")) { closeFig(); return; }
+      if (e.target.closest("[data-close]")) { AD.overlay.close(); return; }
       if (e.target.closest("#clearFilters2")) { document.getElementById("q").value = ""; applyFilter(); return; }
       var fig = e.target.closest("[data-fig]");
       if (fig) { openFig(fig.getAttribute("data-fig")); return; }
@@ -231,35 +174,21 @@ window.AD = window.AD || {};
       }
     });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && isOpen()) closeFig();
+      if (e.key === "Escape" && AD.overlay.isOpen()) AD.overlay.close();
       var fig = e.target.closest && e.target.closest("[data-fig]");
       if (fig && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openFig(fig.getAttribute("data-fig")); }
     });
   }
 
-  /** Idle-deferred cache warming for the attack-map page (near-instant switch). */
-  function schedulePrefetch(list) {
-    var go = function () {
-      var ric = window.requestIdleCallback || function (f) { return setTimeout(f, 1500); };
-      ric(function () {
-        list.forEach(function (href) {
-          var l = document.createElement("link");
-          l.rel = "prefetch"; l.href = href;
-          document.head.appendChild(l);
-        });
-      });
-    };
-    if (document.readyState === "complete") go();
-    else window.addEventListener("load", go, { once: true });
-  }
-
   function init() {
     wire();
     setLang("ja");
-    schedulePrefetch(["index.html", "js/data/attacks.js", "js/data/scenarios.js",
+    AD.prefetchWhenIdle(["index.html", "js/data/attacks.js", "js/data/scenarios.js",
       "js/data/phases.js", "js/data/ui.js", "js/diagram.js", "js/views.js",
       "js/modal.js", "js/app.js", "js/components.js"]);
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
+
+  AD.concepts = { render: render, gotoCard: gotoCard, fillFigsNear: fillFigsNear };
+
+  AD.onReady(init);
 })(window.AD);

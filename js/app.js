@@ -1,7 +1,8 @@
 /*
  * app.js — interaction layer + bootstrap. Owns transient UI state (language,
  * active view, severity filter, search) and wires DOM events to the modules.
- * Loaded last, after the DOM and all other modules.
+ * Loaded last, after the DOM and all other modules. Shared UI plumbing
+ * (theme toggle, debounce, prefetch, i18n, bootstrap) lives in core.js.
  */
 window.AD = window.AD || {};
 (function (AD) {
@@ -12,15 +13,6 @@ window.AD = window.AD || {};
   var activeSev = new Set();
 
   /* ---- language ---- */
-  function applyUiStrings() {
-    var u = AD.UI;
-    document.querySelectorAll("[data-t]").forEach(function (el) { el.textContent = u[el.getAttribute("data-t")]; });
-    document.querySelectorAll("[data-t-html]").forEach(function (el) { el.innerHTML = u[el.getAttribute("data-t-html")]; });
-    document.querySelectorAll("[data-t-ph]").forEach(function (el) { el.setAttribute("placeholder", u[el.getAttribute("data-t-ph")]); });
-    document.querySelectorAll("[data-t-al]").forEach(function (el) { el.setAttribute("aria-label", u[el.getAttribute("data-t-al")]); });
-    document.querySelectorAll("[data-t-ti]").forEach(function (el) { el.setAttribute("title", u[el.getAttribute("data-t-ti")]); });
-  }
-
   function setLang(l) {
     if (!AD.I18N[l]) l = "ja";
     lang = l;
@@ -30,7 +22,7 @@ window.AD = window.AD || {};
     document.documentElement.lang = l;
     var lb = document.getElementById("langBtn");
     if (lb) lb.textContent = (l === "ja" ? "EN" : "日本語");
-    applyUiStrings();
+    AD.applyI18n(AD.UI);
     AD.views.render();
     applyFilter();
   }
@@ -96,16 +88,6 @@ window.AD = window.AD || {};
     applyFilter();
   }
 
-  /* ---- theme toggle ---- */
-  function toggleTheme() {
-    var cur = document.documentElement.getAttribute("data-theme");
-    var sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var now = cur ? cur : (sysDark ? "dark" : "light");
-    document.documentElement.setAttribute("data-theme", now === "dark" ? "light" : "dark");
-  }
-
-  function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
-
   /* ---- phase spine accordion (kill-chain TOC) ---- */
   function togglePhase(pid) {
     var panel = document.getElementById("ptoc-" + pid);
@@ -125,8 +107,7 @@ window.AD = window.AD || {};
     var el = document.getElementById(cid);
     if (!el) return;
     if (el.hasAttribute("data-lazy") && AD.views.fillCard) AD.views.fillCard(el);
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    AD.flashScrollTo(el);
   }
 
   /* ---- event wiring (bound once; survives re-render/lang-switch) ---- */
@@ -134,7 +115,7 @@ window.AD = window.AD || {};
     document.querySelectorAll(".segmented button").forEach(function (b) {
       b.addEventListener("click", function () { setView(b.dataset.view); });
     });
-    document.getElementById("q").addEventListener("input", debounce(applyFilter, 90));
+    document.getElementById("q").addEventListener("input", AD.debounce(applyFilter, 90));
     document.querySelectorAll(".chip").forEach(function (chip) {
       chip.addEventListener("click", function () {
         var s = chip.dataset.sev;
@@ -143,7 +124,7 @@ window.AD = window.AD || {};
         applyFilter();
       });
     });
-    document.getElementById("themeBtn").addEventListener("click", toggleTheme);
+    document.getElementById("themeBtn").addEventListener("click", AD.theme.toggle);
 
     document.addEventListener("click", function (e) {
       if (e.target.closest("[data-close]")) { AD.modal.close(); return; }
@@ -162,32 +143,13 @@ window.AD = window.AD || {};
     });
   }
 
-  /** After the page is idle, warm the browser cache for the other page so a
-   *  glossary⇄map switch is near-instant. Deferred so it never competes with
-   *  this page's own load. */
-  function schedulePrefetch(list) {
-    var go = function () {
-      var ric = window.requestIdleCallback || function (f) { return setTimeout(f, 1500); };
-      ric(function () {
-        list.forEach(function (href) {
-          var l = document.createElement("link");
-          l.rel = "prefetch"; l.href = href;
-          document.head.appendChild(l);
-        });
-      });
-    };
-    if (document.readyState === "complete") go();
-    else window.addEventListener("load", go, { once: true });
-  }
-
   function init() {
     wire();
     setLang("ja");
     setView("purple");
-    schedulePrefetch(["concepts.html", "css/concepts.css", "js/data/concept-ui.js",
+    AD.prefetchWhenIdle(["concepts.html", "css/concepts.css", "js/data/concept-ui.js",
       "js/data/concept-figs.js", "js/data/concepts.js", "js/concepts.js"]);
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
+  AD.onReady(init);
 })(window.AD);

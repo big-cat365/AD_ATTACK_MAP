@@ -1,13 +1,14 @@
 /*
  * modal.js — the enlarged detail view: full-size diagram + full offense/defense
  * copy for a single technique. Reuses AD.lanes / AD.tags / AD.diagram so its
- * content never drifts from the card grid.
+ * content never drifts from the card grid. The overlay shell itself (open/
+ * close/focus-trap/inert/scroll-lock) lives in AD.overlay (core.js) and is
+ * shared with the concepts page's figure modal.
  */
 window.AD = window.AD || {};
 (function (AD) {
   "use strict";
   var esc = AD.esc, mw = AD.monoWrap, ICONS = AD.ICONS;
-  var lastFocus = null;
 
   function findAttack(name) {
     var byName = AD.ATTACKS.filter(function (x) { return x.name === name; })[0];
@@ -16,6 +17,7 @@ window.AD = window.AD || {};
     return AD.ATTACKS.filter(function (x) { return AD.scnNorm(x.name) === key; })[0] || null;
   }
 
+  /** Build the modal body HTML for one technique. */
   function build(a) {
     var scn = AD.diagram.getScenario(a.name);
     var svg = scn
@@ -39,49 +41,15 @@ window.AD = window.AD || {};
     );
   }
 
-  var FOCUSABLE = 'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])';
-  function bg(on) {
-    ['.topbar', '.wrap'].forEach(function (sel) {
-      var el = document.querySelector(sel);
-      if (!el) return;
-      if (on) { el.setAttribute("inert", ""); el.setAttribute("aria-hidden", "true"); }
-      else { el.removeAttribute("inert"); el.removeAttribute("aria-hidden"); }
-    });
-  }
-  function onTrapKey(e) {
-    if (e.key !== "Tab") return;
-    var card = document.querySelector("#modal .modal-card");
-    var items = Array.prototype.slice.call(card.querySelectorAll(FOCUSABLE)).filter(function (el) { return el.offsetParent !== null; });
-    if (!items.length) return;
-    var first = items[0], last = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  }
-
   function open(name) {
     var a = findAttack(name);
     if (!a) return;
-    document.getElementById("modal-body").innerHTML = build(a);
-    var m = document.getElementById("modal");
-    m.hidden = false;
-    document.body.style.overflow = "hidden";
-    lastFocus = document.activeElement;
-    bg(true);
-    m.addEventListener("keydown", onTrapKey);
-    m.querySelector(".modal-x").focus();
-    m.querySelector(".modal-card").scrollTop = 0;
+    AD.overlay.open(build(a));
   }
 
-  function close() {
-    var m = document.getElementById("modal");
-    m.hidden = true;
-    m.removeEventListener("keydown", onTrapKey);
-    bg(false);
-    document.body.style.overflow = "";
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
-  }
+  function close() { AD.overlay.close(); }
 
-  function isOpen() { return !document.getElementById("modal").hidden; }
+  function isOpen() { return AD.overlay.isOpen(); }
 
   AD.modal = { open: open, close: close, isOpen: isOpen };
 })(window.AD);

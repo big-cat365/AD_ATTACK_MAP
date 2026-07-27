@@ -2,6 +2,7 @@
  * views.js — builds the static views from data: stat tiles, kill-chain spine,
  * and the per-phase card grid. Also owns the progressive (scroll-independent)
  * reveal + lazy diagram rendering. Reads AD.PHASES / AD.ATTACKS / AD.GROUP_ORDER.
+ * Lazy card-body fill is delegated to AD.lazy (core.js).
  */
 window.AD = window.AD || {};
 (function (AD) {
@@ -9,12 +10,7 @@ window.AD = window.AD || {};
   var esc = AD.esc, mw = AD.monoWrap, ICONS = AD.ICONS;
   var SEV = { Critical: 1, High: 1, Medium: 1 };
 
-  function phaseCounts() {
-    var m = {};
-    AD.PHASES.forEach(function (p) { m[p.id] = 0; });
-    AD.ATTACKS.forEach(function (a) { if (m[a.phase] != null) m[a.phase]++; });
-    return m;
-  }
+  /* ============================= STATS ============================= */
 
   function renderStats() {
     var sev = { Critical: 0, High: 0, Medium: 0 };
@@ -33,6 +29,15 @@ window.AD = window.AD || {};
     }).join("");
   }
 
+  /* ============================= SPINE ============================= */
+
+  function phaseCounts() {
+    var m = {};
+    AD.PHASES.forEach(function (p) { m[p.id] = 0; });
+    AD.ATTACKS.forEach(function (a) { if (m[a.phase] != null) m[a.phase]++; });
+    return m;
+  }
+
   function renderSpine() {
     var counts = phaseCounts();
     document.getElementById("spine").innerHTML = AD.PHASES.map(function (p) {
@@ -46,6 +51,8 @@ window.AD = window.AD || {};
         "</button>";
     }).join("");
   }
+
+  /* =========================== SPINE-TOC ============================ */
 
   function phaseGroupBody(items) {
     var groups = {};
@@ -78,6 +85,8 @@ window.AD = window.AD || {};
         "</div>";
     }).join("");
   }
+
+  /* ======================== CARD (head + body) ======================= */
 
   /** Heavy body for a card — diagram + Red/Blue split lanes. Rendered lazily. */
   function bodyHtml(a) {
@@ -125,6 +134,8 @@ window.AD = window.AD || {};
     article.removeAttribute("data-lazy");
   }
 
+  /* ============================ MAIN GRID ============================ */
+
   function renderMain() {
     document.getElementById("main").innerHTML = AD.PHASES.map(function (p) {
       var items = AD.ATTACKS.filter(function (a) { return a.phase === p.id; });
@@ -147,6 +158,19 @@ window.AD = window.AD || {};
     }).join("");
   }
 
+  /* ============================ LAZY FILL ============================ */
+
+  /** AD.lazy handle for the current render's card bodies; torn down and
+   *  recreated on each render() so re-renders never leak listeners. */
+  var lazyHandle = null;
+
+  /** Delegates to the current lazy-fill handle (kept for the public API / regression harness). */
+  function fillNear(buffer) {
+    if (lazyHandle) lazyHandle.fillNear(buffer);
+  }
+
+  /* ============================== REVEAL ============================== */
+
   /** Progressively fade cards in (diagrams are already embedded at build). */
   function revealAll() {
     var els = Array.prototype.slice.call(document.querySelectorAll(".reveal:not(.in)"));
@@ -158,54 +182,6 @@ window.AD = window.AD || {};
     })();
   }
 
-  /** IntersectionObserver instance for lazy card-body fill (re-created per render). */
-  var io = null;
-
-  /** Observe still-empty card bodies and fill them as they near the viewport. */
-  /** Synchronously fill every lazy card whose box is within `buffer` px of the viewport. */
-  function fillNear(buffer) {
-    buffer = (buffer == null) ? 1400 : buffer;
-    var vh = window.innerHeight || document.documentElement.clientHeight || 0;
-    var cards = document.querySelectorAll(".card[data-lazy]");
-    for (var i = 0; i < cards.length; i++) {
-      var r = cards[i].getBoundingClientRect();
-      if (r.bottom > -buffer && r.top < vh + buffer) fillCard(cards[i]);
-    }
-    // once nothing is left to fill, drop the scroll/resize listeners
-    if (!document.querySelector(".card[data-lazy]")) {
-      window.removeEventListener("scroll", onScrollResize);
-      window.removeEventListener("resize", onScrollResize);
-    }
-  }
-  var rafPending = false;
-  function onScrollResize() {
-    if (rafPending) return;
-    rafPending = true;
-    var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
-    raf(function () { rafPending = false; fillNear(1400); });
-  }
-  function setupLazyFill() {
-    var cards = Array.prototype.slice.call(document.querySelectorAll(".card[data-lazy]"));
-    if (!cards.length) return;
-    // Always fill the initial viewport synchronously — robust regardless of IO/scroll support.
-    fillNear(1200);
-    // Progressive enhancement: IntersectionObserver fills cards as they approach (real browsers).
-    if ("IntersectionObserver" in window) {
-      if (io) io.disconnect();
-      io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (!entry.isIntersecting) return;
-          fillCard(entry.target);
-          io.unobserve(entry.target);
-        });
-      }, { root: null, rootMargin: "1400px 0px", threshold: 0 });
-      cards.forEach(function (el) { io.observe(el); });
-    }
-    // Fallback + real-browser trigger: fill near viewport on scroll/resize (rAF-throttled).
-    window.addEventListener("scroll", onScrollResize, { passive: true });
-    window.addEventListener("resize", onScrollResize, { passive: true });
-  }
-
   /** Build the whole page body (stats + spine + grid) and kick off reveal. */
   function render() {
     AD.ATTACKS.forEach(function (a, i) { a._cid = a._cid || ("tech-" + i); a._idx = i; });
@@ -213,7 +189,8 @@ window.AD = window.AD || {};
     renderSpine();
     renderSpineToc();
     renderMain();
-    setupLazyFill();
+    if (lazyHandle) lazyHandle.destroy();
+    lazyHandle = AD.lazy({ selector: ".card[data-lazy]", fill: fillCard, buffer: 1400, initialBuffer: 1200 });
     revealAll();
   }
 
