@@ -124,6 +124,7 @@ window.AD = window.AD || {};
   function gotoTech(cid) {
     var el = document.getElementById(cid);
     if (!el) return;
+    if (el.hasAttribute("data-lazy") && AD.views.fillCard) AD.views.fillCard(el);
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
   }
@@ -161,10 +162,30 @@ window.AD = window.AD || {};
     });
   }
 
+  /** After the page is idle, warm the browser cache for the other page so a
+   *  glossary⇄map switch is near-instant. Deferred so it never competes with
+   *  this page's own load. */
+  function schedulePrefetch(list) {
+    var go = function () {
+      var ric = window.requestIdleCallback || function (f) { return setTimeout(f, 1500); };
+      ric(function () {
+        list.forEach(function (href) {
+          var l = document.createElement("link");
+          l.rel = "prefetch"; l.href = href;
+          document.head.appendChild(l);
+        });
+      });
+    };
+    if (document.readyState === "complete") go();
+    else window.addEventListener("load", go, { once: true });
+  }
+
   function init() {
     wire();
     setLang("ja");
     setView("purple");
+    schedulePrefetch(["concepts.html", "css/concepts.css", "js/data/concept-ui.js",
+      "js/data/concept-figs.js", "js/data/concepts.js", "js/concepts.js"]);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

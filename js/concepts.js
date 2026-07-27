@@ -44,7 +44,59 @@ window.AD = window.AD || {};
   function figFor(id) {
     var svg = AD.FIGS && AD.FIGS[id];
     if (!svg) return "";
-    return '<div class="c-fig" data-fig="' + id + '" title="' + esc(UI.figHint) + '" tabindex="0" role="button" aria-label="' + esc(UI.figHint) + '">' + svg + "</div>";
+    return '<div class="c-fig" data-fig="' + id + '" data-figlazy="1" title="' + esc(UI.figHint) + '" tabindex="0" role="button" aria-label="' + esc(UI.figHint) + '"></div>';
+  }
+
+  /** IntersectionObserver instance for lazy inline-figure fill (re-created per render). */
+  var figIo = null;
+
+  /** Fill one figure placeholder with its SVG (once). Idempotent. */
+  function fillFig(el) {
+    if (!el || !el.hasAttribute("data-figlazy")) return;
+    var svg = AD.FIGS && AD.FIGS[el.getAttribute("data-fig")];
+    if (svg) el.innerHTML = svg;
+    el.removeAttribute("data-figlazy");
+  }
+
+  /** Observe still-empty figure placeholders and fill them as they near the viewport. */
+  function fillFigsNear(buffer) {
+    buffer = (buffer == null) ? 1000 : buffer;
+    var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    var figs = document.querySelectorAll(".c-fig[data-figlazy]");
+    for (var i = 0; i < figs.length; i++) {
+      var r = figs[i].getBoundingClientRect();
+      if (r.bottom > -buffer && r.top < vh + buffer) fillFig(figs[i]);
+    }
+    if (!document.querySelector(".c-fig[data-figlazy]")) {
+      window.removeEventListener("scroll", onFigScroll);
+      window.removeEventListener("resize", onFigScroll);
+    }
+  }
+  var figRaf = false;
+  function onFigScroll() {
+    if (figRaf) return;
+    figRaf = true;
+    var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+    raf(function () { figRaf = false; fillFigsNear(1000); });
+  }
+  function setupFigLazy() {
+    var figs = Array.prototype.slice.call(document.querySelectorAll(".c-fig[data-figlazy]"));
+    if (!figs.length) return;
+    fillFigsNear(900);
+    if ("IntersectionObserver" in window) {
+      if (figIo) figIo.disconnect();
+      figIo = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          fillFig(entry.target);
+          figIo.unobserve(entry.target);
+        });
+      }, { root: null, rootMargin: "1000px 0px", threshold: 0 });
+      figs.forEach(function (el) { figIo.observe(el); });
+    }
+    window.addEventListener("scroll", onFigScroll, { passive: true });
+    window.addEventListener("resize", onFigScroll, { passive: true });
+    AD._fillFigsNear = fillFigsNear; // test hook
   }
 
   function relatedChips(rel) {
@@ -91,7 +143,7 @@ window.AD = window.AD || {};
     document.getElementById("main").innerHTML = html;
   }
 
-  function render() { applyUiStrings(); renderNav(); renderMain(); applyFilter(); }
+  function render() { applyUiStrings(); renderNav(); renderMain(); setupFigLazy(); applyFilter(); }
 
   function setLang(l) {
     if (!AD.CONCEPTS || !AD.CONCEPTS[l]) l = "ja";
@@ -185,7 +237,29 @@ window.AD = window.AD || {};
     });
   }
 
-  function init() { wire(); setLang("ja"); }
+  /** Idle-deferred cache warming for the attack-map page (near-instant switch). */
+  function schedulePrefetch(list) {
+    var go = function () {
+      var ric = window.requestIdleCallback || function (f) { return setTimeout(f, 1500); };
+      ric(function () {
+        list.forEach(function (href) {
+          var l = document.createElement("link");
+          l.rel = "prefetch"; l.href = href;
+          document.head.appendChild(l);
+        });
+      });
+    };
+    if (document.readyState === "complete") go();
+    else window.addEventListener("load", go, { once: true });
+  }
+
+  function init() {
+    wire();
+    setLang("ja");
+    schedulePrefetch(["index.html", "js/data/attacks.js", "js/data/scenarios.js",
+      "js/data/phases.js", "js/data/ui.js", "js/diagram.js", "js/views.js",
+      "js/modal.js", "js/app.js", "js/components.js"]);
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 })(window.AD);

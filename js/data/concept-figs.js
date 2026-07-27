@@ -840,6 +840,350 @@ txt(370,350,'FICはシークレット/証明書を使わず、issuer/subject/aud
   txt(370,344,'検知ポイント: 135/tcp宛OXIDリゾルバ呼び出し→動的ポートへの後続接続を監視','lbl','middle'),
   'DCOM OXID解決とRogueOxidResolverによる認証リレー');
 
+  /* ---- tombstone: トゥームストーンとADごみ箱の状態遷移 ---- */
+  F.tombstone = svg(860, 270,
+  txt(430,24,'AD削除オブジェクトの状態遷移: tombstone→AD Recycle Bin→GC','figt','middle') +
+  box(16,54,100,120,{t:'削除操作',s:'(誤操作/悪意)',cls:'off'}) +
+  arr(116,114,150,114,{kind:'off'}) +
+  box(150,54,220,120,{cls:'def'}) +
+  num(170,74,1) +
+  txt(260,80,'isDeleted=TRUE','bt','middle') +
+  txt(260,98,'isRecycled=FALSE','bt','middle') +
+  txt(260,116,'CN=Deleted Objects','lbl','middle') +
+  txt(260,134,'ADごみ箱で復元可 (5138)','lbl','middle') +
+  txt(260,152,'属性・メンバー保持','lbl','middle') +
+  arr(370,114,440,114,{kind:'off',t:'期限超過',dy:-8}) +
+  box(440,54,220,120,{cls:'off'}) +
+  num(460,74,2) +
+  txt(550,80,'isRecycled=TRUE','bt','middle') +
+  txt(550,98,'(再利用済み)','bt','middle') +
+  txt(550,116,'属性の大半を喪失','lbl','middle') +
+  txt(550,134,'ADごみ箱復元は不可','lbl','middle') +
+  txt(550,152,'authoritative restoreのみ','lbl','middle') +
+  arr(660,114,740,114,{kind:'off',t:'期限経過+GC',dy:-8}) +
+  box(740,54,90,120,{t:'物理削除',s:'(復元不能)',cls:'off'}) +
+  num(760,74,3) +
+  txt(260,196,'期間: msDS-deletedObjectLifetime','lbl','middle') +
+  txt(260,214,'既定180日 (NULL時は60日)','lbl','middle') +
+  txt(550,196,'期間: tombstoneLifetime','lbl','middle') +
+  txt(550,214,'既定180日(復元は不可)','lbl','middle') +
+  txt(785,196,'GC実行(既定12h間隔)','lbl','middle') +
+  txt(785,214,'で完全消去・復元不能','lbl','middle') +
+  txt(430,250,'krbtgtや特権グループの削除時、isDeleted/isRecycledと5138イベントを読み解けるかが復旧可否を分ける','lbl','middle'),
+  'トゥームストーンとADごみ箱の状態遷移');
+
+  /* ---- ntlmauthlevel: NTLM認証レベル(LmCompatibilityLevel)の段階構造 ---- */
+  F.ntlmauthlevel = svg(760, 364,
+  txt(380,22,'NTLM認証レベル(LmCompatibilityLevel)の段階構造','figt','middle') +
+  box(30,38,700,20) +
+  txt(50,52,'値','bt','middle') +
+  txt(80,52,'クライアント送信','bt','start') +
+  txt(490,52,'DC側の受理可否','bt','start') +
+  lane(30,64,700,150,'Lv.0〜3: クライアント送信方式のみ制御(DC側はLM/NTLM/NTLMv2いずれも受理)／NTLMv1ダウングレード攻撃の起点に') +
+  box(30,88,700,30,{cls:'off'}) +
+  txt(50,107,'0','bt mono','middle') +
+  txt(80,107,'LM+NTLM応答を送信／NTLMv2セッションセキュリティ:不使用','lbl','start') +
+  txt(490,107,'LM/NTLM/NTLMv2 いずれも受理','lbl','start') +
+  box(30,118,700,30,{cls:'off'}) +
+  txt(50,137,'1','bt mono','middle') +
+  txt(80,137,'LM+NTLM応答を送信／NTLMv2セッションセキュリティ:使用(交渉時)','lbl','start') +
+  txt(490,137,'LM/NTLM/NTLMv2 いずれも受理','lbl','start') +
+  box(30,148,700,30,{cls:'off'}) +
+  txt(50,167,'2','bt mono','middle') +
+  txt(80,167,'NTLM応答のみ送信／NTLMv2セッションセキュリティ:使用(交渉時)','lbl','start') +
+  txt(490,167,'LM/NTLM/NTLMv2 いずれも受理','lbl','start') +
+  box(30,178,700,30,{cls:'def'}) +
+  txt(50,197,'3','bt mono','middle') +
+  txt(80,197,'NTLMv2応答のみ送信 ★既定(Vista/Server2008〜)','lbl','start') +
+  txt(490,197,'LM/NTLM/NTLMv2 いずれも受理','lbl','start') +
+  lane(30,222,700,90,'Lv.4〜5: DC側の受理拒否が追加(LM/NTLM応答を拒否)') +
+  box(30,246,700,30) +
+  txt(50,265,'4','bt mono','middle') +
+  txt(80,265,'NTLMv2応答のみ送信','lbl','start') +
+  txt(490,265,'NTLM/NTLMv2は受理、LMは拒否','lbl','start') +
+  box(30,276,700,30) +
+  txt(50,295,'5','bt mono','middle') +
+  txt(80,295,'NTLMv2応答のみ送信','lbl','start') +
+  txt(490,295,'NTLMv2のみ受理（LM/NTLM拒否）','lbl','start') +
+  txt(380,332,'レジストリ: HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\LmCompatibilityLevel (DWORD, 0〜5)','lbl','middle') +
+  txt(380,350,'要点: 既定Lv.3でもDC側はLM/NTLM/NTLMv2を受理可能、Lv.0〜2は強制認証+NTLMv1ダウングレードでクラック容易','lbl','middle'),
+'NTLM認証レベル(LmCompatibilityLevel)の段階構造');
+
+  /* ---- wow64: WOW64 ファイル/レジストリ リダイレクト ---- */
+  F.wow64 = svg(760, 295,
+  txt(380,24,'WOW64 のファイル/レジストリ リダイレクト','figt','middle') +
+  box(20,42,220,55,{t:'32bitプロセス',s:'WOW64 サブシステム上で動作',cls:'off'}) +
+  box(520,42,220,55,{t:'64bitプロセス',s:'ネイティブに直接実行',cls:'def'}) +
+  box(20,112,300,50,{t:'WOW64: Nt* 呼び出しを横取り',s:'wow64.dll / wow64win.dll / wow64cpu.dll'}) +
+  arr(130,97,130,112,{kind:'off',t:'Nt* API',dy:-4}) +
+  box(20,192,165,45,{t:'C:\\Windows\\SysWOW64',s:'32bitの実体(要注意)',cls:'off',mono:true}) +
+  box(200,192,165,45,{t:'Wow6432Node',s:'HKLM\\Software 配下',cls:'off',mono:true}) +
+  box(380,192,165,45,{t:'C:\\Windows\\System32',s:'64bitの実体(ネイティブ)',cls:'def',mono:true}) +
+  box(560,192,165,45,{t:'HKLM\\Software',s:'64bitの参照先(共有)',cls:'def',mono:true}) +
+  arr(90,162,90,192,{kind:'off',t:'System32参照',dy:-6}) +
+  arr(260,162,282,192,{kind:'off',t:'Software参照',dy:-6}) +
+  arr(630,97,490,192,{kind:'def',t:'System32',dy:-6}) +
+  arr(630,97,642,192,{kind:'def',t:'Software',dy:-6}) +
+  arr(320,135,440,192,{kind:'def',dash:true,t:'\\Sysnative\\ で回避',dy:12}) +
+  txt(380,278,'SysWOW64 / Wow6432Node は32bitの実体。永続化調査での見落としに注意','lbl','middle'),
+  'WOW64 のファイル/レジストリ リダイレクト');
+
+  /* ---- domainauth: ドメイン認証タイプ (Managed/Federated) と IssuerUri 悪用 ---- */
+  F.domainauth = svg(760, 540,
+  txt(380,24,'ドメイン認証タイプ:Managed / Federated と IssuerUri 悪用','figt','middle') +
+  box(24,44,120,52,{t:'ユーザー',s:'UPN でサインイン'}) +
+  arr(144,70,200,70,{t:'UPN入力',dy:-6}) +
+  box(200,44,225,52,{t:'Entra ID',s:'検証済みドメイン (Verified Domain)',cls:'pur'}) +
+  arr(425,70,475,70,{t:'realm',dy:-6}) +
+  box(475,44,270,52,{t:'getuserrealm',s:'NameSpaceType: Managed | Federated',mono:true}) +
+  lane(16,112,728,166,'Managed（既定）: クラウド側でパスワードを直接検証','') +
+  box(32,140,330,58,{t:'Entra ID (Managed)',s:'PHS または PTA でハッシュを直接照合',cls:'pur'}) +
+  arr(362,169,556,169,{kind:'def',t:'トークン発行',dy:-6}) +
+  box(556,140,172,58,{t:'サインイン成功',s:'M365 / Azure へアクセス',cls:'def'}) +
+  box(32,214,696,56,{t:'攻撃面: パスワードスプレー / AiTM フィッシング',s:'クラウド側で検証が完結するため、偽ログインページで直接パスワードを奪取できる',cls:'off'}) +
+  lane(16,290,728,168,'Federated: 外部 IdP (ADFS 等) へ認証を委任','') +
+  box(32,318,184,58,{t:'Entra ID',s:'IssuerUri へリダイレクト',cls:'pur'}) +
+  arr(216,347,326,347,{kind:'def',t:'認証要求',dy:-6}) +
+  box(326,318,174,58,{t:'外部 IdP',s:'ADFS 等 (Issuer)'}) +
+  arr(500,347,612,347,{kind:'def',t:'SAML/WS-Fed',dy:-6}) +
+  box(612,318,116,58,{t:'サインイン成功',s:'署名検証後',cls:'def'}) +
+  box(32,392,696,58,{t:'攻撃面: IssuerUri 書き換え / 署名証明書窃取 → Golden SAML',s:'ConvertTo-AADIntBackdoor が IssuerUri を書換→偽造トークンを正規受理',cls:'off'}) +
+  box(32,468,696,34,{t:'正規操作: Update-MgDomain -AuthenticationType Federated / New-MgDomainFederationConfiguration',cls:'def'}) +
+  txt(380,524,'検知: Entra監査ログの "Set domain authentication" / "Set federation settings on domain" を継続監視','lbl','middle'),
+  'ドメイン認証タイプ (Managed/Federated) と IssuerUri 悪用');
+
+  /* ---- certkeystore: 証明書ストアと秘密鍵プロバイダ ---- */
+  F.certkeystore = svg(760, 600,
+  txt(380,20,'証明書ストア: スコープ×用途と秘密鍵プロバイダ','figt','middle') +
+
+  lane(16,34,350,142,'現在のユーザー (HKCU)') +
+  lane(394,34,350,142,'ローカルコンピュータ (HKLM)') +
+  box(30,62,100,52,{t:'My/Personal',s:'個人用証明書',cls:'def'}) +
+  box(141,62,100,52,{t:'Root',s:'信頼ルートCA',cls:'def'}) +
+  box(252,62,100,52,{t:'CA',s:'中間CA',cls:'def'}) +
+  box(408,62,100,52,{t:'My/Personal',s:'個人用証明書',cls:'def'}) +
+  box(519,62,100,52,{t:'Root',s:'信頼ルートCA',cls:'def'}) +
+  box(630,62,100,52,{t:'CA',s:'中間CA',cls:'def'}) +
+  txt(30,138,'秘密鍵は参照のみ、実体は別管理','lbl') +
+  txt(408,138,'HKLM側は端末全体で共有される','lbl') +
+
+  txt(380,192,'列挙: certutil -store My ／ レジストリ HKCU,HKLM\\Software\\Microsoft\\SystemCertificates','lbl','middle') +
+
+  box(275,206,210,48,{t:'証明書テンプレート',s:'msPKI-Private-Key-Flag 0x10',cls:'pur'}) +
+  arr(320,254,105,304,{kind:'pur',dash:true,t:'継承',dy:-6}) +
+  arr(440,254,568,300,{kind:'pur',dash:true,t:'継承・判定',dy:-6}) +
+
+  lane(16,274,350,170,'レガシー: CryptoAPI (CSP)') +
+  lane(394,274,350,170,'現行: CNG (Key Storage Provider)') +
+  box(30,304,150,52,{t:'CSP',s:'rsaenh.dll',cls:'def'}) +
+  box(196,304,150,52,{t:'鍵ファイル',s:'RSA\\ 配下 (per-user)',cls:'def'}) +
+  txt(30,372,'%APPDATA%\\Microsoft\\Crypto\\RSA\\','mono') +
+  txt(30,390,'DPAPIマスターキーで暗号化保護(ユーザー鍵)','lbl') +
+
+  box(408,300,320,46,{t:'PCP KSP (TPM)',s:'PCPKsp.dll ・ .PCPKEY',cls:'pur'}) +
+  box(408,352,320,46,{t:'Software KSP',s:'Crypto\\Keys\\ ・ DPAPI保護',cls:'def'}) +
+  txt(408,414,'%LOCALAPPDATA%\\...\\PCPKSP\\<SHA1>.PCPKEY','mono') +
+  txt(408,430,'%APPDATA%\\Microsoft\\Crypto\\Keys\\','mono') +
+
+  box(16,462,350,50,{t:'mimikatz: crypto::capi',s:'呼び出し元プロセスのCSPロジックを直接パッチ',cls:'off'}) +
+  box(394,462,350,50,{t:'mimikatz: crypto::cng',s:'LSASS常駐のKeyIsoサービスをメモリパッチ',cls:'off'}) +
+  arr(300,356,300,462,{kind:'off',dash:true,t:'エクスポート判定を無効化',dy:-6}) +
+  arr(700,398,700,462,{kind:'off',dash:true,t:'KeyIso判定を無効化',dy:6}) +
+
+  box(275,528,210,44,{t:'秘密鍵を抽出',s:'本来抽出不可のはずが可能に(THEFT1)',cls:'off'}) +
+  arr(300,512,340,528,{kind:'off'}) +
+  arr(460,512,420,528,{kind:'off'}) +
+
+  txt(380,586,'非公開鍵はCSP/KSP経由でDPAPI保護。TPM封印(seal)のPCP鍵のみパッチ攻撃が通用しない','lbl','middle'),
+  '証明書ストアと秘密鍵プロバイダ');
+
+  /* ---- soctier: SOCアナリスト階層とエスカレーションモデル ---- */
+  F.soctier = svg(740, 350,
+  txt(370,24,'SOCアナリスト階層(Tier1→2→3)とエスカレーションモデル','figt','middle') +
+  box(20,55,220,140,{cls:'def'}) +
+  txt(130,77,'Tier 1: 一次トリアージ','bt','middle') +
+  txt(35,97,'SIEM/XDRアラート一次トリアージ','lbl') +
+  txt(35,115,'プレイブックでFP/TP/FN判定','lbl') +
+  txt(35,133,'対応不要はクローズ','lbl') +
+  txt(35,151,'疑わしい場合はTier2へ','lbl') +
+  box(260,55,220,140,{cls:'def'}) +
+  txt(370,77,'Tier 2: 深掘り調査/IR','bt','middle') +
+  txt(275,97,'ログ相関・端末調査で範囲特定','lbl') +
+  txt(275,115,'封じ込め・根絶・復旧を主導','lbl') +
+  txt(275,133,'実質的な調査/IR担当層','lbl') +
+  txt(275,151,'高度な事案はTier3へ','lbl') +
+  box(500,55,220,140,{cls:'def'}) +
+  txt(610,77,'Tier 3: 高度解析/ハンティング','bt','middle') +
+  txt(515,97,'プロアクティブ脅威ハンティング','lbl') +
+  txt(515,115,'検知ルールのチューニング','lbl') +
+  txt(515,133,'新規検知ロジックの作成(検知工学)','lbl') +
+  txt(515,151,'マルウェア解析・レッドチーム連携','lbl') +
+  txt(515,169,'判定基準・検知ロジック自体を設計','lbl') +
+  arr(240,125,260,125,{kind:'def'}) +
+  num(250,105,1) +
+  arr(480,125,500,125,{kind:'def'}) +
+  num(490,105,2) +
+  arr(610,195,610,225,{kind:'def',dash:true}) +
+  arr(610,225,130,225,{kind:'def',dash:true,t:'検知ルールのチューニング/新規作成を判定基準へ反映',dy:-8}) +
+  arr(130,225,130,195,{kind:'def',dash:true}) +
+  box(20,245,700,70,{cls:'off'}) +
+  txt(370,267,'注意: 同じ「Tier」でも別概念(SOCの対応階層 ≠ AD特権のTier0/1/2)','bt','middle') +
+  txt(35,289,'本図のTier1-3はエスカレーション経路。tiermodelのTier0-2は管理者アカウント/資産の特権境界を指す別概念','lbl') +
+  txt(370,335,'Tier1→2→3で対応範囲が深化し、Tier3の知見が検知ルール(判定基準)へ還元される','lbl','middle'),
+  'SOCアナリスト階層とエスカレーションモデル');
+
+  /* ---- funclevel: msDS-Behavior-Version: DFL/FFL による段階的機能解禁 ---- */
+  F.funclevel = svg(760, 362,
+  txt(380,22,'msDS-Behavior-Version: DFL/FFL による段階的機能解禁','figt','middle') +
+  txt(380,38,'原則として降格不可(例外: ADごみ箱未有効時のみ 2008R2→2008 に限りロールバック可)','lbl','middle') +
+  box(20,140,720,24,{cls:'def'}) +
+  box(20,164,720,24,{cls:'def'}) +
+  box(20,212,720,24,{cls:'def'}) +
+  box(20,236,720,24,{cls:'pur'}) +
+  box(20,46,720,1,{}) + box(20,68,720,1,{}) + box(20,92,720,1,{}) + box(20,116,720,1,{}) +
+  box(20,140,720,1,{}) + box(20,164,720,1,{}) + box(20,188,720,1,{}) + box(20,212,720,1,{}) +
+  box(20,236,720,1,{}) + box(20,260,720,1,{}) +
+  box(20,46,1,214,{}) + box(70,46,1,214,{}) + box(200,46,1,214,{}) + box(740,46,1,214,{}) +
+  txt(45,60,'値','lbl','middle') + txt(80,60,'名称','lbl','start') + txt(210,60,'解禁される代表機能','lbl','start') +
+  txt(45,84,'0','mono','middle') + txt(80,84,'Windows 2000','lbl','start') + txt(210,84,'ネイティブモード(最古の値)','lbl','start') +
+  txt(45,108,'1','mono','middle') + txt(80,108,'2003(混在)','lbl','start') + txt(210,108,'値1はフォレストのみで有効(ドメインでは未使用)','lbl','start') +
+  txt(45,132,'2','mono','middle') + txt(80,132,'2003','lbl','start') + txt(210,132,'(特記事項なし・標準機能セット)','lbl','start') +
+  txt(45,156,'3','mono','middle') + txt(80,156,'2008','bt','start') + txt(210,156,'DFSR既定化(SYSVOL) / PSO(細粒度パスワードポリシー)','bt','start') +
+  txt(45,180,'4','mono','middle') + txt(80,180,'2008 R2','bt','start') + txt(210,180,'ADごみ箱(Recycle Bin)の前提条件(FFL)','bt','start') +
+  txt(45,204,'5','mono','middle') + txt(80,204,'2012','lbl','start') + txt(210,204,'(Protected Users はまだ非発動)','lbl','start') +
+  txt(45,228,'6','mono','middle') + txt(80,228,'2012 R2','bt','start') + txt(210,228,'Protected Users: DC側保護発動(NTLM/Digest/CredSSP拒否等)','bt','start') +
+  txt(45,252,'7','mono','middle') + txt(80,252,'2016','bt','start') + txt(210,252,'PAMトラスト / シャドウプリンシパル(msDS-ShadowPrincipal)','bt','start') +
+  box(20,272,720,54,{t:'gMSA と RBCD は機能レベルに非依存',s:'RBCD属性はスキーマ要件のみ / gMSAはKDSルートキー等が条件 — どちらも機能レベル非依存',cls:'off'}) +
+  txt(380,344,'確認は Get-ADDomain / Get-ADForest の DomainMode・ForestMode — 緩和策が原理上有効化可能かの出発点','lbl','middle'),
+  'msDS-Behavior-Version: DFL/FFL による段階的機能解禁');
+
+  /* ---- reparse: 再解析ポイント (Reparse Point) の仕組み ---- */
+  F.reparse = svg(760, 500,
+    txt(380,22,'再解析ポイント (Reparse Point) の仕組み','figt','middle') +
+    box(20,48,175,64,{t:'アクセス要求',s:'C:\\App\\data\\file'}) +
+    arr(195,80,252,80,{t:'オープン要求',dy:-6}) +
+    box(252,48,216,64,{t:'NTFS: 再解析ポイント検出',s:'IO_REPARSE_TAG / FSCTL',cls:'def'}) +
+    arr(468,80,528,80,{kind:'def',t:'転送 (reparse)',dy:-6}) +
+    box(528,48,212,64,{t:'実際のアクセス先',s:'D:\\Real\\path\\file'}) +
+    lane(15,124,730,150,'再解析ポイントの代表実装(同じ機構の3種類)') +
+    box(20,150,230,110,{cls:'def'}) +
+    txt(135,170,'ジャンクション (Junction)','bt','middle') +
+    txt(32,188,'IO_REPARSE_TAG_MOUNT_POINT','lbl') +
+    txt(32,206,'対象:ディレクトリ/ローカルのみ','lbl') +
+    txt(32,224,'絶対パスのみ / mklink /J','lbl') +
+    txt(32,242,'書込み権限のみで作成可(特権不要)','lbl') +
+    box(265,150,230,110,{cls:'def'}) +
+    txt(380,170,'シンボリックリンク (Symlink)','bt','middle') +
+    txt(277,188,'IO_REPARSE_TAG_SYMLINK','lbl') +
+    txt(277,206,'対象:ファイル/ディレクトリ両方','lbl') +
+    txt(277,224,'相対/UNC/リモートパスも指定可','lbl') +
+    txt(277,242,'SeCreateSymbolicLink特権が必要','lbl') +
+    box(510,150,230,110,{cls:'def'}) +
+    txt(625,170,'ボリュームマウントポイント','bt','middle') +
+    txt(522,188,'\\??\\Volume{GUID}\\ を指す','lbl') +
+    txt(522,206,'ボリューム全体を別フォルダへ','lbl') +
+    txt(522,224,'同じ再解析ポイント機構を使用','lbl') +
+    txt(522,242,'ドライブ文字を使わず統合','lbl') +
+    box(20,286,720,70,{}) +
+    txt(380,306,'【対比】ハードリンク (Hard Link) は再解析ポイントとは別機構','bt','middle') +
+    txt(32,324,'同一ボリューム内で同じMFTレコード(ファイルデータ)を指す別ディレクトリエントリ','lbl') +
+    txt(32,342,'リパースタグを持たず、ファイルのみが対象 — パス転送(reparse)ではない','lbl') +
+    box(20,368,720,95,{cls:'off'}) +
+    txt(380,386,'⚠ 悪用: 予測可能パスへのTOCTOU型権限昇格 (FSCTL_SET_REPARSE_POINT)','bt','middle') +
+    txt(32,404,'特権プロセス(インストーラ/更新サービス/AV等)が予測可能なパスへ','lbl') +
+    txt(32,422,'ファイル作成・削除・コピー直前にジャンクション/シンボリックリンクを設置','lbl') +
+    txt(32,440,'→ 書込み・削除先を任意の保護ファイルへリダイレクト(権限昇格の定番手口)','lbl') +
+    txt(380,482,'ジャンクション/シンボリックリンク/マウントポイント=同じ機構、ハードリンクは別機構(MFT直接参照)','lbl','middle'),
+    '再解析ポイント (Reparse Point) の仕組み');
+
+  /* ---- au: 管理単位(AU)とRMAUによるスコープ分離 ---- */
+  F.au = svg(740, 480,
+  txt(370,24,'管理単位(AU)とRMAUによるスコープ分離','figt','middle') +
+  box(220,42,300,50,{t:'Global Admin / Priv. Role Admin',s:'テナント全体スコープ',cls:'def'}) +
+  lane(20,110,340,260,'AU-部門A(通常の管理単位)','def') +
+  lane(380,110,340,260,'AU-部門B(RMAU: 制限付き管理AU)','pur') +
+  arr(320,92,180,140,{kind:'def',t:'委任(スコープ内のみ)',dy:-10}) +
+  arr(420,92,530,140,{kind:'off',dash:true,t:'直接操作不可(RMAU保護)',dy:-10}) +
+  box(40,140,220,44,{t:'User Administrator',s:'@AU-部門A スコープ',cls:'def'}) +
+  box(400,140,300,44,{t:'Privileged Auth. Administrator',s:'@AU-部門B(自己割当が必要)',cls:'off'}) +
+  arr(150,184,150,230,{kind:'def',t:'AU範囲内のみ有効',dy:-6}) +
+  arr(550,184,550,230,{kind:'off',t:'RMAU範囲内のみ(強力)',dy:-6}) +
+  box(40,230,220,50,{t:'ユーザー/グループ/デバイス',s:'部門Aメンバー',cls:'def'}) +
+  box(400,230,300,50,{t:'メンバー(ユーザー/グループ/デバイス)',s:'攻撃者アカウントを収容',cls:'off'}) +
+  txt(190,320,'GA/PRAが直接操作可能(通常のRBAC)','lbl','middle') +
+  arr(550,280,550,390,{kind:'off',dash:true,t:'HiddenMembership→不可視',dy:-6}) +
+  box(400,390,300,50,{t:'SOC (Security Admin/Operator)',s:'既定では閲覧不可(調査の盲点)',cls:'def'}) +
+  txt(370,466,'RMAU+スコープ限定ロールの自己割当は、GA/PRA・SOCどちらからも発見・無効化が困難な永続化点になる','lbl','middle'),
+  '管理単位(AU)とRMAUによるスコープ分離');
+
+  /* ---- dyngroup: 動的グループ (Dynamic Group) のメンバーシップ規則評価 ---- */
+  F.dyngroup = svg(740, 420,
+  txt(370,22,'動的グループ (Dynamic Group) のメンバーシップ規則評価フロー','figt','middle') +
+  box(25,50,205,145,{cls:'pur'}) +
+  txt(127,74,'ユーザー/デバイス属性','bt','middle') +
+  txt(40,98,'user.department','mono') +
+  txt(40,116,'user.jobTitle','mono') +
+  txt(40,134,'user.userType','mono') +
+  txt(40,152,'device.deviceOSType','mono') +
+  txt(40,176,'※書込可能な属性を含む','lbl') +
+  box(268,50,205,145,{cls:'def'}) +
+  txt(370,74,'メンバーシップ規則の評価','bt','middle') +
+  txt(283,98,'membershipRule:','lbl') +
+  txt(283,118,'department -eq "Sales"','mono') +
+  txt(283,142,'評価状態: On / Paused','lbl') +
+  txt(283,166,'属性変更→非同期キューで再評価','lbl') +
+  box(511,50,205,145,{cls:'pur'}) +
+  txt(613,74,'グループへ自動加入/離脱','bt','middle') +
+  txt(526,98,'groupTypes:','mono') +
+  txt(526,118,'"DynamicMembership"','mono') +
+  txt(526,142,'アプリロール割当','lbl') +
+  txt(526,160,'条件付きアクセス対象/除外','lbl') +
+  txt(526,178,'M365動的グループ→SaaS','lbl') +
+  arr(230,122,268,122,{kind:'pur',t:'属性値',dy:-6}) +
+  arr(473,122,511,122,{kind:'def',t:'条件一致',dy:-6}) +
+  box(511,205,205,50,{cls:'def'}) +
+  txt(613,222,'ロール割当可能グループ化 不可','bt','middle') +
+  txt(613,240,'PIM for Groups 有効化不可','bs','middle') +
+  arr(650,265,110,265,{kind:'def',dash:true,t:'属性変更のたび非同期キューで再評価(数時間~24時間超)',dy:14}) +
+  box(60,300,320,70,{cls:'off'}) +
+  txt(220,322,'攻撃者: 書込可能な属性を悪用','bt','middle') +
+  txt(75,344,'department等をルールに一致させ偽装','lbl') +
+  txt(75,362,'→ 特権グループへ自動加入(ロール直接昇格ではない)','lbl') +
+  txt(370,396,'到達範囲はアプリロール/条件付きアクセス等のリソースアクセスに限定、ディレクトリロール直接昇格やPIM時限昇格はできない','lbl','middle'),
+  '動的グループのメンバーシップ規則評価とロール昇格の制約');
+
+  /* ---- appcontainer: AppContainer分離モデル ---- */
+  F.appcontainer = svg(740, 460,
+  txt(370,22,'AppContainer 分離モデル: LowBoxトークンとサンドボックス境界','figt','middle') +
+  lane(20,60,195,230,'既定で遮断','off') +
+  box(35,90,165,42,{t:'ファイルシステム',s:'DACLに許可SIDが無ければ拒否',cls:'off'}) +
+  box(35,142,165,42,{t:'レジストリ',s:'既定でアクセス拒否',cls:'off'}) +
+  box(35,194,165,50,{t:'名前付きオブジェクト',s:'隔離名前空間で不可視',cls:'off'}) +
+  lane(265,48,210,250,'AppContainerプロセス') +
+  box(280,74,180,44,{t:'LowBoxトークン',s:'primary/偽装トークン',cls:'pur'}) +
+  txt(280,134,'AppContainer SID','lbl') +
+  txt(280,148,'= SHA256(モニカー)由来のSID','lbl') +
+  txt(280,162,'サンドボックスごとの識別子','lbl') +
+  txt(280,182,'capability SID 一覧','lbl') +
+  txt(280,196,'internetClient等を許可','lbl') +
+  txt(280,210,'既定機能: 単一RID形式','lbl') +
+  txt(280,224,'独自機能: SHA256由来の複数RID','lbl') +
+  txt(280,244,'整合性レベル: Low','lbl') +
+  txt(280,258,'(S-1-16-4096) で既定動作','lbl') +
+  lane(525,60,195,230,'許可 (capability経由)','def') +
+  box(540,90,165,42,{t:'ネットワーク',s:'internetClient capability',cls:'def'}) +
+  box(540,142,165,42,{t:'ドキュメント',s:'documentsLibrary等',cls:'def'}) +
+  box(540,194,165,50,{t:'ALL APP PACKAGES SID',s:'ACEで許可(S-1-15-2-1)',cls:'def'}) +
+  txt(540,260,'RESTRICTED版も同様に判定','lbl') +
+  arr(265,175,217,175,{kind:'off',t:'既定拒否',dy:-8}) +
+  arr(475,175,523,175,{kind:'def',t:'capability',dy:-8}) +
+  arr(370,298,370,318,{kind:'off',dash:true}) +
+  box(160,318,420,60,{t:'サンドボックス脱出 (escape)',s:'RPCサーバ/サービスがLowBoxトークンを未検証だと境界突破',cls:'off'}) +
+  txt(370,398,'例: CVE-2024-49039 (タスクスケジューラRPC, 2024-11修正, 実環境悪用報告)','lbl','middle') +
+  txt(370,416,'名前付きオブジェクトは \\Sessions\\<ID>\\AppContainerNamedObjects\\<AC-SID>\\ に隔離','lbl','middle') +
+  txt(370,440,'LowBoxトークンの検証漏れがあるRPC/ブローカーはコンテナ境界を破る攻撃面になる','lbl','middle'),
+  'AppContainer 分離モデル');
+
   // map several concept ids to the shared figures
   AD.FIGS = {
     userkernel: F.userkernel,
@@ -869,7 +1213,6 @@ txt(370,350,'FICはシークレット/証明書を使わず、issuer/subject/aud
     tiermodel: F.tiermodel, paw: F.tiermodel,
     tokentheft: F.token,
     shadowcred: F.pkinit, keycredlink: F.pkinit,
-    coerce: F.coercion,
     // --- added (coverage audit) ---
     dllhijack: F.dllhijack,
     bloodhound: F.bloodhound,
@@ -900,6 +1243,17 @@ txt(370,350,'FICはシークレット/証明書を使わず、issuer/subject/aud
     actortoken: F.actortoken,
     enrollagent: F.enrollagent,
     shadowprincipal: F.shadowprincipal,
-    oxid: F.oxid
+    oxid: F.oxid,
+    tombstone: F.tombstone,
+    ntlmauthlevel: F.ntlmauthlevel,
+    wow64: F.wow64,
+    domainauth: F.domainauth,
+    certkeystore: F.certkeystore,
+    soctier: F.soctier,
+    funclevel: F.funclevel,
+    reparse: F.reparse,
+    au: F.au,
+    dyngroup: F.dyngroup,
+    appcontainer: F.appcontainer
   };
 })(window.AD);

@@ -39,7 +39,8 @@ AD.CONCEPTS.ja = [
       "token",
       "lsass",
       "integrity",
-      "proctree"
+      "proctree",
+      "wow64"
     ]
   },
   {
@@ -60,7 +61,8 @@ AD.CONCEPTS.ja = [
       "integrity",
       "uac",
       "logonsession",
-      "ppidspoof"
+      "ppidspoof",
+      "appcontainer"
     ]
   },
   {
@@ -80,7 +82,8 @@ AD.CONCEPTS.ja = [
       "token",
       "lsass",
       "uac",
-      "integrity"
+      "integrity",
+      "jea"
     ]
   },
   {
@@ -100,7 +103,8 @@ AD.CONCEPTS.ja = [
       "token",
       "uac",
       "privilege",
-      "process"
+      "process",
+      "appcontainer"
     ]
   },
   {
@@ -230,7 +234,8 @@ AD.CONCEPTS.ja = [
       "secdesc",
       "dacl",
       "sacl",
-      "uacbypass"
+      "uacbypass",
+      "wow64"
     ]
   },
   {
@@ -367,7 +372,8 @@ AD.CONCEPTS.ja = [
       "sam",
       "registry",
       "sid",
-      "secdesc"
+      "secdesc",
+      "certkeystore"
     ]
   },
   {
@@ -571,7 +577,8 @@ AD.CONCEPTS.ja = [
       "auditpolicy",
       "eventlog",
       "ntds",
-      "dschanges"
+      "dschanges",
+      "objaudit"
     ]
   },
   {
@@ -766,7 +773,8 @@ AD.CONCEPTS.ja = [
       "dc",
       "ou",
       "replication",
-      "domaintree"
+      "domaintree",
+      "funclevel"
     ]
   },
   {
@@ -847,7 +855,8 @@ AD.CONCEPTS.ja = [
       "forest",
       "replication",
       "schema",
-      "ldap"
+      "ldap",
+      "tokengroups"
     ]
   },
   {
@@ -889,7 +898,8 @@ AD.CONCEPTS.ja = [
       "replication",
       "dpapi",
       "krbtgt",
-      "sam"
+      "sam",
+      "tombstone"
     ]
   },
   {
@@ -911,7 +921,8 @@ AD.CONCEPTS.ja = [
       "replication",
       "dc",
       "domain",
-      "smb"
+      "smb",
+      "funclevel"
     ]
   },
   {
@@ -1112,7 +1123,9 @@ AD.CONCEPTS.ja = [
       "sid",
       "dacl",
       "principal",
-      "primarygroupid"
+      "primarygroupid",
+      "tokengroups",
+      "dyngroup"
     ]
   },
   {
@@ -1134,7 +1147,8 @@ AD.CONCEPTS.ja = [
       "gc",
       "domain",
       "forest",
-      "sid"
+      "sid",
+      "tokengroups"
     ]
   },
   {
@@ -1244,7 +1258,8 @@ AD.CONCEPTS.ja = [
       "kerberos",
       "delegation",
       "ntlm",
-      "adminsdholder"
+      "adminsdholder",
+      "funclevel"
     ]
   },
   {
@@ -1310,7 +1325,8 @@ AD.CONCEPTS.ja = [
       "kerberos",
       "sspi",
       "authnz",
-      "ntlmmic"
+      "ntlmmic",
+      "ntlmauthlevel"
     ]
   },
   {
@@ -1333,7 +1349,8 @@ AD.CONCEPTS.ja = [
       "ntds",
       "kerberos",
       "etype",
-      "kerbsalt"
+      "kerbsalt",
+      "ntlmauthlevel"
     ]
   },
   {
@@ -1356,7 +1373,8 @@ AD.CONCEPTS.ja = [
       "smb",
       "ldap",
       "sspi",
-      "ntlmmic"
+      "ntlmmic",
+      "ntlmauthlevel"
     ]
   },
   {
@@ -1381,7 +1399,9 @@ AD.CONCEPTS.ja = [
       "pac",
       "nopac",
       "u2u",
-      "kdcerrcode"
+      "kdcerrcode",
+      "ticketflags",
+      "ccachekeytab"
     ]
   },
   {
@@ -1425,7 +1445,8 @@ AD.CONCEPTS.ja = [
       "pac",
       "kdc",
       "st",
-      "krbmsgs"
+      "krbmsgs",
+      "ticketflags"
     ]
   },
   {
@@ -1447,7 +1468,8 @@ AD.CONCEPTS.ja = [
       "tgt",
       "krbmsgs",
       "kerberos",
-      "pac"
+      "pac",
+      "ticketflags"
     ]
   },
   {
@@ -1469,7 +1491,8 @@ AD.CONCEPTS.ja = [
       "st",
       "preauth",
       "kdc",
-      "kerberos"
+      "kerberos",
+      "ticketflags"
     ]
   },
   {
@@ -1560,7 +1583,8 @@ AD.CONCEPTS.ja = [
       "ntlm",
       "lsass",
       "authnz",
-      "namedpipe"
+      "namedpipe",
+      "ccachekeytab"
     ]
   },
   {
@@ -1583,7 +1607,8 @@ AD.CONCEPTS.ja = [
       "tgt",
       "uacflags",
       "kerberos",
-      "unconstrained"
+      "unconstrained",
+      "ticketflags"
     ]
   },
   {
@@ -1628,7 +1653,8 @@ AD.CONCEPTS.ja = [
       "kdc",
       "trust",
       "domain",
-      "krbtgt"
+      "krbtgt",
+      "ccachekeytab"
     ]
   },
   {
@@ -1674,7 +1700,8 @@ AD.CONCEPTS.ja = [
       "adcsesc",
       "enrollagent",
       "caperm",
-      "issuancepolicy"
+      "issuancepolicy",
+      "certkeystore"
     ]
   },
   {
@@ -1719,7 +1746,8 @@ AD.CONCEPTS.ja = [
       "authnz",
       "adcsesc",
       "enrollagent",
-      "apppolicy"
+      "apppolicy",
+      "certkeystore"
     ]
   },
   {
@@ -1789,7 +1817,8 @@ AD.CONCEPTS.ja = [
       "certmapping",
       "adcsesc",
       "u2u",
-      "sessionkey"
+      "sessionkey",
+      "certkeystore"
     ]
   },
   {
@@ -1833,7 +1862,9 @@ AD.CONCEPTS.ja = [
       "oauth",
       "saml",
       "prt",
-      "entraconnect"
+      "entraconnect",
+      "au",
+      "domainauth"
     ]
   },
   {
@@ -1855,7 +1886,8 @@ AD.CONCEPTS.ja = [
       "oauth",
       "tokens",
       "guid",
-      "saml"
+      "saml",
+      "au"
     ]
   },
   {
@@ -1902,7 +1934,8 @@ AD.CONCEPTS.ja = [
       "entra",
       "condaccess",
       "saml",
-      "actortoken"
+      "actortoken",
+      "cae"
     ]
   },
   {
@@ -1948,7 +1981,8 @@ AD.CONCEPTS.ja = [
       "condaccess",
       "devicejoin",
       "actortoken",
-      "foci"
+      "foci",
+      "cae"
     ]
   },
   {
@@ -1970,7 +2004,9 @@ AD.CONCEPTS.ja = [
       "tokens",
       "devicejoin",
       "oauth",
-      "prt"
+      "prt",
+      "namedloc",
+      "cae"
     ]
   },
   {
@@ -1994,7 +2030,8 @@ AD.CONCEPTS.ja = [
       "nthash",
       "tenant",
       "hybridauth",
-      "ssprwriteback"
+      "ssprwriteback",
+      "domainauth"
     ]
   },
   {
@@ -2063,7 +2100,8 @@ AD.CONCEPTS.ja = [
       "wef",
       "etw",
       "eventlogclear",
-      "dschanges"
+      "dschanges",
+      "objaudit"
     ]
   },
   {
@@ -2088,7 +2126,8 @@ AD.CONCEPTS.ja = [
       "wef",
       "dschanges",
       "wfpaudit",
-      "dhcpdnsauditlog"
+      "dhcpdnsauditlog",
+      "objaudit"
     ]
   },
   {
@@ -2220,7 +2259,8 @@ AD.CONCEPTS.ja = [
       "ntlm",
       "delegation",
       "pslogging",
-      "rdp"
+      "rdp",
+      "jea"
     ]
   },
   {
@@ -2439,7 +2479,8 @@ AD.CONCEPTS.ja = [
       "credman",
       "protectedusers",
       "paw",
-      "credssp"
+      "credssp",
+      "rdplogs"
     ]
   },
   {
@@ -2749,7 +2790,8 @@ AD.CONCEPTS.ja = [
       "sam",
       "registry",
       "dc",
-      "adds"
+      "adds",
+      "tombstone"
     ]
   },
   {
@@ -3122,7 +3164,8 @@ AD.CONCEPTS.ja = [
       "pki",
       "entra",
       "condaccess",
-      "hybridauth"
+      "hybridauth",
+      "domainauth"
     ]
   },
   {
@@ -3144,7 +3187,8 @@ AD.CONCEPTS.ja = [
       "silverticket",
       "kerberos",
       "entra",
-      "nthash"
+      "nthash",
+      "domainauth"
     ]
   },
   {
@@ -3804,7 +3848,8 @@ AD.CONCEPTS.ja = [
       "etw",
       "byovd",
       "sandbox",
-      "memforensics"
+      "memforensics",
+      "avlogs"
     ]
   },
   {
@@ -3891,7 +3936,8 @@ AD.CONCEPTS.ja = [
       "sysmon",
       "eventlog",
       "xdr",
-      "entralogs"
+      "entralogs",
+      "soctier"
     ]
   },
   {
@@ -3938,7 +3984,8 @@ AD.CONCEPTS.ja = [
       "mde",
       "wdac",
       "obfuscation",
-      "reflectiveload"
+      "reflectiveload",
+      "avlogs"
     ]
   },
   {
@@ -3959,7 +4006,8 @@ AD.CONCEPTS.ja = [
       "procinjection",
       "lolbin",
       "wdac",
-      "mde"
+      "mde",
+      "avlogs"
     ]
   },
   {
@@ -3980,7 +4028,8 @@ AD.CONCEPTS.ja = [
       "asr",
       "lolbin",
       "amsi",
-      "byovd"
+      "byovd",
+      "avlogs"
     ]
   },
   {
@@ -4222,7 +4271,8 @@ AD.CONCEPTS.ja = [
       "authpolicy",
       "privgroups",
       "protectedusers",
-      "pth"
+      "pth",
+      "jea"
     ]
   },
   {
@@ -4244,7 +4294,8 @@ AD.CONCEPTS.ja = [
       "authpolicy",
       "credguard",
       "wdac",
-      "rdp"
+      "rdp",
+      "jea"
     ]
   },
   {
@@ -4332,7 +4383,8 @@ AD.CONCEPTS.ja = [
       "registry",
       "sysmon",
       "lolbin",
-      "ifeo"
+      "ifeo",
+      "reparse"
     ]
   },
   {
@@ -4486,7 +4538,9 @@ AD.CONCEPTS.ja = [
       "azurerbac",
       "graphapi",
       "pim",
-      "gdap"
+      "gdap",
+      "au",
+      "dyngroup"
     ]
   },
   {
@@ -4570,7 +4624,8 @@ AD.CONCEPTS.ja = [
       "tenant",
       "principal",
       "condaccess",
-      "graphapi"
+      "graphapi",
+      "cts"
     ]
   },
   {
@@ -4885,7 +4940,8 @@ AD.CONCEPTS.ja = [
       "mde",
       "advhunting",
       "xdr",
-      "mttdmttr"
+      "mttdmttr",
+      "soctier"
     ]
   },
   {
@@ -4929,7 +4985,8 @@ AD.CONCEPTS.ja = [
       "condaccess",
       "illicitconsent",
       "oauth",
-      "siem"
+      "siem",
+      "dlp"
     ]
   },
   {
@@ -4951,7 +5008,8 @@ AD.CONCEPTS.ja = [
       "condaccess",
       "mfafatigue",
       "tokentheft",
-      "aitm"
+      "aitm",
+      "cae"
     ]
   },
   {
@@ -5064,7 +5122,8 @@ AD.CONCEPTS.ja = [
       "cti",
       "iocioa",
       "mttdmttr",
-      "memforensics"
+      "memforensics",
+      "soctier"
     ]
   },
   {
@@ -5152,7 +5211,8 @@ AD.CONCEPTS.ja = [
       "peformat",
       "process",
       "lolbin",
-      "sysmon"
+      "sysmon",
+      "wow64"
     ]
   },
   {
@@ -5172,7 +5232,8 @@ AD.CONCEPTS.ja = [
       "dll",
       "procinjection",
       "yara",
-      "sandbox"
+      "sandbox",
+      "wow64"
     ]
   },
   {
@@ -5254,7 +5315,8 @@ AD.CONCEPTS.ja = [
       "amcache",
       "prefetch",
       "vss",
-      "userart"
+      "userart",
+      "reparse"
     ]
   },
   {
@@ -5295,7 +5357,8 @@ AD.CONCEPTS.ja = [
       "iocioa",
       "threathunting",
       "ir",
-      "ueba"
+      "ueba",
+      "soctier"
     ]
   },
   {
@@ -5586,7 +5649,8 @@ AD.CONCEPTS.ja = [
       "authevents",
       "acctmgmtevents",
       "passwordspray",
-      "rdp"
+      "rdp",
+      "rdplogs"
     ]
   },
   {
@@ -5956,7 +6020,8 @@ AD.CONCEPTS.ja = [
       "c2",
       "networktelemetry",
       "dnslogging",
-      "bits"
+      "bits",
+      "dlp"
     ]
   },
   {
@@ -5998,7 +6063,8 @@ AD.CONCEPTS.ja = [
       "adfs",
       "goldensaml",
       "seamlesssso",
-      "prt"
+      "prt",
+      "domainauth"
     ]
   },
   {
@@ -6547,7 +6613,8 @@ AD.CONCEPTS.ja = [
       "sidfiltering",
       "tiermodel",
       "forest",
-      "pim"
+      "pim",
+      "funclevel"
     ]
   },
   {
@@ -6616,7 +6683,8 @@ AD.CONCEPTS.ja = [
       "eventlog",
       "keycredlink",
       "rbcdattr",
-      "badsuccessor"
+      "badsuccessor",
+      "tombstone"
     ]
   },
   {
@@ -6684,6 +6752,526 @@ AD.CONCEPTS.ja = [
       "syscall",
       "byovd",
       "handle"
+    ]
+  },
+  {
+    "id": "funclevel",
+    "term": "ドメイン/フォレスト機能レベル",
+    "en": "Domain / Forest Functional Level",
+    "aka": "msDS-Behavior-Version, DFL/FFL, Windows 2000〜2016機能レベル",
+    "cat": "adstruct",
+    "body": "ドメイン機能レベル (DFL) / フォレスト機能レベル (FFL) は、ドメインヘッドおよびPartitionsコンテナのmsDS-Behavior-Version属性に格納される整数値で、そのドメイン/フォレストで段階的に解禁される機能セットを決定する基礎属性。値は0=Windows 2000ネイティブ、1=2003混在(フォレストのみ)、2=2003、3=2008、4=2008 R2、5=2012、6=2012 R2、7=2016に対応し、ドメイン内の全DCが対象バージョン以上で稼働している必要がある。昇格は原則不可逆で、唯一の例外はADごみ箱(Recycle Bin)を有効化していない場合に限りDFL/FFLを「2008 R2→2008」へロールバックできる点のみ。DFL 2008(3)以降は、新規作成ドメインでは既定でSYSVOLレプリケーションにDFSRが使用され(FRSは不使用)、既存ドメインをこのレベルへ引き上げた場合はdfsrmigによる手動移行が必要になる。同レベルからきめ細かいパスワードポリシー(PSO/Fine-Grained Password Policy)も利用可能になる。FFL 2008 R2(4)はADごみ箱の解禁条件だが、gMSAはこれと独立しており機能レベル要件は一切なく、2012以降のDCが最低1台存在しスキーマが更新されKDSルートキーが生成されていれば動作する点に注意(「2008 R2=ADごみ箱/gMSA」と同列に語るのは誤り)。Protected Usersグループが提供するDC側の保護(NTLM/Digest/CredSSP拒否、Kerberos長期鍵の非キャッシュ等)はDFL 2012 R2(値6)を要求し、DFL 2012(値5)では発動しない。RBCD(msDS-AllowedToActOnBehalfOfOtherIdentity属性)自体も機能レベルには依存せず、フロント/バックエンド双方のドメインに2012以降のDCが存在しスキーマにこの属性があれば動作する。FFL 2016(7)はPAMトラスト/シャドウプリンシパル(msDS-ShadowPrincipal)による時限グループメンバーシップの前提条件となる。攻撃者・防御者いずれにとっても、対象ドメインのDFL/FFLを把握することはProtected UsersやPAMトラストなど特定の緩和策・機能が原理的に有効化可能かを判断する出発点であり、Get-ADDomain/Get-ADForestのDomainMode/ForestModeプロパティで確認できる。",
+    "points": [
+      "msDS-Behavior-Version: 値0(2000)〜7(2016)、DFL/FFL共通のスキーム。ドメイン内の全DCが対象バージョン以上で稼働している必要",
+      "昇格は原則不可逆(唯一の例外: ADごみ箱未有効化時に限りDFL/FFL「2008 R2→2008」へロールバック可能)",
+      "DFL2008(3)以降: 新規ドメインは既定でSYSVOL=DFSR(既存ドメインはdfsrmigで手動移行)、PSO(ファイングレインパスワードポリシー)解禁",
+      "FFL2008 R2(4): ADごみ箱解禁。gMSAは機能レベル非依存(2012以降DC1台+スキーマ更新+KDSルートキーで決定)",
+      "DFL2012 R2(6)必須: Protected UsersのDC側保護(NTLM/Digest/CredSSP拒否等)。DFL2012(5)では未発動。RBCDも機能レベル非依存(フロント/バックエンド双方に2012以降DC+スキーマ属性で決定)",
+      "FFL2016(7): PAMトラスト/シャドウプリンシパル(msDS-ShadowPrincipal)による時限グループメンバーシップの前提。確認はGet-ADDomain/Get-ADForestのDomainMode/ForestMode"
+    ],
+    "related": [
+      "domain",
+      "sysvol",
+      "shadowprincipal",
+      "protectedusers",
+      "rbcdattr",
+      "gmsa",
+      "lockoutpolicy"
+    ]
+  },
+  {
+    "id": "tombstone",
+    "term": "トゥームストーンとADごみ箱",
+    "en": "Tombstone Lifetime & AD Recycle Bin",
+    "aka": "tombstoneLifetime, msDS-deletedObjectLifetime, isDeleted, isRecycled, CN=Deleted Objects",
+    "cat": "adstruct",
+    "body": "トゥームストーンとADごみ箱は、ADオブジェクト削除後に即座には消去せず、論理削除(トゥームストーン化)→(条件付きで)ADごみ箱による復元可能期間→ガベージコレクションによる完全消去という段階を経て消滅させる仕組みである。削除直後のオブジェクトはisDeleted=TRUEとなりCN=Deleted Objects,<ドメインDN>へ移動されるが、isRecycled=FALSEのままであれば、AD Recycle Bin(2008 R2以降の森林機能レベルで有効化可能)により属性やメンバーシップを保持したまま復元(5138 Undeleteイベントに相当)できる。この復元可能期間はtombstoneLifetime属性(未設定=NULLの場合のみ60日にフォールバックするレガシー既定であり、Windows Server 2003 SP1以降に新規作成されたフォレストの既定は180日)と、既定値がtombstoneLifetimeと同値(通常180日)のmsDS-deletedObjectLifetimeで制御される。この期限を超過するとオブジェクトはisRecycled=TRUEの「再利用済み」状態へ遷移して属性の大半を失い、この時点でAD Recycle Binによる復元はもはや不可能となり、以後は認可された復元(authoritative restore)のみが唯一の手段となる。さらにtombstoneLifetime期間の経過後、既定12時間間隔で実行されるガベージコレクションのタイミングでデータベースから物理的に完全消去され、いかなる方法でも復元不能になる。攻撃マップ上では、krbtgtや特権グループ・GPOの誤削除/悪意的削除に対し、5138イベントとisDeleted/isRecycledの状態を正しく読み解くことで、IR担当者が「まだAD Recycle Binで復元可能か」「認可された復元しか残っていないか」を即座に判断できるかが復旧の成否を左右する。",
+    "points": [
+      "isDeleted=TRUE かつ isRecycled=FALSE → CN=Deleted Objectsへ移動、AD Recycle Binで復元可能(5138 Undelete)",
+      "tombstoneLifetime: 未設定(NULL)時のみ60日にフォールバック(レガシー既定)/2003 SP1以降の新規フォレストは180日が既定",
+      "msDS-deletedObjectLifetimeの既定値はtombstoneLifetimeと同値(通常180日)、この期間が実質的な復元可能期間となる",
+      "期限超過でisRecycled=TRUEに遷移 → ADごみ箱復元は不可能、以後は認可された復元(authoritative restore)のみ",
+      "tombstoneLifetime経過後、既定12時間間隔(garbageCollPeriod)のガベージコレクションでデータベースから完全消去、復元不能"
+    ],
+    "related": [
+      "dschanges",
+      "krbtgt",
+      "gpo",
+      "funclevel",
+      "replication",
+      "dsrm"
+    ]
+  },
+  {
+    "id": "tokengroups",
+    "term": "tokenGroups (実効グループ算出属性)",
+    "en": "tokenGroups Constructed Attribute",
+    "aka": "constructed attribute, LDAP_MATCHING_RULE_IN_CHAIN, whoami /groups",
+    "cat": "identity",
+    "body": "tokenGroups は、対象オブジェクトの実効セキュリティグループメンバーシップ(ネストを再帰的に展開した結果のSID集合。プライマリグループのSIDも含む)をDCがクエリ時に動的に計算して返す構築(constructed)属性である。通常のLDAP属性と異なり値はディレクトリに格納されておらず、対象オブジェクトのDNを指定したBASEスコープ検索でのみ取得でき、subtree/onelevel検索や検索フィルタの条件には使用できない。値は照会のたびに都度再計算されるため、多数のオブジェクトへ連続して照会するとDCの処理性能を大きく圧迫しうる。返されるのはセキュリティグループのSIDのみで、配布グループは反映されない。対象ドメイン内のグローバル/ドメインローカルグループはDC自身の保有データのみで算出できるが、フォレスト内の他ドメインにまたがるユニバーサルグループの再帰展開にはGC(グローバルカタログ)への問い合わせが必要であり、GCに到達できない場合はユニバーサルグループメンバーシップが欠落する、またはtokenGroups自体を取得できないという既知の完全性の制約がある。\n\nこれとは別の代替手法として拡張マッチングルール LDAP_MATCHING_RULE_IN_CHAIN (OID 1.2.840.113556.1.4.1941) があり、こちらは member/memberOf など識別名(DN)構文属性への再帰(推移的)マッチングを可能にする検索フィルタ拡張で、通常のsubtree検索フィルタ内で (member:1.2.840.113556.1.4.1941:=<DN>) のように利用できる。両者は「実効グループメンバーシップの算出」という目的を共有するが、前者はDCが対象オブジェクト単位で算出した結果を1回のBASE検索で返す方式、後者はLDAPサーバに検索時点でsubtree全体を対象とした再帰展開を実行させる検索フィルタ方式であり、互いに独立した2つの異なる手段である。\n\nwhoami /groups が表示する実効グループ一覧は、ログオン時にトークン(PAC)へ格納されたSID集合を参照するもので、tokenGroupsが返す値と本質的に同じ再帰展開ロジックの結果を反映する。一方でBloodHound/SharpHoundはtokenGroupsやLDAP_MATCHING_RULE_IN_CHAINを直接利用せず、生のmember/memberOf関係をLDAPでそのまま収集し、Neo4jグラフDB上でCypherの可変長パスマッチングにより再帰展開を後段で実行するという第三の手段を採る。groupエントリが指摘するネスト展開の課題は、このように用途に応じて複数の異なる仕組みで解決されている。",
+    "points": [
+      "構築(constructed)属性: ディレクトリに値を格納せず、クエリ時にDCが動的計算 → BASEスコープ検索のみで取得可、subtree検索やフィルタ条件には使用不可",
+      "セキュリティグループのSID(プライマリグループ含む)のみ反映、配布グループは含まれない",
+      "値は照会のたびに再計算されるため、大量オブジェクトへの連続照会はDC性能を圧迫しうる",
+      "対象ドメイン内グループはDC単独で算出可能だが、他ドメインのユニバーサルグループの再帰展開にはGC照会が必要 → 非GCなDCではユニバーサルグループメンバーシップの欠落/取得失敗という既知の制約",
+      "代替手法: LDAP_MATCHING_RULE_IN_CHAIN (OID 1.2.840.113556.1.4.1941) — member/memberOf等DN構文属性への再帰マッチング検索フィルタ拡張、例: (member:1.2.840.113556.1.4.1941:=<DN>)、通常のsubtree検索で利用可",
+      "whoami /groupsはトークン(PAC)のSID集合(tokenGroupsと同じ再帰展開ロジックの結果)を表示。一方BloodHound/SharpHoundはtokenGroups/LDAP_MATCHING_RULE_IN_CHAINを使わず、生のmember/memberOfをLDAP収集しNeo4jのCypher可変長パスで再帰展開する第三の手段を採る"
+    ],
+    "related": [
+      "group",
+      "gc",
+      "bloodhound",
+      "ldap",
+      "sid",
+      "discovery"
+    ]
+  },
+  {
+    "id": "ntlmauthlevel",
+    "term": "NTLM認証レベル (LmCompatibilityLevel)",
+    "en": "NTLM Authentication Level (LmCompatibilityLevel)",
+    "aka": "LAN Manager authentication level, LmCompatibilityLevel, レベル0〜5",
+    "cat": "auth",
+    "body": "NTLM認証レベル(LmCompatibilityLevel)は、クライアントとサーバー/DCがLM・NTLMv1・NTLMv2のいずれの認証方式を送受信するかを制御するポリシー値で、レジストリ HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\LmCompatibilityLevel(DWORD)、またはGPO「ネットワーク セキュリティ: LAN Manager 認証レベル」により0〜5の6段階で設定する。各レベルの挙動は、0=LMとNTLM応答を送信しNTLMv2セッションセキュリティは使用しない、1=LMとNTLM応答を送信しネゴシエーションできればNTLMv2セッションセキュリティを使用、2=NTLM応答のみを送信しネゴシエーションできればNTLMv2セッションセキュリティを使用、3=NTLMv2応答のみを送信、4=NTLMv2応答のみを送信しDC側はLM応答を拒否、5=NTLMv2応答のみを送信しDC側はLMとNTLM応答をともに拒否しNTLMv2のみ受理、という段階構造を持つ。0〜3はいずれもクライアント側が送信する応答方式を制御するだけでDC側の受理方針(LM・NTLM・NTLMv2をいずれも受理)は変わらず、4〜5になって初めてDC側の受理拒否が加わる。Windows Vista/Server 2008以降はクライアント・DCともに実効的な既定値がレベル3であり(GPO自体は多くのクライアントで「未定義」のままだが、既定動作はレベル3相当でクライアントはNTLMv2応答のみを送信する)、この場合でもDC側はなおNTLMv1やLMを受理し得る。値が0〜2に緩められている、または既定より緩いレガシー環境では、強制認証と組み合わせたNTLMv1ダウングレード攻撃でNetNTLMv1応答を取得しやすくなり、応答が3つの7バイトDES鍵に分解できる弱い鍵構造で計算されるため、crack.shなどでオフラインでNTハッシュ相当の値まで解読可能になる。なお同じLsaキー配下のNoLMHash(GPO「ネットワーク セキュリティ: 次回のパスワード変更時にLAN Managerのハッシュ値を保存しない」)はLMハッシュ自体の生成・保存有無を制御する別軸の設定であり、認証方式のネゴシエーションを制御するLmCompatibilityLevelとは区別する必要がある。攻撃マップの『NTLMv1 Downgrade & Crack』技法(aka「LmCompatibilityLevelダウングレード」)は値を0〜2へ引き下げる変更を、『Internal Monologue』技法はLmCompatibilityLevelに加えNtlmMinClientSec/RestrictSendingNTLMTrafficも合わせて、RegValueNameを直接クエリするhuntロジックで検知する。",
+    "points": [
+      "レジストリ: HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\LmCompatibilityLevel(DWORD, 0〜5)",
+      "GPO名: ネットワーク セキュリティ: LAN Manager 認証レベル",
+      "0=LM+NTLM送信/NTLMv2SS不使用、1=LM+NTLM送信/NTLMv2SS任意使用、2=NTLM単体送信/NTLMv2SS任意使用、3=NTLMv2応答のみ送信",
+      "4=NTLMv2応答のみ+DC側LM拒否、5=NTLMv2応答のみ+DC側LM・NTLMv1拒否(NTLMv2のみ受理)",
+      "既定の実効値: Windows Vista/Server 2008以降はレベル3。0〜3はDC側の受理方針を変えず、4〜5で初めてDC側拒否が加わる段階構造",
+      "0〜2への緩和+強制認証の組合せはNTLMv1ダウングレード攻撃(NetNTLMv1取得→crack.sh等でオフライン解読)の足がかり",
+      "同じLsaキー配下のNoLMHash(LMハッシュの保存有無を制御)とは別軸の設定で、aka扱いはせず区別する"
+    ],
+    "related": [
+      "netntlm",
+      "ntlm",
+      "nthash",
+      "protectedusers",
+      "gpo",
+      "authevents"
+    ]
+  },
+  {
+    "id": "certkeystore",
+    "term": "証明書ストアと秘密鍵プロバイダー (CryptoAPI/CNG)",
+    "en": "Certificate Store & Private Key Providers (CryptoAPI/CNG)",
+    "aka": "MY/Personalストア, CSP, KSP, エクスポート可能フラグ, certutil -store, KeyIso",
+    "cat": "pki",
+    "body": "証明書ストアは、Windows がユーザー/コンピュータ両スコープで発行済み証明書とその秘密鍵参照を保持するコンテナ群で、スコープ(現在のユーザー vs ローカルコンピュータ)と用途(個人=My/Personal、信頼されたルートCA=Root、中間CA=CA など)の組み合わせで分類され、レジストリ(HKCU/HKLM\\Software\\Microsoft\\SystemCertificates)や certutil -store My で列挙できる。秘密鍵の実体はストアとは別に管理され、レガシーCryptoAPIではCSP(Cryptographic Service Provider、例: Microsoft Enhanced RSA and AES Cryptographic Provider、rsaenh.dll)が%APPDATA%\\Microsoft\\Crypto\\RSA\\配下に鍵ファイルを置く。現行のCNG(Cryptography API: Next Generation)ではKSP(Key Storage Provider)がプロバイダ種別ごとに異なる場所へ格納し、ソフトウェア鍵を扱うMicrosoft Software Key Storage Providerは%APPDATA%\\Microsoft\\Crypto\\Keys\\配下に、TPM利用時のMicrosoft Platform Crypto Provider(PCPKsp.dll)は%LOCALAPPDATA%\\Microsoft\\Crypto\\PCPKSP\\配下に鍵名のSHA-1ダイジェストを名前とする.PCPKEYファイルとして保護対象の鍵blobを置く(いずれもcertutilのProviderName指定で確認可能)。このうちCSP鍵とソフトウェアCNG鍵はユーザーのDPAPIマスターキーで暗号化保護されるのに対し、PCPの鍵blobはTPMに封印(seal)される形で保護され、鍵材料自体は平文でTPM外に出ない。鍵がエクスポート可能かは発行元の証明書テンプレートに設定されたCT_FLAG_EXPORTABLE_KEY(msPKI-Private-Key-Flag のビット0x10、既定では非エクスポート)が起点となり、これを引き継いだCSP/KSPが CryptExportKey/NCryptExportKey 呼び出し時にエクスポート可否を判定・拒否する。ソフトウェア鍵の場合、この判定はCAPIでは呼び出し元プロセスにロードされたCSP DLL(rsaenh.dll)自身のロジックに過ぎず、CNGでは既定でLSASSプロセス内に常駐するCNGキー分離サービス(KeyIso)が判定を担う。mimikatzのcrypto::capiは呼び出し元プロセス自身のメモリ上でCSPの非エクスポートチェックをパッチし、crypto::cngはLSASSプロセスに常駐するKeyIsoサービスをメモリパッチすることで、この非エクスポートチェック自体を無効化し、本来抽出不能なはずの秘密鍵をエクスポート可能な形でメモリ上から取り出す。これがTHEFT1技法の核心であり、逆にTPMやスマートカードなどハードウェアバックドの鍵は鍵材料自体がハードウェア境界の外に出ないためこの手法は通用しない。",
+    "points": [
+      "ストア分類: スコープ(ユーザー/コンピュータ) × 用途(My/Personal, Root, CA, TrustedPublisher等)",
+      "レガシーCSP(rsaenh.dll等) → %APPDATA%\\Microsoft\\Crypto\\RSA\\に鍵ファイル",
+      "CNGソフトウェアKSP(Microsoft Software Key Storage Provider) → %APPDATA%\\Microsoft\\Crypto\\Keys\\、TPM利用のMicrosoft Platform Crypto Provider(PCPKsp.dll) → %LOCALAPPDATA%\\Microsoft\\Crypto\\PCPKSP\\に.PCPKEYファイル",
+      "エクスポート可否はテンプレートのCT_FLAG_EXPORTABLE_KEY(msPKI-Private-Key-Flag ビット0x10)に由来し既定は非エクスポート",
+      "mimikatz crypto::capiは呼び出し元プロセス内のCSP(rsaenh.dll)を、crypto::cngはLSASS内のCNGキー分離サービス(KeyIso)をメモリパッチしエクスポート不可鍵を抽出(THEFT1)",
+      "certutil -store My で列挙可能。CSP/ソフトウェアKSPの鍵ファイルはDPAPIマスターキーで保護されるが、TPM(PCP)の鍵blobはDPAPIではなくTPM封印で保護される"
+    ],
+    "related": [
+      "template",
+      "adcs",
+      "dpapi",
+      "pkinit",
+      "passcert",
+      "certmapping"
+    ]
+  },
+  {
+    "id": "ticketflags",
+    "term": "Kerberosチケットフラグ (forwardable/proxiable/renewable等)",
+    "en": "Kerberos Ticket Flags (Forwardable / Proxiable / Renewable / OK-AS-DELEGATE)",
+    "aka": "KDCOptions（要求フラグ）, TicketFlags（許可済みフラグ）, renew-till, klist flags, Rubeus dump",
+    "cat": "auth",
+    "body": "Kerberosチケットフラグは、TGT/STの発行・委任・更新の可否を制御する32ビットのビットフィールドで、RFC 4120では同一のビット位置定義(KerberosFlags型)を共有しつつも意味が異なる2つの別個フィールドとして現れる。ひとつはAS-REQ/TGS-REQでクライアントが希望する処理を伝えるKDCOptions(要求フラグ)、もうひとつはKDCがそれを審査した結果として実際にTGT/STへ埋め込むTicketFlags(許可済みフラグ)であり、両者を単なる同一フィールドの別名として扱うのは不正確である。代表的なビットには forwardable(0x40000000)、proxiable(0x10000000)、renewable(0x00800000)、pre-authent(0x00200000)、ok-as-delegate(0x00040000)があり、forwardableは当該チケットを転送してS4U2Selfや従来型委任に使える前提条件、ok-as-delegateはTRUSTED_FOR_DELEGATION(userAccountControl、無制約委任)が設定されたサービス宛てのSTにKDCが立てる、「クライアントはこのサービスへTGTを転送してよい」という印である(msDS-AllowedToDelegateToによる制約委任とは別系統)。renewableが立ったチケットのみ、有効期限(ticket lifetime)を超えてrenew-till(AD既定のKerberosポリシーでは通常7日)まで、krbtgt宛てのRENEWオプション付きTGS-REQで有効期限を延長できる。Kerberos Bronze Bit攻撃(CVE-2020-17049)は、TicketFlags中のforwardableビットがPACのような署名・整合性検証の対象外にあることを突き、攻撃者が既知のサービス鍵でnon-forwardableなS4U2Selfチケットを復号してforwardableビットを反転させ、再暗号化してS4U2Proxyへ渡す改ざんであり、どのフラグがどこ(平文ヘッダ/暗号化本体/署名対象)で扱われるかを理解しないとこの技法の要点を追えない。SOC実務ではklist、Rubeus dump/triage、mimikatz kerberos::listの出力中の16進フラグ値やフラグ名一覧を読み、委任(無制約/制約/S4U)の成立条件やチケットの正当性をトリアージする際にこの区別が土台となる。",
+    "points": [
+      "KDCOptions=クライアントの要求フラグ、TicketFlags=チケットに埋め込まれた許諾済みフラグ(RFC4120 KerberosFlags型、同一ビット位置を共有する別フィールド)",
+      "forwardable=0x40000000、proxiable=0x10000000、renewable=0x00800000",
+      "pre-authent=0x00200000、ok-as-delegate=0x00040000(TRUSTED_FOR_DELEGATIONが設定された無制約委任サービスのSTに立つ、TGT転送許可の印)",
+      "renew-till: renewableフラグ付きチケットのみRENEWオプション付きTGS-REQで有効期限延長可(AD既定は7日)",
+      "klist/Rubeus dump/mimikatz kerberos::listで確認。Kerberos Bronze Bit(CVE-2020-17049)はforwardableビットが署名/整合性検証の対象外であることを突く改ざん"
+    ],
+    "related": [
+      "tgt",
+      "st",
+      "delegation",
+      "s4u",
+      "unconstrained",
+      "u2u"
+    ]
+  },
+  {
+    "id": "ccachekeytab",
+    "term": "ccache / keytab (MIT Kerberos資格情報ファイル)",
+    "en": "ccache / keytab (MIT Kerberos Credential Files)",
+    "aka": "credential cache, KRB5CCNAME, keytab file, kinit -kt, klist",
+    "cat": "auth",
+    "body": "ccache（credential cache）と keytab は、Linux/macOS など MIT Kerberos 実装を使う非Windowsクライアントにおける2種類の資格情報ファイルで、Windows でいう LSASS のチケットキャッシュと NTハッシュ/AES鍵の永続保存にそれぞれ相当する。ccache は kinit や SSSD が取得済みの TGT/ST を保持する一時キャッシュで、FILE:/DIR:/KEYRING:/MEMORY: などの種別があり、既定では /tmp/krb5cc_<uid> やカーネルキーリング(KEYRING:persistent:<uid>)に置かれ、環境変数 KRB5CCNAME で参照先を切り替えられる。keytab はプリンシパル名・kvno(鍵バージョン番号)・etype・秘密鍵バイト列を平文同等で保持する長期鍵ファイルで、ホスト自身のマシンアカウント相当を表す /etc/krb5.keytab や、サービス/SSSD専用のキータブとして配置され、kinit -kt <keytab> <principal> によりパスワード入力なしで新規TGTを取得する非対話ログオンに使われる。ドメイン参加Linuxホストでは SSSD がこの host/ キータブで自身をADに認証し、ログインユーザーのチケットは個々のccacheで管理される。攻撃面としては、ccacheの窃取は有効期限内のチケット再利用に限られるPass-the-Ticket相当、keytabの窃取は保持されたetype鍵から任意のタイミングでオフラインに新規TGTを発行できるためNTハッシュ窃取やOverpass-the-Hashに相当する恒久的な侵害となり、両者とも klist -c(ccache一覧) / klist -k(keytab一覧) で内容を確認できる。",
+    "points": [
+      "ccache = 取得済みチケット(TGT/ST)の一時保持。種別: FILE:/DIR:/KEYRING:/MEMORY:",
+      "既定パス /tmp/krb5cc_<uid> や KEYRING:persistent:<uid>、環境変数 KRB5CCNAME で参照先指定",
+      "keytab = principal+kvno+etype+key を保持する長期鍵ファイル (/etc/krb5.keytab 等)",
+      "kinit -kt <keytab> <principal> で非対話TGT取得。SSSDはhost/keytabでマシン自身を認証",
+      "ccache窃取=Pass-the-Ticket相当(期限内)、keytab窃取=NTハッシュ窃取/Overpass-the-Hash相当(恒久)",
+      "klist -c / klist -k で内容確認"
+    ],
+    "related": [
+      "kerberos",
+      "tgt",
+      "st",
+      "lsass",
+      "nthash",
+      "ptt",
+      "overpass",
+      "kerbsalt"
+    ]
+  },
+  {
+    "id": "au",
+    "term": "管理単位 (Administrative Unit)",
+    "en": "Administrative Unit (AU)",
+    "aka": "Restricted Management AU, RMAU, HiddenMembership, isMemberManagementRestricted",
+    "cat": "cloud",
+    "body": "管理単位 (Administrative Unit, AU) は、Entra ID のユーザー・グループ・デバイスを地域や部門などの単位でまとめ、その集合に対してのみ有効なディレクトリロールを委任するためのスコープ用コンテナオブジェクトである(ネスト不可)。administrativeUnits リソースとして作成し、isMemberManagementRestricted=true(制限付き管理AU, RMAU — 作成時のみ設定可能でイミュータブル、メンバーにできるのはユーザー・デバイス・セキュリティグループのみ)を指定すると、メンバーの属性変更・無効化・パスワード/MFAリセット・削除・グループのメンバー/所有者変更がAUスコープの専用ロール保有者に限定される。テナント全体の Global Administrator や Privileged Role Administrator であっても直接は対象メンバーを操作できず、操作するには自分自身をそのRMAUスコープのロールに明示的に割り当てる必要がある(この自己割当自体は監査ログに残る)。さらに visibility=HiddenMembership を設定するとAUのメンバー一覧がAUメンバー本人や一部の管理ロール以外から不可視になるが、この閲覧可能ロールにSecurity Administrator/Security Operatorは含まれず、SOCの通常の調査ロールではメンバーを確認できないという盲点が生じる。攻撃者アカウントをRMAUに収容した上で Privileged Authentication Administrator 等の特権ロールをこのAUスコープで割り当てると、正規のGA/PRAからも発見・無効化が困難な永続化基盤になる — 攻撃マップの「Entra Restricted-Management Administrative Unit Persistence」技法はこの仕様をそのまま悪用する。防御側は Add administrative unit / Add member to restricted management administrative unit / Add member to role scoped over Restricted Management Administrative Unit の監査ログ相関と、RMAU作成者・対象の許可リスト統制が要となる。",
+    "points": [
+      "administrativeUnits リソース = ユーザー/グループ/デバイスをスコープ限定するコンテナ(ネスト不可)",
+      "isMemberManagementRestricted=true → RMAU(作成時のみ設定・不変)、GA/PRAでも直接メンバー操作不能、自己スコープ割当で回避可能(要監査)",
+      "visibility=HiddenMembership → メンバー一覧を非メンバーから秘匿、Security Administrator/Security Operatorも閲覧不可という盲点",
+      "AUスコープの特権ロール割当(Privileged Authentication Administrator等)と組み合わせ濫用される",
+      "監査: Add administrative unit / Add member to restricted management administrative unit / Add member to role scoped over Restricted Management Administrative Unit"
+    ],
+    "related": [
+      "entraroles",
+      "entra",
+      "pim",
+      "entralogs",
+      "graphapi",
+      "tiermodel"
+    ]
+  },
+  {
+    "id": "dyngroup",
+    "term": "動的グループ / メンバーシップ規則 (Dynamic Group)",
+    "en": "Dynamic Group / Membership Rule",
+    "aka": "dynamic membership, membershipRule, isAssignableToRole",
+    "cat": "cloud",
+    "body": "動的グループ (Dynamic Group) は、Entra ID のグループオブジェクトで groupTypes プロパティに \"DynamicMembership\" を含み、membershipRule 属性に記述したルール(例: user.department -eq \"Sales\"、device.deviceOSType -eq \"Windows\")に基づいて、ユーザーやデバイスの属性値からメンバーシップを自動的に計算する仕組みである。ルール評価は membershipRuleProcessingState (On / Paused) で有効・停止を切り替えられ、対象属性が変更されると即時ではなく非同期のキューで順次再評価されるため、実際のメンバー追加・削除への反映には遅延が生じる。Microsoft の公式ガイダンスでは通常は数時間以内に処理されるとされるが、テナント内の動的グループ数やオブジェクト変更量、ルールの効率(Match/Containsの多用など)次第では24時間を超える遅延も起こり得る。動的グループはアプリのロール割当、条件付きアクセスの対象/除外スコープ、Microsoft 365 動的グループによる Teams/SharePoint などの SaaS アクセスといった「リソースへのアクセス制御」の入力として広く利用できる一方、仕様上 isAssignableToRole=true (ロール割り当て可能グループ) に設定することはできずディレクトリロールへ直接割り当てることは不可能であり、さらに PIM for Groups(グループメンバーシップ/所有権の適格化・時限アクティブ化)の対象として有効化することもできない(オンプレ同期グループと並び明示的に対象外)という二重の制約を持つ。この属性駆動の自動化は、department や拡張属性など自身で書き込める属性を持つユーザーが値を操作してルールに一致させ、意図しない特権グループに自動編入される攻撃面を生むが、その到達範囲はディレクトリロールへの直接昇格やPIMの時限昇格ではなく、isAssignableToRole/PIM for Groupsの制約下にあるリソースアクセス経路(アプリロール、条件付きアクセス、SaaS/M365リソース等)に限定される点が防御評価の要となる。",
+    "points": [
+      "groupTypes: [\"DynamicMembership\"] + membershipRule属性(例: user.department -eq \"Sales\"、device.deviceOSType -eq \"Windows\")",
+      "membershipRuleProcessingState: On/Paused。属性変更ごとに非同期キューで順次再評価され、通常は数時間以内、条件次第で24時間超の遅延もあり得る(数分〜数十分という短時間保証ではない)",
+      "isAssignableToRole=true は動的グループでは設定不可 → ディレクトリロールへの直接割当は不可能",
+      "PIM for Groups(グループメンバーシップ/所有権の適格化・時限アクティブ化)にも動的グループは有効化できない(オンプレ同期グループも同様に対象外)",
+      "用途: アプリロール割当、条件付きアクセスの対象/除外、Microsoft 365動的グループによるTeams/SharePointアクセス",
+      "書込可能な属性(department, extensionAttribute等)の自己操作でルールに一致させ意図しないグループへ編入される攻撃面"
+    ],
+    "related": [
+      "entraroles",
+      "pim",
+      "condaccess",
+      "graphapi",
+      "entra",
+      "sp"
+    ]
+  },
+  {
+    "id": "cts",
+    "term": "クロステナント同期 (Cross-Tenant Synchronization)",
+    "en": "Cross-Tenant Synchronization (CTS)",
+    "aka": "CTS, cross-tenant sync, cross-tenant provisioning, Allow user synchronization into this tenant, Allow users sync into this tenant",
+    "cat": "cloud",
+    "body": "クロステナント同期 (Cross-Tenant Synchronization, CTS) は、Microsoft Entra ID のプロビジョニングエンジンを用いて、あるテナント(ソース)の内部ユーザーと対応するセキュリティグループを、別テナント(ターゲット)へ片方向・自動でプッシュ供給し、ターゲット側にB2Bコラボレーションユーザー/グループとして作成・更新・削除する機能である。ソーステナント側ではHybrid Identity Administrator等の権限でクロステナント同期の構成(同期ジョブ)を作成し、ターゲットテナントを指定した上で属性マッピングとスコープフィルターを設定する。ターゲットテナント側は、クロステナントアクセス設定の対象組織における受信アクセス設定(Inbound access)の「Cross-tenant sync」タブにある「Allow user synchronization into this tenant」を有効化するだけでなく、ソース(アウトバウンド)・ターゲット(インバウンド)双方で「自動償還 (Automatic redemption)」設定も有効化して初めて動作する。招待型のB2Bコラボレーション(招待メール送信→本人による招待の受諾・同意プロンプトへの同意)とは異なり、この2種の設定が揃ったCTSは招待メール送信や同意プロンプトを構造的に経由しない。属性マッピングでuserTypeをMember/Guestいずれに設定するかでターゲット側の既定アクセス範囲が変わるが、CTSで同期できるグループはrole-assignable(ロール割り当て可能)にはできず、CTS単体でターゲット側のディレクトリロールを直接付与することはできない。それでもソース側の構成権限を奪取した攻撃者は、ターゲットテナントの承認や本人操作を一切必要とせずスコープフィルターに任意の内部ユーザーを追加してB2Bユーザーとして静かに注入でき、以降のテナント間ラテラルムーブメントや、不正なCTS構成自体を残すバックドア的永続化に悪用できる(2023年に公表された実攻撃手法)。ターゲット側のプロビジョニングログ・サインインログでの同期イベント監視と、受信アクセス設定でのCTS許可組織・自動償還設定の厳格な絞り込みが防御の要となる。",
+    "points": [
+      "プロビジョニングエンジンによる片方向(ソース→ターゲット)の自動プッシュ型ユーザー・グループ同期であり、ターゲット側からのpull型ではない",
+      "ターゲット側の必須設定: クロステナントアクセス設定 > 受信アクセス設定 > 「Cross-tenant sync」タブの「Allow user synchronization into this tenant」(旧UI表記 Allow users sync into this tenant)",
+      "上記に加え、ソース(アウトバウンド)・ターゲット(インバウンド)双方で「自動償還(Automatic redemption)」の有効化が必要。これによりCTSは招待メール送信・同意プロンプトを構造的に経由しない",
+      "属性マッピングでuserType(既定はMember)を制御できるが、同期されるグループはrole-assignable不可のためCTS単体でディレクトリロールを直接付与することはできない",
+      "ソース側の構成権限(Hybrid Identity Administrator、ユーザー割り当て/構成削除にはCloud Application Administrator等)を奪取されると、ターゲット側の承認・本人操作なしに任意の内部ユーザーが注入される",
+      "攻撃者はスコープフィルター改変によるユーザー注入や、不正なCTS構成をバックドアとして残す永続化・テナント間ラテラルムーブメントに悪用できる(2023年公表の実攻撃手法)"
+    ],
+    "related": [
+      "b2bguest",
+      "entra",
+      "tenant",
+      "entraroles",
+      "sp",
+      "entralogs"
+    ]
+  },
+  {
+    "id": "namedloc",
+    "term": "名前付きの場所 (Named Location)",
+    "en": "Named Location",
+    "aka": "trusted location, isTrusted, IP範囲ベースの場所, 国/地域ベースの場所",
+    "cat": "cloud",
+    "body": "Named Location は Entra ID の条件付きアクセスにおける「場所」シグナルを構成するオブジェクトで、Microsoft Graph 上では IPv4/IPv6 範囲を列挙する ipNamedLocation(「IP範囲ベース」)と、国/地域コードで指定する countryNamedLocation(「国/地域ベース」)の2つの派生型がある。isTrusted=true フラグを付与できるのは IP範囲ベースの Named Location のみで、国/地域ベースの場所には信頼済みとしてマークする機能自体が提供されない(Microsoft Learn: countryの場所設定では信頼済みとしてマークする手段がないと明記)。isTrusted=true が付いた場所は多くの条件付きアクセスポリシーで除外条件や MFA 要求の緩和条件として参照されるほか、Entra ID Protection のサインインリスク計算の精度向上にも利用される。攻撃者が Named Location オブジェクトを新規作成・改変して自分の送信元 IP をIP範囲ベースの場所に追加したり isTrusted を付与したりすると、既存ポリシーをすり抜けて MFA なしでサインインできてしまう「Conditional Access Policy Backdoor / Tampering」の主要な手口の一つとなる。作成・変更には Graph API の Policy.ReadWrite.ConditionalAccess 権限(最小権限としては Policy.Read.All と併用)、または Conditional Access Administrator ロールもしくは Security Administrator ロール(いずれも named location の作成/更新/削除操作をサポート)が必要であり、監査ログでは Policy カテゴリの「Add named location」「Update named location」「Delete named location」イベントとして記録されるため、この変更監視が防御上重要である。なお、国/地域ベースの場所は IP アドレスに加えて端末の GPS 位置情報(Microsoft Authenticator アプリ経由)による判定も選択できるが、これも Named Location オブジェクトの一機能であり別モノではない。これとは別に、レガシーの MFA サービス設定にある「信頼できる IP」(trusted IPs、IPv4 限定)は Named Location オブジェクトそのものとは別の仕組みだが、条件付きアクセスの場所選択リストには「MFA Trusted IPs」として統合表示されるため混同しやすい。",
+    "points": [
+      "IPv4/IPv6範囲を束ねるipNamedLocationと、国/地域コードで指定するcountryNamedLocationの2種類が存在",
+      "isTrusted=trueはIP範囲ベースのみ付与可能(国/地域ベースは不可、Microsoft Learnで明記)",
+      "isTrusted=trueの場所は多くのCAポリシーの除外/MFA緩和条件やEntra ID Protectionのリスク計算精度向上に使用される",
+      "Policy.ReadWrite.ConditionalAccess(+Policy.Read.All)権限、またはConditional Access Administrator/Security Administratorロールで作成・改変可能",
+      "監査ログはPolicyカテゴリの Add/Update/Delete named location イベントとして記録され、変更監視が重要"
+    ],
+    "related": [
+      "condaccess",
+      "cae",
+      "entra",
+      "entraidp",
+      "graphapi"
+    ]
+  },
+  {
+    "id": "domainauth",
+    "term": "ドメイン認証タイプ (Managed / Federated)",
+    "en": "Domain Authentication Type (Managed vs Federated)",
+    "aka": "DomainAuthenticationType, IssuerUri, Update-MgDomain, ConvertTo-AADIntBackdoor",
+    "cat": "cloud",
+    "body": "ドメイン認証タイプは、Entraテナントに追加された検証済みドメイン(Verified Domain)オブジェクトが持つ属性で、Managed(クラウド側でMicrosoftがパスワードハッシュを直接検証する既定方式。PHSまたはPTAと併用)と、Federated(認証をIssuerUriで指定した外部IdP、典型的にはADFSへ委任する方式)のいずれかを取る。Federatedへの切り替え時にはIssuerUri、フェデレーションメタデータURL、トークン署名証明書のサムプリントなどの設定がドメインオブジェクトに紐付けられ、Entraはそれ以降そのドメイン配下のUPNサインインをすべて指定IdPからのSAML/WS-Fedアサーションに委ねる。この属性を攻撃者が悪用すると、テナントが正規に信頼するIssuerUriを攻撃者が制御する値に書き換えることで、任意のユーザーを名乗る偽造トークンをそのまま受理させるバックドアを作れる。AADInternalsの悪性コマンドConvertTo-AADIntBackdoorはまさにこの認証タイプ切替とIssuerUri差し替えを自動化したもので、正規の管理操作としてはMicrosoft GraphのUpdate-MgDomain -AuthenticationType FederatedおよびNew-MgDomainFederationConfigurationが該当する(旧MSOnlineモジュールのSet-MsolDomainAuthenticationは2025年に廃止され現行テナントでは動作しない)。防御側はドメインの認証タイプ変更やフェデレーション構成の追加/更新を、Entra監査ログの「Set domain authentication」「Set federation settings on domain」等のアクティビティで継続的に監視する必要がある。",
+    "points": [
+      "Managed = クラウド側でパスワードハッシュ検証(PHS/PTAと併用)",
+      "Federated = IssuerUri経由で外部IdP(ADFS等)へ認証委任",
+      "悪用: IssuerUri書き換え→任意ユーザーの偽装トークン受理→テナントバックドア化",
+      "悪性ツール: AADInternalsのConvertTo-AADIntBackdoor",
+      "正規操作: Update-MgDomain -AuthenticationType Federated / New-MgDomainFederationConfiguration(MS Graph)。旧Set-MsolDomainAuthenticationは2025年廃止"
+    ],
+    "related": [
+      "adfs",
+      "saml",
+      "hybridauth",
+      "entra",
+      "entraconnect",
+      "goldensaml"
+    ]
+  },
+  {
+    "id": "cae",
+    "term": "継続的アクセス評価 (CAE)",
+    "en": "Continuous Access Evaluation (CAE)",
+    "aka": "CAE, near real-time token revocation, critical event, CAEP, Shared Signals Framework (SSF)",
+    "cat": "cloud",
+    "body": "継続的アクセス評価(CAE)は、Microsoft Entra IDがOAuth/OIDCアクセストークンの静的な有効期限だけに頼らず、アカウントの無効化・削除、パスワードの変更・リセット、管理者による明示的なリフレッシュトークン失効、MFA有効化、Entra ID Protectionによる高リスク検知などの「重大イベント(critical event)」発生時にトークンをニアリアルタイムで失効させる仕組み。OpenIDのCAEP(Continuous Access Evaluation Profile、Shared Signals Frameworkの一部)を基盤とし、Exchange Online・SharePoint Online・Teams等のリソースプロバイダがEntra IDの重大イベントを購読し、有効期限内のトークンであっても401+claim challengeで拒否してクライアントに再取得を強制できる。この重大イベント評価はニアリアルタイムを目標としつつも、イベント種別により伝播に最大15分程度の遅延があり得る(公称値としてSharePoint Online/Teamsは約15分、Exchange Onlineは約35〜40分)一方、IPロケーションに基づく条件付きアクセスポリシーの適用はほぼ即時に働く。CAE対応のクライアント・リソースの組み合わせでは、この失効の実効性を裏付けとしてアクセストークンの寿命を既定の60〜90分から最長28時間まで延長でき、頻繁なリフレッシュ通信を避けつつ強制失効に頼れるというトレードオフが成立する。逆にCAE非対応のクライアント/リソースの組み合わせでは長寿命化の恩恵もバックチャネル失効も効かず、窃取済みのアクセストークンやPRTはSOCがアカウント無効化・パスワードリセット・セッション取り消しを実施しても、既定の静的な有効期限が尽きるまで使われ続け得る。加えてCAEはゲストユーザーを保護対象としない上、条件付きアクセスポリシーやグループメンバーシップの変更自体が反映されるまでには別途最大1日(最適化時で2時間)を要し得るため、「重大イベントによる即時失効」と「ポリシー/グループ変更の反映」は異なる時間軸で動く点にも注意が必要。したがってインシデント対応では、アカウント無効化やセッション取り消しといった封じ込め操作が実際にどこまで即時遮断になるかは、被害トークンの発行元クライアントとアクセス先リソースの双方がCAE対応か、対象がゲストユーザーでないか、失効理由が重大イベントかポリシー/グループ変更かに依存する点を必ず確認する必要がある。",
+    "points": [
+      "重大イベント(critical event): アカウント無効化・削除、パスワード変更・リセット、管理者による明示的リフレッシュトークン失効、MFA有効化、Entra ID Protectionの高リスク検知(SharePoint Onlineはユーザーリスクイベント非対応)",
+      "OpenIDのCAEP(Shared Signals Framework)に基づき、Exchange Online/SharePoint Online/Teams等が重大イベントを購読し、期限内のトークンでも401+claim challengeで拒否可能",
+      "重大イベントの伝播はニアリアルタイムが目標だが最大15分程度の遅延があり得る(SharePoint/Teamsは約15分、Exchange Onlineは約35〜40分)",
+      "IPロケーションに基づく条件付きアクセスポリシーの適用はほぼ即時(ただし対応するクライアント/リソースの組み合わせは限定的)",
+      "CAE対応時はアクセストークン寿命を既定60〜90分→最長28時間まで延長可能というトレードオフ",
+      "CAE非対応のクライアント/リソースでは静的な有効期限まで窃取トークンが有効であり続ける(IRの実効性判断に直結)",
+      "ゲストユーザーはCAE非対応。条件付きアクセスポリシーやグループメンバーシップ変更自体の反映には別途最大1日(最適化時2時間)を要し得る"
+    ],
+    "related": [
+      "tokens",
+      "prt",
+      "condaccess",
+      "entra",
+      "aitm",
+      "entraidp"
+    ]
+  },
+  {
+    "id": "soctier",
+    "term": "SOCアナリスト階層 (Tier 1/2/3 エスカレーションモデル)",
+    "en": "SOC Analyst Tiers (Tier 1/2/3 Escalation Model)",
+    "aka": "L1/L2/L3, alert triage tier, escalation path",
+    "cat": "soc",
+    "body": "SOCアナリスト階層(Tier 1/2/3エスカレーションモデル)は、商用SOC/MSSPにおける人員配置とアラート対応フローの標準的な構造で、経験値・権限・対応範囲に応じてアナリストを3段階(組織によっては4段階)に分ける運用モデルである。Tier 1はSIEM/XDRが生成したアラートの一次トリアージを担当し、既定のプレイブックに沿ってFP/TP/FNを判定し、対応不要なものをクローズ、疑わしいものをTier 2へエスカレーションする。Tier 2はより深いログ相関・端末調査・侵害範囲の特定を行い、インシデントレスポンス(封じ込め・根絶・復旧)を主導する実質的な調査担当層である。Tier 3はプロアクティブな脅威ハンティング、検知ルールのチューニング・新規作成(検知エンジニアリング)、マルウェア解析やレッドチーム連携など高度な業務を担い、しばしばTier 1/2が用いるアラート判定基準や検知ロジックそのものを設計する側に回る。なお、この「Tier」はAD管理特権を階層化するEnterprise Access ModelのTier 0/1/2(tiermodelエントリ)とは全く別の概念で、同じ語を使うが指す対象(SOC人員のエスカレーション経路 vs 管理者アカウント・資産の特権境界)が異なる点に注意が必要。エスカレーション経路の設計はMTTD/MTTRなどのKPIに直結し、攻撃マップ上の各技法がどのTierで検知・調査・対応されるかを理解する土台になる。",
+    "points": [
+      "Tier 1 = 一次トリアージ(アラート判定、プレイブック準拠、FP/TP/FN判別、エスカレーション可否の一次判断)",
+      "Tier 2 = 深掘り調査・IR主導(ログ相関、端末調査、侵害範囲特定、封じ込め〜復旧)",
+      "Tier 3 = 脅威ハンティング/検知エンジニアリング/マルウェア解析、判定基準そのものの設計",
+      "同じ『Tier』の語でもAD管理特権のTier 0/1/2(Enterprise Access Model、tiermodel)とは別概念で混同注意",
+      "エスカレーション経路の設計品質はMTTD/MTTRなどSOC KPIに直結"
+    ],
+    "related": [
+      "triage",
+      "ir",
+      "threathunting",
+      "deteng",
+      "tiermodel",
+      "mttdmttr"
+    ]
+  },
+  {
+    "id": "jea",
+    "term": "JEA (Just Enough Administration)",
+    "en": "Just Enough Administration (JEA)",
+    "aka": "constrained endpoint, role capability, session configuration, RunAsVirtualAccount",
+    "cat": "soc",
+    "body": "JEA (Just Enough Administration) は PowerShell の機能で、リモート管理を「接続するユーザー自身の権限」ではなく「エンドポイントが許可する範囲のコマンド」に縛る制約付きセッションを実現する。Session Configuration (.pssc) ファイルでセッションの種類(SessionType=RestrictedRemoteServer 等、NoLanguage モードで限定コマンドのみ実行可能)や実行アカウント方式(RunAsVirtualAccount / RunAsCredential)を定義し、Role Capability (.psrc) ファイルで実行可能なコマンドレット・関数・パラメータをホワイトリスト化する(VisibleCmdlets 等)。Register-PSSessionConfiguration でエンドポイントを登録し、利用者は Enter-PSSession -ConfigurationName でそのエンドポイントにのみ接続できる。RunAsVirtualAccount を有効にすると、セッション終了時に破棄される一時的な仮想アカウントの権限で処理が実行されるため、接続元ユーザーに常時の管理者権限を持たせる必要がない。ただしこの仮想アカウントは既定でメンバーサーバーではローカル Administrators、ドメインコントローラーでは Domain Admins に自動的に所属するため、権限そのものはむしろ強力になり得る点に注意が必要であり(必要に応じ RunAsVirtualAccountGroups で所属グループを限定可能)、JEAの主たる防御機構はあくまでRole Capabilityによるコマンド制限である。攻撃マップ上の意義は、WinRM/PSRemoting を経由した横展開(evil-winrm、Enter-PSSession でのフル PowerShell コンソール奪取)を前提とする攻撃技法に対し、たとえ資格情報が窃取されてもエンドポイントで許可された狭いコマンド集合しか実行できなくする点にあり、複数の技法エントリの mitigate 節が「JEA で操作を限定」と参照するのはこの制約付きエンドポイントの構成を指す。セッション内の操作は TranscriptDirectory 設定による PowerShell トランスクリプション等で記録されるため監査性も高い。",
+    "points": [
+      "Session Configuration (.pssc): エンドポイント定義、SessionType=RestrictedRemoteServer(NoLanguageモード)、RunAsVirtualAccount/RunAsCredential",
+      "Role Capability (.psrc): 実行可能なコマンドレット/関数/パラメータのホワイトリスト(VisibleCmdlets等)",
+      "Register-PSSessionConfiguration で登録、Enter-PSSession -ConfigurationName <endpoint> で接続",
+      "RunAsVirtualAccount: セッション終了時に破棄される一時的な仮想アカウント。既定でメンバーサーバーはローカルAdministrators、ドメインコントローラーはDomain Adminsに所属(RunAsVirtualAccountGroupsで限定可能)",
+      "WinRM/PSRemoting悪用(evil-winrm等)への対抗策として、コマンド単位で横展開時の実行可能操作を制限"
+    ],
+    "related": [
+      "winrm",
+      "credguard",
+      "wdac",
+      "applocker",
+      "pim",
+      "tiermodel",
+      "paw"
+    ]
+  },
+  {
+    "id": "dlp",
+    "term": "DLP (データ損失防止)",
+    "en": "Data Loss Prevention (DLP)",
+    "aka": "Data Loss Prevention, endpoint DLP, ポリシーのヒント, Microsoft Purview DLP, EDM",
+    "cat": "soc",
+    "body": "DLP(データ損失防止)は、機密データが組織外へ持ち出される、または不適切に共有されるのを防ぐため、コンテンツ検査(正規表現、キーワード、機密情報の種類、完全一致データ検出 EDM)と、感度ラベル・トレーニング可能な分類子などのメタデータ、および送信先・ユーザー・デバイス・アプリといったコンテキストを組み合わせてポリシーを適用するコントロール群。実装形態はエンドポイントDLP(USBコピー・印刷・クリップボード・ネットワーク共有への書き込みを監視)、クラウドアプリDLP(Defender for Cloud Apps経由でSaaS/OAuthアプリへのアップロードを監視)、ネットワークDLP(プロキシ/メールゲートウェイでの検査)に大別され、Microsoft 365環境ではMicrosoft Purview DLPが感度ラベルやトレーニング可能な分類子と統合してポリシーを適用する。検知時のアクションは監査ログ記録、ポリシーのヒント(ユーザーへの警告バナー)、暗号化、ブロックの段階があり、まず監査モードで誤検知率を確認してから強制ブロックへ移行するのが一般的な運用。攻撃マップ上では、SYSVOLや共有フォルダに残置された秘密鍵・パスワードファイルの棚卸しや、アーカイブ化してのクラウドアップロード等のデータ持ち出し(exfil)を検知・抑止する代表的な防御コントロールとして、複数の技法エントリのmitigate節から名指しで参照される。ただしDLPは正規表現/分類子ベースの検査が中心であるため、暗号化・分割・難読化された持ち出しやオフライン媒体経由の持ち出しには効果が限定的で、EDRやネットワーク監視、監査ログとの併用が前提となる。",
+    "points": [
+      "コンテンツ検査(正規表現/キーワード/EDM完全一致)と感度ラベル等のメタデータ、宛先・ユーザー・アプリ等のコンテキストを組み合わせてポリシー適用",
+      "エンドポイントDLP(USB/印刷/クリップボード)、クラウドアプリDLP(Defender for Cloud Apps)、ネットワークDLP(プロキシ/メールゲートウェイ)",
+      "Microsoft Purview DLPは感度ラベル・トレーニング可能な分類子と統合",
+      "アクション段階: 監査ログのみ → ポリシーのヒント(警告) → 暗号化/ブロック",
+      "暗号化・難読化された持ち出しやオフライン媒体には限定的、EDR/監査ログとの併用が前提"
+    ],
+    "related": [
+      "exfil",
+      "mdca",
+      "objaudit",
+      "siem",
+      "edr",
+      "sysvol"
+    ]
+  },
+  {
+    "id": "wow64",
+    "term": "WOW64 とファイルシステム/レジストリ リダイレクト",
+    "en": "WOW64 & File System / Registry Redirection",
+    "aka": "SysWOW64, Sysnative, WoW64, Wow6432Node, 32bit on 64bit",
+    "cat": "os",
+    "body": "WOW64 (Windows on Windows 64-bit) は、64bit版Windowsで32bitプロセスを実行するための互換レイヤーで、wow64.dll(コアのシステムコール変換、およびファイルシステム/レジストリのリダイレクト実装本体)・wow64win.dll(win32k.sys関連のGUI系Nt*呼び出しの変換)・wow64cpu.dll(x86→x64のプロセッサモード切り替え、x64版のみ)の3つのDLLがNt*ネイティブAPI呼び出しを横取りし、ファイルシステムとレジストリへの参照を透過的にリダイレクトする。ファイルシステムでは32bitプロセスが %SystemRoot%\\System32 を参照すると自動的に %SystemRoot%\\SysWOW64 へ書き換えられ、このリダイレクトを回避して64bit側のSystem32に到達するには仮想パス \\Sysnative\\ を使うか、Wow64DisableWow64FsRedirection APIで一時的に無効化し、処理後は Wow64RevertWow64FsRedirection で復元する。レジストリでは HKLM\\Software 配下の参照が HKLM\\Software\\Wow6432Node へリダイレクトされる一方、HKCU\\Software は32bit/64bitプロセス間で共有(shared)されリダイレクト対象外であり、Windows XP/Server 2003/Vista/Server 2008では一部の被リダイレクトキーがレジストリリフレクションにより32/64bit間で同期されていたが、この機構はWindows 7/Server 2008 R2以降廃止されている。この仕組みを理解していないと、32bitで動作するマルウェアやツールが書き込むRunキー等の永続化が HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run ではなく Wow6432Node 配下に現れることを見落とし、Sysmon/EDRのプロセス生成ログでイメージパスが SysWOW64 であれば32bitプロセス、\\Sysnative\\ 参照があればリダイレクト回避の兆候であるという読み解きを誤る。",
+    "points": [
+      "System32 → SysWOW64(32bitプロセスからのファイルシステムリダイレクト)",
+      "\\Sysnative\\ 仮想パスでリダイレクトを回避し64bit System32 へアクセス",
+      "HKLM\\Software → HKLM\\Software\\Wow6432Node(32bitプロセスからのレジストリリダイレクト、HKCU\\Software は共有されリダイレクト対象外)",
+      "Wow64DisableWow64FsRedirection / Wow64RevertWow64FsRedirection APIで一時的にリダイレクト無効化",
+      "レジストリリフレクションはXP/Server 2003/Vista/Server 2008まで存在し、Windows 7/Server 2008 R2以降は廃止",
+      "永続化(Runキー等)は32/64bitで異なるパスに現れるため双方確認が必要"
+    ],
+    "related": [
+      "registry",
+      "asep",
+      "process",
+      "dll",
+      "peformat",
+      "syscall"
+    ]
+  },
+  {
+    "id": "reparse",
+    "term": "再解析ポイント / ジャンクション / シンボリックリンク",
+    "en": "Reparse Points / Junctions / Symbolic Links",
+    "aka": "reparse point, junction, symlink, hardlink, mount point, IO_REPARSE_TAG",
+    "cat": "os",
+    "body": "再解析ポイント (reparse point) は、NTFSのファイル/ディレクトリに付与されるIO_REPARSE_TAGとリパースデータバッファ(最大16KB, MAXIMUM_REPARSE_DATA_BUFFER_SIZE)により、I/Oマネージャやファイルシステムフィルタがオープン要求を別のパスへ転送(\"reparse\")する仕組みである。代表的な実装はディレクトリ限定・ローカルボリューム限定で絶対パスのみを指すジャンクション(IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003、mklink /J で作成、特権不要で対象ディレクトリへの書込み権限さえあれば作成可能)と、ファイル/ディレクトリの双方を対象にでき相対パスやUNC/リモートパスも指定できるシンボリックリンク(IO_REPARSE_TAG_SYMLINK = 0xA000000C、mklink で作成、作成にはSeCreateSymbolicLinkPrivilegeが必要で既定では管理者のみ保有、Windows 10 1703以降は開発者モード有効時に非昇格ユーザーへも許可可能)である。ボリューム全体を別フォルダへマウントするボリュームマウントポイント(\\??\\Volume{GUID}\\ を指す)も同じ再解析ポイント機構を利用する。ハードリンクは同一ボリューム内で同じMFTレコード(ファイルデータ)を指す別ディレクトリエントリであり、リパースタグを持たずファイルのみが対象という点で再解析ポイントとは全く別機構である。攻撃面では、特権プロセス(インストーラ、更新サービス、AV等)が予測可能なパスへファイルを作成・削除・コピーする直前にジャンクションやシンボリックリンクを仕込み、書込み/削除先を任意の保護されたファイルへリダイレクトさせるTOCTOU型の権限昇格プリミティブ(FSCTL_SET_REPARSE_POINT経由)として定番的に悪用され、ADSと並びNTFS機能理解の要となる。",
+    "points": [
+      "ジャンクション: IO_REPARSE_TAG_MOUNT_POINT (0xA0000003)、ディレクトリのみ・ローカル絶対パスのみ、作成に特権不要",
+      "シンボリックリンク: IO_REPARSE_TAG_SYMLINK (0xA000000C)、ファイル/ディレクトリ・相対/UNC可、SeCreateSymbolicLinkPrivilege必須(既定は管理者のみ)",
+      "ボリュームマウントポイントも同じ再解析ポイント機構(\\??\\Volume{GUID}\\)",
+      "ハードリンクは別機構: 同一ボリュームでMFTレコード共有、リパースタグなし、ファイルのみが対象",
+      "特権プロセスの書込み/削除先をリダイレクトするTOCTOU型権限昇格プリミティブ、FSCTL_SET_REPARSE_POINT、最大16KBのリパースデータバッファ"
+    ],
+    "related": [
+      "ads",
+      "abusableprivs",
+      "privilege",
+      "syscall",
+      "handle",
+      "ntfsart"
+    ]
+  },
+  {
+    "id": "appcontainer",
+    "term": "AppContainer / アプリサンドボックス",
+    "en": "AppContainer / Application Sandbox",
+    "aka": "AppContainer, LowBox token, capability SID, ALL APPLICATION PACKAGES, ブラウザサンドボックス",
+    "cat": "os",
+    "body": "AppContainerはWindows 8で導入されたプロセス分離機構で、UWPアプリやDesktop Bridge化されたWin32アプリ、Chromium系ブラウザ(Chrome/Edgeのレンダラプロセスやサンドボックス化されたPDFビューアなど)のサンドボックス実装基盤として使われる。中核は「LowBoxトークン」と呼ばれる特殊なプライマリ/偽装トークンで、AppContainerモニカー(コンテナ名。UWPアプリではパッケージファミリー名に対応)をSHA256でハッシュ化して導出されるAppContainer SID(サンドボックスごとの名前空間識別子)と、internetClientやdocumentsLibraryなど個別リソースへのアクセスを許可するcapability SID(既定機能はS-1-15-3-xの単一RID形式、アプリ独自定義の機能はSHA256由来の複数RID形式)のリストを保持する。プロセスは既定でLow整合性レベル(S-1-16-4096)で動作し、ファイル/レジストリ/名前付きオブジェクトへのアクセスはDACLにALL APPLICATION PACKAGES(S-1-15-2-1)やALL RESTRICTED APPLICATION PACKAGES(S-1-15-2-2)、または該当capability SIDが明示的に許可されていない限り拒否される。ミューテックスやセクションなどの名前付きオブジェクトも\\Sessions\\<セッションID>\\AppContainerNamedObjects\\<AppContainerSID>\\配下の専用名前空間に隔離され、他のサンドボックスや非サンドボックスプロセスから不可視になる。攻撃マップ上は、RPCサーバやサービスが呼び出し元のLowBoxトークン(AppContainerか否か、capability)を適切に検証していない場合に「サンドボックス脱出(escape)」が成立する点が重要で、2024年11月修正のCVE-2024-49039はタスクスケジューラのRPCインターフェースがAppContainer内プロセスからの呼び出しを適切に制限しておらず、Low整合性のAppContainerサンドボックスからMedium整合性で特権RPC関数を呼び出せる脱出が成立し、Google TAGにより実環境での悪用が報告された。ブラウザのサンドボックス脱出も同様に、ブローカープロセスやカーネルの脆弱性を突いてLowBoxトークンの制約を回避する構図を取る。",
+    "points": [
+      "LowBoxトークン = AppContainer SID + capability SIDリストを保持する特殊トークン",
+      "AppContainer SID は AppContainerモニカー(名前。UWPアプリではパッケージファミリー名に対応)をSHA256でハッシュ化して導出される名前空間識別子",
+      "capability SID: 既定機能はS-1-15-3-x (例: internetClient, documentsLibrary) の単一RID形式で個別リソースアクセスを許可",
+      "ALL APPLICATION PACKAGES = S-1-15-2-1、ALL RESTRICTED APPLICATION PACKAGES = S-1-15-2-2",
+      "既定でLow整合性(S-1-16-4096)+ \\Sessions\\<セッションID>\\AppContainerNamedObjects\\<AppContainerSID>\\ に隔離された名前付きオブジェクト空間",
+      "RPC呼び出し元のAppContainer検証不備がサンドボックス脱出の温床(例: CVE-2024-49039 タスクスケジューラRPC、2024年11月修正、Low→Medium整合性への昇格が実環境で悪用)"
+    ],
+    "related": [
+      "token",
+      "integrity",
+      "sid",
+      "rpc",
+      "schtask"
+    ]
+  },
+  {
+    "id": "objaudit",
+    "term": "オブジェクトアクセス監査 (4656/4663/4660/4670)",
+    "en": "Object Access Auditing (4656 / 4663 / 4660 / 4670)",
+    "aka": "4656, 4663, 4660, 4670, ファイル/レジストリ監査, SACL, ハンドル要求",
+    "cat": "logging",
+    "body": "オブジェクトアクセス監査は、ファイル・レジストリキー・カーネルオブジェクト(ミューテックス、セクション等)への実際のアクセスをセキュリティイベントとして記録する監査群で、高度な監査ポリシーの「オブジェクトアクセス」カテゴリ(監査ファイルシステム/監査レジストリ/監査カーネルオブジェクト等のサブカテゴリ)に対応する。Event 4656はハンドル要求(Access Maskで指定されたアクセス種別のオープン試行)を記録するが、実際にその権限が行使されたことを示すのはEvent 4663のみであり、両者はHandle IDで相関付けられる――4656だけでは「開いた」ことしか分からず「読んだ/書いた」かは判別できない点はSOCで頻繁に誤解される。Event 4660はオブジェクト削除、Event 4670はDACL(所有者変更を含む権限)の変更を記録するが、SACL自体の変更はここに含まれず、SACL変更はAudit Policy Changeカテゴリに属するEvent 4907(Auditing settings on object were changed)で別途記録される点に注意が必要。これらのイベントを取得するには(1) auditpolでサブカテゴリの監査を有効化することに加え、(2) 監視対象オブジェクト自身のSACLに監査エントリ(プリンシパル・アクセス種別・成功/失敗)を明示的に設定する必要があり、どちらか片方だけでは記録されない。NTDS.dit・SAMハイブ・ブラウザの資格情報ファイル(Login Data、key4.db等)やLSA Secretsなど機微なファイル/レジストリへのアクセス監視に不可欠だが、ADオブジェクト自体へのアクセスはこの4663系ではなくEvent 4662(Directory Service Access)で記録される点に注意が必要。",
+    "points": [
+      "4656=ハンドル要求(オープン試行)、4663=実際のアクセス行使 — 両者はHandle IDで相関",
+      "4660=オブジェクト削除、4670=DACL(所有者変更含む権限)の変更の記録 — SACL自体の変更はEvent 4907(Audit Policy Change)で別途記録される",
+      "取得にはサブカテゴリ監査(File System/Registry/Kernel Object等)の有効化+対象オブジェクトのSACL設定の両方が必須",
+      "NTDS.dit/SAMハイブ/ブラウザ資格情報ファイル等の機微オブジェクト監視に活用",
+      "ADオブジェクトへのアクセスは4663系でなくEvent 4662(DS Access)で記録される"
+    ],
+    "related": [
+      "sacl",
+      "auditpolicy",
+      "eventlog",
+      "dschanges",
+      "accessmask",
+      "secdesc"
+    ]
+  },
+  {
+    "id": "rdplogs",
+    "term": "RDP 接続ログ (TerminalServices 系)",
+    "en": "RDP Connection Logs (TerminalServices Channels)",
+    "aka": "1149, 21, 22, 23, 24, 25, 4778, 4779, LocalSessionManager, RemoteConnectionManager, RDPClient 1024",
+    "cat": "logging",
+    "body": "RDP接続ログ(TerminalServices系)は、Securityログの4624(Type 10)だけでは再構成できないRDPセッションの全体像を、TerminalServices関連の専用イベントログチャネルから補完して追う調査手法群である。接続先(踏み台にされたホスト)側では、Microsoft-Windows-TerminalServices-RemoteConnectionManager/OperationalのEvent ID 1149が「User authentication succeeded」と表示されるが、これは実際にはRDPプロトコル/NLA層での資格情報受理を意味するに過ぎず、必ずしも対話的ログオンの完了を保証しない。接続元アドレス(Source Network Address)を記録する初期シグナルとして使い、実際にセッションが確立されたかはMicrosoft-Windows-TerminalServices-LocalSessionManager/OperationalのEvent ID 21(セッションログオン成功)で裏付ける。同チャネルの22(シェル起動)/23(ログオフ成功)/24(切断)/25(再接続成功)と合わせて、セッション生成から切断・再接続までのライフサイクルを刻む。通常のRDP再接続(クライアントが資格情報を再入力して接続し直す場合)では都度4624 Type10と25が対で生成されるが、RDPセッションハイジャック(tscon悪用によるセッション乗っ取り。SYSTEM権限でtscon <セッションID> /dest:<セッション名> を実行し、パスワード再入力なしに他ユーザーの切断中/稼働中セッションを乗っ取る手口)では、SecurityログのEvent ID 4778(セッション再接続)やLocalSessionManagerの25は生成される一方、対応する4624が存在しないというギャップが生じる。このギャップこそが実践的な検知シグナルとなる。接続元(攻撃者の踏み台)側ではMicrosoft-Windows-TerminalServices-RDPClient/OperationalのEvent ID 1024が接続試行の時点で接続先ホスト名/IPを記録する(接続の成否によらず記録されるため失敗した試行の追跡にも使える)。これにより多段のRDP横展開経路を追跡できる。これらのオペレーショナルログは既定で有効だが保持サイズが小さいため、WEFやSIEMへの転送・長期保管が実運用上の前提となる。",
+    "points": [
+      "RemoteConnectionManager/Operational の 1149 = RDPプロトコル/NLA層での資格情報受理(表示上は「認証成功」)を記録、Source Network Address に接続元アドレス",
+      "LocalSessionManager/Operational の 21(ログオン成功)/22(シェル起動)/23(ログオフ成功)/24(切断)/25(再接続成功)がセッションのライフサイクルを記録",
+      "通常の再接続は4624 Type10と25が対で生成されるが、tscon悪用のセッションハイジャックでは対応する4624を伴わない25(Security側は4778)が生じ、これが検知シグナルになる",
+      "RDPClient/Operational の 1024 = 接続元ホストでの発信先記録(接続の成否を問わず記録)、多段の横展開追跡に有効",
+      "既定のログ保持サイズが小さく、WEF/SIEM転送による長期保管が実運用上の前提"
+    ],
+    "related": [
+      "rdp",
+      "logonevents",
+      "eventlog",
+      "credssp",
+      "remoteexec",
+      "wef"
+    ]
+  },
+  {
+    "id": "avlogs",
+    "term": "Microsoft Defender ウイルス対策 運用ログ (1116/1117/1118/1119/5001/5007)",
+    "en": "Microsoft Defender Antivirus Operational Log (Event 1116/1117/1118/1119/5001/5007)",
+    "aka": "1116, 1117, 1118, 1119, 5001, 5007, Windows Defender/Operational, MpCmdRun, 除外設定変更",
+    "cat": "logging",
+    "body": "Microsoft Defender ウイルス対策(旧称 Windows Defender)がマルウェア検出・保護動作・設定変更を記録する、Microsoft-Windows-Windows Defender/Operational チャネルのイベントログ。脅威を検出するとEvent 1116(脅威名/重大度/カテゴリ/ファイルパスなどを含む)が記録され、検疫や削除など処置が成功すると1117、失敗すると1118、致命的に失敗すると1119が続けて記録される。設定変更全般はEvent 5007(旧値/新値のペアを伴う)に集約され、除外パス・除外プロセスの追加やタンパー保護の変更もここに現れる一方、リアルタイム保護の無効化はEvent 5001として単独で発生する。除外追加や保護停止は通常PowerShellのSet-MpPreference/Add-MpPreferenceコマンドレットやレジストリ・グループポリシー経由で行われ、攻撃者はペイロード実行前にこれらでAV検出を回避するほか、MpCmdRun.exeの-RemoveDefinitionsでシグネチャを削除したり-Restoreで検疫済みマルウェアを復元したりする手口も見られる。5007と5001の組み合わせはEDR無効化・マルウェア展開の前哨シグナルとして極めて重要であり、1116〜1119は実際の検出・対処結果の裏取りに使う。",
+    "points": [
+      "Event 1116 = 検出(脅威名/重大度/カテゴリ/ファイルパス)",
+      "Event 1117/1118/1119 = 処置成功/処置失敗/致命的な処置失敗",
+      "Event 5001 = リアルタイム保護の無効化(単独でも強い前兆シグナル)",
+      "Event 5007 = 設定変更全般(除外パス追加・タンパー保護変更、旧値/新値を記録)",
+      "チャネル: Microsoft-Windows-Windows Defender/Operational。除外・保護設定の変更は通常Set-MpPreference/Add-MpPreferenceやレジストリ/GPO経由で、MpCmdRun.exeはスキャン実行・検疫復元(-Restore)・シグネチャ削除(-RemoveDefinitions)などの操作に使われる"
+    ],
+    "related": [
+      "eventlog",
+      "mde",
+      "asr",
+      "edr",
+      "advhunting",
+      "eventlogclear"
     ]
   }
 ];

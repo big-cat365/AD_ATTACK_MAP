@@ -79,24 +79,15 @@ window.AD = window.AD || {};
     }).join("");
   }
 
-  function card(a) {
+  /** Heavy body for a card — diagram + Red/Blue split lanes. Rendered lazily. */
+  function bodyHtml(a) {
     var u = AD.UI;
     var lanes = AD.lanes(a);
-    var searchTxt = esc([a.name, a.aka, a.mitre, a.cve, a.summary, a.how, a.detect, a.tools].join(" ").toLowerCase());
-    var sev = SEV[a.sev] ? a.sev : "Medium";
     var nameEsc = esc(a.name);
     var scn = AD.diagram.getScenario(a.name);
     var svg = scn ? AD.diagram.renderSeq(scn, { compact: true })
       : '<div style="color:var(--faint);font-family:var(--mono);font-size:11px;padding:10px">— flow n/a —</div>';
-    return '<article id="' + a._cid + '" class="card sev-' + sev + ' reveal" data-sev="' + sev + '" data-txt="' + searchTxt + '">' +
-      '<div class="card-head">' +
-        '<div class="card-title-row"><div><h3>' + nameEsc + "</h3>" +
-          (a.aka ? '<div class="aka">' + esc(a.aka) + "</div>" : "") + "</div>" +
-          '<span class="sev-badge">' + esc(sev) + "</span></div>" +
-        '<p class="summary">' + mw(a.summary) + "</p>" +
-        '<div class="tags">' + AD.tags(a) + "</div>" +
-      "</div>" +
-      '<div class="diagram" data-scn="' + nameEsc + '" title="' + esc(u.expand) + '">' +
+    return '<div class="diagram" data-scn="' + nameEsc + '" title="' + esc(u.expand) + '">' +
         '<div class="diagram-head"><span class="dl">' + u.flowHead + "</span>" +
           '<button class="expand" data-expand="' + nameEsc + '" aria-label="' + esc(u.expandAl.replace("{name}", a.name)) + '">' + esc(u.expand) + "</button></div>" +
         '<div class="dscroll">' + svg + "</div>" +
@@ -104,7 +95,34 @@ window.AD = window.AD || {};
       '<div class="split">' +
         '<div class="lane off"><div class="lane-head">' + ICONS.sword + " " + esc(u.cardRed) + "</div>" + lanes.red + "</div>" +
         '<div class="lane def"><div class="lane-head">' + ICONS.shield + " " + esc(u.cardBlue) + "</div>" + lanes.blue + "</div>" +
-      "</div></article>";
+      "</div>";
+  }
+
+  function card(a) {
+    var searchTxt = esc([a.name, a.aka, a.mitre, a.cve, a.summary, a.how, a.detect, a.tools].join(" ").toLowerCase());
+    var sev = SEV[a.sev] ? a.sev : "Medium";
+    var nameEsc = esc(a.name);
+    return '<article id="' + a._cid + '" class="card sev-' + sev + ' reveal" data-sev="' + sev + '" data-txt="' + searchTxt + '" data-idx="' + a._idx + '" data-lazy="1">' +
+      '<div class="card-head">' +
+        '<div class="card-title-row"><div><h3>' + nameEsc + "</h3>" +
+          (a.aka ? '<div class="aka">' + esc(a.aka) + "</div>" : "") + "</div>" +
+          '<span class="sev-badge">' + esc(sev) + "</span></div>" +
+        '<p class="summary">' + mw(a.summary) + "</p>" +
+        '<div class="tags">' + AD.tags(a) + "</div>" +
+      "</div>" +
+      '<div class="card-body" data-lazy="1"></div>' +
+      "</article>";
+  }
+
+  /** Render (once) the heavy body of a single card, on demand. Idempotent. */
+  function fillCard(article) {
+    if (!article || article.classList.contains("filled")) return;
+    var a = AD.ATTACKS[+article.getAttribute("data-idx")];
+    if (!a) return;
+    var body = article.querySelector(".card-body");
+    if (body) { body.innerHTML = bodyHtml(a); body.removeAttribute("data-lazy"); }
+    article.classList.add("filled");
+    article.removeAttribute("data-lazy");
   }
 
   function renderMain() {
@@ -140,15 +158,64 @@ window.AD = window.AD || {};
     })();
   }
 
+  /** IntersectionObserver instance for lazy card-body fill (re-created per render). */
+  var io = null;
+
+  /** Observe still-empty card bodies and fill them as they near the viewport. */
+  /** Synchronously fill every lazy card whose box is within `buffer` px of the viewport. */
+  function fillNear(buffer) {
+    buffer = (buffer == null) ? 1400 : buffer;
+    var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    var cards = document.querySelectorAll(".card[data-lazy]");
+    for (var i = 0; i < cards.length; i++) {
+      var r = cards[i].getBoundingClientRect();
+      if (r.bottom > -buffer && r.top < vh + buffer) fillCard(cards[i]);
+    }
+    // once nothing is left to fill, drop the scroll/resize listeners
+    if (!document.querySelector(".card[data-lazy]")) {
+      window.removeEventListener("scroll", onScrollResize);
+      window.removeEventListener("resize", onScrollResize);
+    }
+  }
+  var rafPending = false;
+  function onScrollResize() {
+    if (rafPending) return;
+    rafPending = true;
+    var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+    raf(function () { rafPending = false; fillNear(1400); });
+  }
+  function setupLazyFill() {
+    var cards = Array.prototype.slice.call(document.querySelectorAll(".card[data-lazy]"));
+    if (!cards.length) return;
+    // Always fill the initial viewport synchronously — robust regardless of IO/scroll support.
+    fillNear(1200);
+    // Progressive enhancement: IntersectionObserver fills cards as they approach (real browsers).
+    if ("IntersectionObserver" in window) {
+      if (io) io.disconnect();
+      io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          fillCard(entry.target);
+          io.unobserve(entry.target);
+        });
+      }, { root: null, rootMargin: "1400px 0px", threshold: 0 });
+      cards.forEach(function (el) { io.observe(el); });
+    }
+    // Fallback + real-browser trigger: fill near viewport on scroll/resize (rAF-throttled).
+    window.addEventListener("scroll", onScrollResize, { passive: true });
+    window.addEventListener("resize", onScrollResize, { passive: true });
+  }
+
   /** Build the whole page body (stats + spine + grid) and kick off reveal. */
   function render() {
-    AD.ATTACKS.forEach(function (a, i) { a._cid = "tech-" + i; });
+    AD.ATTACKS.forEach(function (a, i) { a._cid = a._cid || ("tech-" + i); a._idx = i; });
     renderStats();
     renderSpine();
     renderSpineToc();
     renderMain();
+    setupLazyFill();
     revealAll();
   }
 
-  AD.views = { render: render };
+  AD.views = { render: render, fillCard: fillCard, fillNear: fillNear };
 })(window.AD);
