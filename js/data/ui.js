@@ -36,6 +36,7 @@ AD.I18N.ja.ui = {
   expand: "⤢ 拡大", expandAl: "{name} の攻撃フロー図を拡大",
   techniques: "techniques",
   detectLabel: "検知:", triageLabel: "判定 (ログ分析):", mitigateLabel: "対策:",
+  cmdLabel: "コマンド例 (観測される文字列)", cmdHint: "攻撃側が実際に実行する代表的なコマンド。EDR/Sysmon のプロセスログ (Sysmon EID1 / DeviceProcessEvents / ProcessRollup2) に現れる文字列そのものなので、ハンティングやウォッチリストのマッチ対象として使えます。ドメイン名・ユーザー名・パスワード・PID はすべてダミー値です。",
   huntLabel: "ハンティング クエリ (KQL)", huntHint: "Defender XDR / Sentinel の Advanced Hunting 例。自環境のスキーマ・監査設定に合わせて調整してください。",
   huntCsLabel: "ハンティング クエリ (CrowdStrike Falcon)", huntCsHint: "Falcon Event Search (SPL) / LogScale・Next-Gen SIEM (CQL) の例。DC固有イベントは Falcon Identity Protection の検知、または攻撃元ホストのテレメトリで補完します。",
   statTotal: "収録テクニック", statPhases: "キルチェーン フェーズ", statCats: "攻撃カテゴリ", statCrit: "Critical 重大度", statHigh: "High 重大度",

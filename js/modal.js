@@ -34,6 +34,7 @@ window.AD = window.AD || {};
       '<p class="m-summary">' + mw(a.summary) + "</p>" +
       '<div class="m-diagram">' + svg + "</div>" +
       '<div class="m-seqlegend">' + AD.diagram.kindLegend() + "</div>" +
+      AD.cmdBlock(a.cmd) +
       '<div class="m-lanes">' +
         '<div class="m-lane off"><h3>' + ICONS.sword + " " + esc(AD.UI.modalRed) + "</h3>" + lanes.red + "</div>" +
         '<div class="m-lane def"><h3>' + ICONS.shield + " " + esc(AD.UI.modalBlue) + "</h3>" + lanes.blue + "</div>" +

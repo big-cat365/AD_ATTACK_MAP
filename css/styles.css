@@ -337,7 +337,12 @@
   .lane-head { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
   .lane.off .lane-head { color: var(--offense); }
   .lane.def .lane-head { color: var(--defense); }
-  .lane-head .ic { width: 15px; height: 15px; display: inline-flex; }
+  /* AD.ICONS emits <svg class="ic"> with a viewBox but no width/height, so it
+     needs explicit sizing or it falls back to the 300x150 replaced-element
+     default. Scoped to .lane-head this only covered the card; the modal's
+     .m-lane h3 used the same icons and rendered them at ~285px. Size the
+     class itself so every consumer is covered. */
+  .ic { width: 15px; height: 15px; flex: none; display: inline-flex; }
   .hl-def { color: var(--defense); }
   .hl-tri { color: var(--defense); }
   .triage { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 5px; padding: 7px 9px; }
@@ -369,6 +374,19 @@
   .plat-identity-protection { background: #e2b85a; color: #2a1f00; }
   .hunt pre.kql { margin: 0; padding: 9px 10px; background: var(--ground-2); border: 1px solid var(--line-soft); border-radius: 5px; overflow-x: auto; }
   .hunt pre.kql code { display: block; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--ink); white-space: pre; background: none; border: 0; padding: 0; border-radius: 0; }
+  /* Command-example block. Reuses the .hunt chrome but is rendered *outside*
+     the offense/defense lanes: the same string is what the intruder types and
+     what the analyst matches on, so neither view may dim it. Hence the purple
+     ("both sides") accent rather than the red or teal one. */
+  .cmds { margin: 10px 16px 2px; border-color: var(--purple-dim); }
+  .cmds > summary { color: var(--purple); }
+  .cmds > summary:hover { color: var(--purple-dim); }
+  .cmd-tool { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; padding: 1px 5px; border-radius: 4px; color: var(--purple); background: var(--purple-glow); border: 1px solid var(--purple-dim); }
+  /* .hq-cap sits outside .lane here, so the inline <code> from the caption's
+     backticks needs its own rule — .lane code does not reach it. */
+  .cmds .hq-cap code { font-family: var(--mono); font-size: 11px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-soft); border-radius: 4px; padding: 0 4px; }
+  /* In the modal the body already supplies the horizontal padding. */
+  #modal-body > .cmds { margin: 12px 0 14px; }
   .lane p { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
   .lane p:last-child { margin-bottom: 0; }
   .lane .meta { display: block; margin-top: 8px; }

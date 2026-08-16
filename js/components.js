@@ -52,6 +52,33 @@ window.AD = window.AD || {};
   };
 
   /**
+   * Collapsible block of representative command lines for a technique.
+   * `list` is an array of { tool, t, q }: the tool badge, a defender-facing
+   * caption (which token to pin a hunt on / which log it lands in), and the
+   * command exactly as it appears in process telemetry.
+   *
+   * Shares the `.hunt` chrome so the collapsible affordance is identical to
+   * the query blocks, but is rendered *outside* the Red/Blue lanes: the same
+   * strings are what the attacker types and what the analyst matches on, so
+   * dimming them in either view would be wrong. The caption goes through
+   * monoWrap (backticks -> <code>) while the command itself is only esc'd,
+   * so operators/quotes/pipes render literally.
+   */
+  AD.cmdBlock = function (list) {
+    if (!list || !list.length) return "";
+    var u = AD.UI;
+    var rows = list.map(function (c) {
+      var badge = c.tool ? '<span class="cmd-tool">' + esc(c.tool) + "</span>" : "";
+      return '<div class="hq">' +
+        (c.t || badge ? '<div class="hq-cap">' + badge + (c.t ? " " + mw(c.t) : "") + "</div>" : "") +
+        '<pre class="kql"><code>' + esc(c.q) + "</code></pre></div>";
+    }).join("");
+    return '<details class="hunt cmds"><summary><span class="hunt-lbl">' + esc(u.cmdLabel) +
+      '</span><span class="hq-n">' + list.length + "</span></summary>" +
+      '<p class="hunt-hint">' + esc(u.cmdHint) + "</p>" + rows + "</details>";
+  };
+
+  /**
    * The inner HTML of the two analysis lanes for a technique.
    * Returned as { red, blue } so the card and modal can wrap them in their
    * own containers (.lane vs .m-lane) while sharing identical content.

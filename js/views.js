@@ -101,14 +101,21 @@ window.AD = window.AD || {};
           '<button class="expand" data-expand="' + nameEsc + '" aria-label="' + esc(u.expandAl.replace("{name}", a.name)) + '">' + esc(u.expand) + "</button></div>" +
         '<div class="dscroll">' + svg + "</div>" +
       "</div>" +
+      AD.cmdBlock(a.cmd) +
       '<div class="split">' +
         '<div class="lane off"><div class="lane-head">' + ICONS.sword + " " + esc(u.cardRed) + "</div>" + lanes.red + "</div>" +
         '<div class="lane def"><div class="lane-head">' + ICONS.shield + " " + esc(u.cardBlue) + "</div>" + lanes.blue + "</div>" +
       "</div>";
   }
 
+  /** Tool names + command text, flattened into the card's search index so an
+   *  analyst can paste a string seen in telemetry and land on the technique. */
+  function cmdTxt(a) {
+    return (a.cmd || []).map(function (c) { return c.tool + " " + c.q; }).join(" ");
+  }
+
   function card(a) {
-    var searchTxt = esc([a.name, a.aka, a.mitre, a.cve, a.summary, a.how, a.detect, a.tools].join(" ").toLowerCase());
+    var searchTxt = esc([a.name, a.aka, a.mitre, a.cve, a.summary, a.how, a.detect, a.tools, cmdTxt(a)].join(" ").toLowerCase());
     var sev = SEV[a.sev] ? a.sev : "Medium";
     var nameEsc = esc(a.name);
     return '<article id="' + a._cid + '" class="card sev-' + sev + ' reveal" data-sev="' + sev + '" data-txt="' + searchTxt + '" data-idx="' + a._idx + '" data-lazy="1">' +

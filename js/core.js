@@ -181,7 +181,11 @@ window.AD = window.AD || {};
    * `.modal-card` / `.wrap` still works.
    */
   AD.overlay = (function () {
-    var FOCUSABLE = 'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])';
+    /* `summary` belongs here: the modal body is mostly <details> blocks (hunt
+       queries, command examples). Without it the trap list collapses to the
+       close button alone, first === last, and every Tab bounces straight back
+       to it — the collapsibles become unreachable by keyboard. */
+    var FOCUSABLE = 'a[href], button:not([disabled]), input, summary, [tabindex]:not([tabindex="-1"])';
     var lastFocus = null;
 
     function bg(on) {
