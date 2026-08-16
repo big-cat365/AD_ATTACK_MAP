@@ -59,6 +59,10 @@
 .c-aka { font-family: var(--mono); font-size: 11px; color: var(--faint); margin: 5px 0 0; line-height: 1.45; word-break: break-word; }
 
 .c-body { font-size: 13.5px; color: var(--ink-2); margin: 11px 0 0; line-height: 1.65; }
+/* Attribute names and registry paths run long and unbroken (348 runs of 30+ chars
+   in the data, longest 97). .c-card has no overflow:hidden, so without this they
+   spill outside the card border instead of being clipped. */
+.c-body, .c-points li, .c-aka { overflow-wrap: anywhere; }
 
 .c-points { margin: 11px 0 0; }
 .c-points .pl, .c-related .rl { display: block; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); margin-bottom: 5px; }
@@ -106,4 +110,12 @@
 /* ==========================================================================
    RESPONSIVE
    ========================================================================== */
-@media (max-width: 640px) { .c-grid { column-width: auto; columns: 1; } }
+/* .c-grid is CSS Grid (it used to be multi-column masonry). `columns`/`column-width`
+   are multi-column properties and do nothing on a grid container, so this rule was
+   dead after that migration and the 390px minimum track kept applying — which made
+   every card 390px wide inside a 335px column and scrolled the whole page sideways
+   by 35px on a 375px phone. Override the track instead — with minmax(0, 1fr), not a
+   bare `1fr`: the latter is minmax(auto, 1fr) and its auto minimum is min-content,
+   so a single unbreakable string (longest in the data: 97 chars) would push the
+   track wide again and bring the sideways scroll straight back. */
+@media (max-width: 640px) { .c-grid { grid-template-columns: minmax(0, 1fr); } }

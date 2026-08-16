@@ -7,6 +7,8 @@
 <title>AD / Windows Concepts — AD Attack Map</title>
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/concepts.css">
+<!-- See the matching note in index.html — restores the saved theme before first paint. -->
+<script>try{var t=localStorage.getItem("ad-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
 <header class="topbar">
@@ -25,7 +27,9 @@
     <button class="iconbtn" id="themeBtn" aria-label="配色テーマを切替（ダーク／ライト）" data-t-al="themeAl">◐ theme</button>
   </div>
   <div class="topbar-filters">
-    <span class="rescount" id="rescount" role="status" aria-live="polite"></span>
+    <!-- Placeholder reserves the line so the topbar does not grow one when
+         concepts.js writes the real count in. -->
+    <span class="rescount" id="rescount" role="status" aria-live="polite"><b>—</b></span>
   </div>
 </header>
 

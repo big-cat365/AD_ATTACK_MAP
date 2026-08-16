@@ -38,6 +38,14 @@
     --purple-dim: #7a66d6;
     --purple-glow: rgba(155, 131, 249, 0.16);
 
+    /* Ink for text sitting ON an accent fill. The accents are light in this
+       theme and dark in the light theme, so the readable ink has to flip with
+       them — a fixed #fff measured 3.52:1 on --offense and 3.00:1 on --purple
+       (the latter being the default view, i.e. the most-seen state on the site). */
+    --on-offense: var(--ground);
+    --on-defense: #06222a;
+    --on-purple: var(--ground);
+
     /* severity (amber ramp — the only warm hue, reserved) */
     --sev-crit: #f0a13a;
     --sev-high: #c98f4a;
@@ -78,6 +86,10 @@
       --purple: #6b4fe0;
       --purple-dim: #7a66d6;
       --purple-glow: rgba(107, 79, 224, 0.10);
+      /* accents are dark here, so white is the readable ink (see the dark block) */
+      --on-offense: #fff;
+      --on-defense: #fff;
+      --on-purple: #fff;
       --sev-crit: #a05c10;
       --sev-high: #8a611c;
       --sev-med: #556070;
@@ -111,6 +123,10 @@
     --purple: #6b4fe0;
     --purple-dim: #7a66d6;
     --purple-glow: rgba(107, 79, 224, 0.10);
+    /* accents are dark here, so white is the readable ink (see the dark block) */
+    --on-offense: #fff;
+    --on-defense: #fff;
+    --on-purple: #fff;
     --sev-crit: #a05c10;
     --sev-high: #8a611c;
     --sev-med: #556070;
@@ -181,10 +197,13 @@
   }
   .segmented button:hover { color: var(--ink); }
   .segmented button.active { color: #fff; }
-  body[data-view="red"] .segmented button[data-view="red"] { background: var(--offense); color: #fff; }
-  body[data-view="purple"] .segmented button[data-view="purple"] { background: var(--purple); color: #fff; }
-  body[data-view="blue"] .segmented button[data-view="blue"] { background: var(--defense); color: #06222a; }
-  :root[data-theme="light"] body[data-view="blue"] .segmented button[data-view="blue"], .segmented button[data-view="blue"].active { color: #04242c; }
+  /* Ink comes from the --on-* tokens so it flips with the palette; see the note
+     beside them in DESIGN TOKENS. The previous fixed values failed AA on the
+     dark theme's red (3.52:1) and purple (3.00:1) and on the light theme's
+     blue (3.50:1) — the purple one being the default view. */
+  body[data-view="red"] .segmented button[data-view="red"] { background: var(--offense); color: var(--on-offense); }
+  body[data-view="purple"] .segmented button[data-view="purple"] { background: var(--purple); color: var(--on-purple); }
+  body[data-view="blue"] .segmented button[data-view="blue"] { background: var(--defense); color: var(--on-defense); }
 
   .iconbtn { font-family: var(--mono); font-size: 12px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 7px 12px; cursor: pointer; transition: color .18s, border-color .18s; }
   a.iconbtn { text-decoration: none; display: inline-flex; align-items: center; }
@@ -331,8 +350,13 @@
      LANES + HUNT BLOCKS
      ========================================================================== */
   /* offense / defense split */
-  .split { display: grid; grid-template-columns: 1fr; }
-  .lane { padding: 12px 16px 13px 16px; transition: opacity .28s, filter .28s; }
+  /* minmax(0, 1fr), not 1fr: a bare `1fr` is minmax(auto, 1fr), and the `auto`
+     minimum is min-content. The hunt blocks contain <pre class="kql"> with
+     white-space:pre, whose min-content width is the longest query line — so an
+     opened query block stretched the lane to ~1065px inside a 399px card and
+     .card{overflow:hidden} silently clipped two thirds of the prose. */
+  .split { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .lane { min-width: 0; padding: 12px 16px 13px 16px; transition: opacity .28s, filter .28s; }
   .lane.off { border-bottom: 1px solid var(--line-soft); }
   .lane-head { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
   .lane.off .lane-head { color: var(--offense); }
@@ -359,7 +383,10 @@
   .hunt .hq-cap { font-size: 11.5px; color: var(--ink-2); margin-bottom: 4px; line-height: 1.45; }
   .hunt .hq-plat { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; padding: 1px 5px; border-radius: 4px; }
   .plat-mde { background: #6ea8fe; color: #05173a; }
-  .plat-mdi { background: var(--defense); color: #06222a; }
+  /* The only plat badge whose fill is a theme token rather than a fixed colour,
+     so its ink has to flip too — a fixed dark ink measured 3.56:1 once the light
+     theme darkened --defense to #0b7f9b. The rest use fixed fills and are stable. */
+  .plat-mdi { background: var(--defense); color: var(--on-defense); }
   .plat-sentinel { background: #b98cff; color: #12071f; }
   .plat-entra { background: #f2c14e; color: #2a1f00; }
   /* Umbrella product for MDE/MDI — kept in the same blue/teal family but at
@@ -381,7 +408,11 @@
   .cmds { margin: 10px 16px 2px; border-color: var(--purple-dim); }
   .cmds > summary { color: var(--purple); }
   .cmds > summary:hover { color: var(--purple-dim); }
-  .cmd-tool { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; padding: 1px 5px; border-radius: 4px; color: var(--purple); background: var(--purple-glow); border: 1px solid var(--purple-dim); }
+  /* Ink rather than --purple for the label: purple-on-purple-glow measured
+     4.20:1 (dark) / 4.48:1 (light), both under AA, and this badge carries the
+     tool name — the part a reader most needs to read. The purple border and
+     tint still tie it to the block; --ink measures 9.31 / 13.12. */
+  .cmd-tool { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; padding: 1px 5px; border-radius: 4px; color: var(--ink); background: var(--purple-glow); border: 1px solid var(--purple-dim); }
   /* .hq-cap sits outside .lane here, so the inline <code> from the caption's
      backticks needs its own rule — .lane code does not reach it. */
   .cmds .hq-cap code { font-family: var(--mono); font-size: 11px; color: var(--ink); background: var(--panel); border: 1px solid var(--line-soft); border-radius: 4px; padding: 0 4px; }
@@ -392,6 +423,14 @@
   .lane .meta { display: block; margin-top: 8px; }
   .lane .meta .ml { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); display: block; margin-bottom: 3px; }
   .lane code, .lane .mono { font-family: var(--mono); font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 5px; padding: 1px 5px; }
+  /* Tools / Event ID are comma-joined lists that routinely contain a single
+     unbreakable ASCII run (longest in the data: 148 chars). Without this the
+     run overflows the card and .card{overflow:hidden} clips it with no
+     ellipsis and no scrollbar — the text simply vanishes. `anywhere` rather
+     than `break-word` because only `anywhere` also lowers min-content width,
+     which keeps the modal from gaining a horizontal scrollbar for the same
+     string. `.lane code` (backtick fragments) is left alone deliberately. */
+  .lane .mono, .m-lane .mono { overflow-wrap: anywhere; }
   .lane.off { background: var(--offense-glow); }
   .lane.def { background: var(--defense-glow); }
 
@@ -499,8 +538,9 @@
   .m-diagram { border: 1px solid var(--line-soft); border-radius: 6px; background: var(--ground-2); padding: 6px 10px 4px; margin-bottom: 6px; overflow-x: auto; }
   .m-seqlegend { display: flex; flex-wrap: wrap; gap: 5px 16px; margin: 0 0 20px; font-size: 11px; color: var(--muted); font-family: var(--mono); }
   .m-seqlegend span { display: inline-flex; align-items: center; gap: 6px; }
-  .m-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .m-lane { border: 1px solid var(--line-soft); border-radius: 6px; padding: 14px 16px; }
+  /* minmax(0, …) for the same reason as .split — see the note there. */
+  .m-lanes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .m-lane { min-width: 0; border: 1px solid var(--line-soft); border-radius: 6px; padding: 14px 16px; }
   .m-lane.off { border-color: var(--offense-line); background: linear-gradient(180deg, var(--offense-glow), transparent 70%); }
   .m-lane.def { border-color: var(--defense-line); background: linear-gradient(180deg, var(--defense-glow), transparent 70%); }
   .m-lane h3 { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 10px; display: flex; align-items: center; gap: 7px; }
@@ -508,7 +548,7 @@
   .m-lane p { font-size: 13px; color: var(--ink-2); margin: 0 0 10px; }
   .m-lane .ml { font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); display: block; margin: 10px 0 3px; }
   .m-lane .mono { font-family: var(--mono); font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 5px; padding: 2px 6px; display: inline-block; }
-  @media (max-width: 620px) { .m-lanes { grid-template-columns: 1fr; } .modal-body { padding: 20px 18px 24px; } }
+  @media (max-width: 620px) { .m-lanes { grid-template-columns: minmax(0, 1fr); } .modal-body { padding: 20px 18px 24px; } }
 
   /* ==========================================================================
      BACK TO TOP

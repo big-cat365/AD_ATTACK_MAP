@@ -32,14 +32,32 @@ window.AD = window.AD || {};
   }
 
   /* ---- search + severity filtering ---- */
+
+  /**
+   * Normalise a query the way a Japanese keyboard actually produces it:
+   * lowercase, and fold full-width alphanumerics to ASCII. An IME left in
+   * hiragana mode commits "４６２４", which never matches the half-width
+   * "4624" in the index (different code points) and silently returns nothing.
+   */
+  function normalizeQuery(s) {
+    return (s || "").replace(/[Ａ-Ｚａ-ｚ０-９]/g, function (ch) {
+      return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+    }).trim().toLowerCase();
+  }
+
   function applyFilter() {
-    var q = document.getElementById("q").value.trim().toLowerCase();
-    var filtering = q !== "" || activeSev.size > 0;
+    // Split on whitespace and require every token (AND). A single substring
+    // match forced the reader to reproduce word order exactly, so ordinary
+    // queries like "mimikatz lsass" or "pass the hash" returned zero results
+    // even though 21 and 22 techniques respectively contain both words.
+    var terms = normalizeQuery(document.getElementById("q").value).split(/\s+/).filter(Boolean);
+    var filtering = terms.length > 0 || activeSev.size > 0;
     var visible = 0;
 
     document.querySelectorAll(".card").forEach(function (c) {
       var okSev = activeSev.size === 0 || activeSev.has(c.dataset.sev);
-      var okQ = !q || c.dataset.txt.indexOf(q) !== -1;
+      var txt = c.dataset.txt;
+      var okQ = terms.every(function (t) { return txt.indexOf(t) !== -1; });
       var show = okSev && okQ;
       c.classList.toggle("hide", !show);
       if (show) visible++;
@@ -64,7 +82,11 @@ window.AD = window.AD || {};
       if (node) {
         var pc = node.querySelector(".pcount");
         if (pc) pc.textContent = pv + " techniques";
+        // `.disabled` only sets pointer-events:none, which stops the mouse but
+        // leaves the button in the tab order and still firing on Enter. Set the
+        // real property too so keyboard and mouse agree.
         node.classList.toggle("disabled", pv === 0);
+        node.disabled = pv === 0;
         node.setAttribute("aria-disabled", pv === 0 ? "true" : "false");
       }
     });
@@ -73,6 +95,11 @@ window.AD = window.AD || {};
     if (rc) rc.innerHTML = filtering ? "<b>" + visible + "</b> / " + TOTAL + " techniques" : "<b>" + TOTAL + "</b> techniques";
     document.getElementById("noresult").classList.toggle("show", visible === 0);
     document.querySelectorAll("#clearFilters").forEach(function (b) { b.hidden = !filtering; });
+
+    // Filtering reflows the grid, so cards that were far below the fold can land
+    // in view without any scroll event firing. Fill what is on screen now rather
+    // than leaving placeholders until the user happens to scroll.
+    if (AD.views && AD.views.fillNear) AD.views.fillNear();
   }
 
   function clearFilters() {
@@ -133,7 +160,14 @@ window.AD = window.AD || {};
       if (dg && dg.getAttribute("data-scn")) AD.modal.open(dg.getAttribute("data-scn"));
     });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && AD.modal.isOpen()) AD.modal.close();
+      if (e.key === "Escape" && AD.modal.isOpen()) { AD.modal.close(); return; }
+      // The diagram is a role="button"; native buttons get Enter/Space for free
+      // but a focusable <div> does not, and the legend tells the reader to use Enter.
+      var dg = e.target.closest && e.target.closest(".diagram[data-scn]");
+      if (dg && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        AD.modal.open(dg.getAttribute("data-scn"));
+      }
     });
   }
 

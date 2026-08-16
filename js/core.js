@@ -58,13 +58,29 @@ window.AD = window.AD || {};
     if (opts.title != null) document.title = opts.title;
   };
 
-  /** Dark/light theme toggle. Pins an explicit value on first click (falls back to the OS preference). */
+  /**
+   * Dark/light theme toggle. Pins an explicit value on first click (falls back
+   * to the OS preference), and remembers the choice — the two pages cross-link
+   * constantly, and without persistence every hop threw the reader's choice
+   * away and snapped back to the OS setting.
+   *
+   * Reading it back is NOT done here: an inline <script> in each page's <head>
+   * re-applies the saved value before first paint, because doing it from this
+   * file — which loads at the end of <body> — shows a flash of the OS theme
+   * first. That snippet uses the same "ad-theme" key; keep them in step.
+   */
+  var THEME_KEY = "ad-theme";
+
   AD.theme = {
     toggle: function () {
       var cur = document.documentElement.getAttribute("data-theme");
       var sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       var now = cur ? cur : (sysDark ? "dark" : "light");
-      document.documentElement.setAttribute("data-theme", now === "dark" ? "light" : "dark");
+      var next = now === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      // Wrapped: localStorage throws on a file:// origin in some browsers, and
+      // this site is meant to work straight off the filesystem.
+      try { window.localStorage.setItem(THEME_KEY, next); } catch (e) { /* storage unavailable */ }
     }
   };
 
@@ -128,6 +144,12 @@ window.AD = window.AD || {};
       var els = document.querySelectorAll(selector);
       for (var i = 0; i < els.length; i++) {
         var r = els[i].getBoundingClientRect();
+        // A display:none element (a card hidden by the search/severity filter)
+        // reports an all-zero rect, which satisfies the viewport test below for
+        // *every* such element. Without this guard the first scroll after any
+        // filter filled all ~300 hidden cards in one frame — 5k -> 44k nodes and
+        // ~160ms of synchronous work — silently undoing the lazy architecture.
+        if (!r.width && !r.height) continue;
         if (r.bottom > -buffer2 && r.top < vh + buffer2) fill(els[i]);
       }
       // once nothing is left to fill, drop the scroll/resize listeners + observer

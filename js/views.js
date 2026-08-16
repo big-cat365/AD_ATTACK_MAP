@@ -96,7 +96,11 @@ window.AD = window.AD || {};
     var scn = AD.diagram.getScenario(a.name);
     var svg = scn ? AD.diagram.renderSeq(scn, { compact: true })
       : '<div style="color:var(--faint);font-family:var(--mono);font-size:11px;padding:10px">— flow n/a —</div>';
-    return '<div class="diagram" data-scn="' + nameEsc + '" title="' + esc(u.expand) + '">' +
+    // tabindex/role: the legend promises "図をクリック／Enterで拡大" and
+    // styles.css already carries a .diagram:focus-visible rule, but the element
+    // was never focusable, so the Enter route the copy advertises did not exist.
+    return '<div class="diagram" data-scn="' + nameEsc + '" title="' + esc(u.expand) + '"' +
+        ' tabindex="0" role="button" aria-label="' + esc(u.expandAl.replace("{name}", a.name)) + '">' +
         '<div class="diagram-head"><span class="dl">' + u.flowHead + "</span>" +
           '<button class="expand" data-expand="' + nameEsc + '" aria-label="' + esc(u.expandAl.replace("{name}", a.name)) + '">' + esc(u.expand) + "</button></div>" +
         '<div class="dscroll">' + svg + "</div>" +
@@ -114,8 +118,25 @@ window.AD = window.AD || {};
     return (a.cmd || []).map(function (c) { return c.tool + " " + c.q; }).join(" ");
   }
 
+  /**
+   * The card's search haystack, built once at render time (never re-read from
+   * the DOM, so lazily-unfilled cards stay searchable).
+   *
+   * `events` and `triage` are in here on purpose: the most common real entry
+   * point is an analyst holding an Event ID from an alert. Indexing only the
+   * prose fields found ~44% of the 4769 techniques and ~39% of the 4624 ones,
+   * and — worse than finding none — it returned a plausible-looking count, so
+   * the gap was invisible. `hunt`/`huntcs` query bodies are deliberately left
+   * out: +411KB, and shared table names like DeviceProcessEvents would match
+   * almost every card.
+   */
+  function searchText(a) {
+    return [a.name, a.aka, a.mitre, a.cve, a.summary, a.how, a.detect,
+            a.tools, cmdTxt(a), a.events, a.triage].join(" ").toLowerCase();
+  }
+
   function card(a) {
-    var searchTxt = esc([a.name, a.aka, a.mitre, a.cve, a.summary, a.how, a.detect, a.tools, cmdTxt(a)].join(" ").toLowerCase());
+    var searchTxt = esc(searchText(a));
     var sev = SEV[a.sev] ? a.sev : "Medium";
     var nameEsc = esc(a.name);
     return '<article id="' + a._cid + '" class="card sev-' + sev + ' reveal" data-sev="' + sev + '" data-txt="' + searchTxt + '" data-idx="' + a._idx + '" data-lazy="1">' +
