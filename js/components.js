@@ -86,14 +86,14 @@ window.AD = window.AD || {};
   AD.lanes = function (a) {
     var u = AD.UI;
     return {
-      red: "<p>" + mw(a.how) + "</p>" + metaRow("Tools", a.tools),
+      red: "<p>" + mw(a.how) + "</p>" + metaRow("ツール", a.tools),
       blue:
         '<p><b class="hl-def">' + u.detectLabel + "</b> " + mw(a.detect) + "</p>" +
         (a.triage ? '<p class="triage"><b class="hl-tri">' + u.triageLabel + "</b> " + mw(a.triage) + "</p>" : "") +
         AD.huntBlock(a.hunt) +
         AD.huntBlock(a.huntcs, { label: u.huntCsLabel, hint: u.huntCsHint, cls: "cs" }) +
         '<p><b class="hl-def">' + u.mitigateLabel + "</b> " + mw(a.mitigate) + "</p>" +
-        metaRow("Event ID", a.events)
+        metaRow("イベントID", a.events)
     };
   };
 })(window.AD);

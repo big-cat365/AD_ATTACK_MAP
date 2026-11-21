@@ -26,8 +26,8 @@ window.AD = window.AD || {};
     var phase = AD.PHASES.filter(function (p) { return p.id === a.phase; })[0];
     var lanes = AD.lanes(a);
     return (
-      '<p class="m-eyebrow">' + (phase ? esc(phase.idx + " · " + phase.name + " / " + phase.en) : "") +
-        '<span class="sevwrap sev-' + a.sev + '" style="margin-left:8px"><span class="sev-badge">' + a.sev + "</span></span></p>" +
+      '<p class="m-eyebrow">' + (phase ? esc(phase.idx + " " + phase.name) : "") +
+        '<span class="sevwrap sev-' + a.sev + '" style="margin-left:8px"><span class="sev-badge">' + esc(AD.UI.sevLabel[a.sev] || a.sev) + "</span></span></p>" +
       '<h2 id="m-title">' + esc(a.name) + "</h2>" +
       (a.aka ? '<p class="m-aka">' + esc(a.aka) + "</p>" : "") +
       '<div class="m-tags">' + AD.tags(a, true) + "</div>" +

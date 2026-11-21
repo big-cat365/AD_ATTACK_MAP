@@ -67,7 +67,7 @@ window.AD = window.AD || {};
       var pv = pb.querySelectorAll(".card:not(.hide)").length;
       pb.classList.toggle("hide", pv === 0);
       var cnt = pb.querySelector(".phase-head .cnt");
-      if (cnt) cnt.textContent = pv + " techniques";
+      if (cnt) cnt.textContent = pv + " 件";
       pb.querySelectorAll(".group-label").forEach(function (gl) {
         var grid = gl.nextElementSibling;
         if (grid && grid.classList.contains("grid")) {
@@ -81,7 +81,7 @@ window.AD = window.AD || {};
       var node = document.querySelector('.phase-node[data-phase="' + phase + '"]');
       if (node) {
         var pc = node.querySelector(".pcount");
-        if (pc) pc.textContent = pv + " techniques";
+        if (pc) pc.textContent = pv + " 件";
         // `.disabled` only sets pointer-events:none, which stops the mouse but
         // leaves the button in the tab order and still firing on Enter. Set the
         // real property too so keyboard and mouse agree.
@@ -92,7 +92,7 @@ window.AD = window.AD || {};
     });
 
     var rc = document.getElementById("rescount");
-    if (rc) rc.innerHTML = filtering ? "<b>" + visible + "</b> / " + TOTAL + " techniques" : "<b>" + TOTAL + "</b> techniques";
+    if (rc) rc.innerHTML = filtering ? "<b>" + visible + "</b> / " + TOTAL + " 件" : "<b>" + TOTAL + "</b> 件";
     document.getElementById("noresult").classList.toggle("show", visible === 0);
     document.querySelectorAll("#clearFilters").forEach(function (b) { b.hidden = !filtering; });
 

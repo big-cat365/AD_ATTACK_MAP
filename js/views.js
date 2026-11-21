@@ -25,7 +25,7 @@ window.AD = window.AD || {};
       { n: sev.High, l: u.statHigh, c: "" }
     ];
     document.getElementById("stats").innerHTML = tiles.map(function (s) {
-      return '<div class="stat ' + s.c + '"><div class="n">' + s.n + '</div><div class="l">' + s.l + "</div></div>";
+      return '<span class="stat ' + s.c + '"><span class="n">' + s.n + '</span><span class="l">' + s.l + "</span></span>";
     }).join("");
   }
 
@@ -45,8 +45,7 @@ window.AD = window.AD || {};
         '<span class="rail"></span>' +
         '<span class="pnum">' + esc(p.idx) + "</span>" +
         '<span class="pname">' + esc(p.name) + "</span>" +
-        '<span class="pen">' + esc(p.en) + "</span>" +
-        '<span class="pcount">' + counts[p.id] + " techniques</span>" +
+        '<span class="pcount">' + counts[p.id] + " 件</span>" +
         '<span class="arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>' +
         "</button>";
     }).join("");
@@ -80,7 +79,7 @@ window.AD = window.AD || {};
     document.getElementById("spine-toc").innerHTML = AD.PHASES.map(function (p) {
       var items = AD.ATTACKS.filter(function (a) { return a.phase === p.id; });
       return '<div class="ptoc" id="ptoc-' + p.id + '" data-phase="' + p.id + '" hidden>' +
-        '<div class="ptoc-head"><span class="ptoc-idx">' + esc(p.idx) + '</span><span class="ptoc-name">' + esc(p.name) + '</span><span class="ptoc-en">' + esc(p.en) + "</span></div>" +
+        '<div class="ptoc-head"><span class="ptoc-idx">' + esc(p.idx) + '</span><span class="ptoc-name">' + esc(p.name) + '</span></div>' +
         phaseGroupBody(items) +
         "</div>";
     }).join("");
@@ -95,7 +94,7 @@ window.AD = window.AD || {};
     var nameEsc = esc(a.name);
     var scn = AD.diagram.getScenario(a.name);
     var svg = scn ? AD.diagram.renderSeq(scn, { compact: true })
-      : '<div style="color:var(--faint);font-family:var(--mono);font-size:11px;padding:10px">— flow n/a —</div>';
+      : '<div style="color:var(--faint);font-family:var(--mono);font-size:12px;padding:12px">' + esc(u.noFlow) + '</div>';
     // tabindex/role: the legend promises "図をクリック／Enterで拡大" and
     // styles.css already carries a .diagram:focus-visible rule, but the element
     // was never focusable, so the Enter route the copy advertises did not exist.
@@ -143,7 +142,7 @@ window.AD = window.AD || {};
       '<div class="card-head">' +
         '<div class="card-title-row"><div><h3>' + nameEsc + "</h3>" +
           (a.aka ? '<div class="aka">' + esc(a.aka) + "</div>" : "") + "</div>" +
-          '<span class="sev-badge">' + esc(sev) + "</span></div>" +
+          '<span class="sev-badge">' + esc(AD.UI.sevLabel[sev] || sev) + "</span></div>" +
         '<p class="summary">' + mw(a.summary) + "</p>" +
         '<div class="tags">' + AD.tags(a) + "</div>" +
       "</div>" +
@@ -181,7 +180,7 @@ window.AD = window.AD || {};
       }).join("");
       return '<section class="phase-block" id="ph-' + p.id + '" data-phase="' + p.id + '">' +
         '<div class="phase-head"><span class="idx">' + esc(p.idx) + '</span><h2>' + esc(p.name) + "</h2>" +
-          '<span class="en">' + esc(p.en) + '</span><span class="cnt">' + items.length + " techniques</span></div>" +
+          '<span class="cnt">' + items.length + " 件</span></div>" +
         '<p class="phase-desc">' + esc(p.desc) + "</p>" + body + "</section>";
     }).join("");
   }

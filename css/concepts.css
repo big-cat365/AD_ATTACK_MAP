@@ -8,29 +8,29 @@
    ========================================================================== */
 .cat-nav { display: flex; flex-direction: column; gap: 6px; }
 .cat-group { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
-.cat-node { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--panel); color: var(--ink-2); border: 0; cursor: pointer; font-size: 13.5px; font-family: inherit; text-align: left; transition: background .16s, color .16s; }
+.cat-node { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--panel); color: var(--ink-2); border: 0; cursor: pointer; font-size: 14px; font-family: inherit; text-align: left; transition: background .16s, color .16s; }
 .cat-node:hover { background: var(--panel-2); color: var(--ink); }
 .cat-node[aria-expanded="true"] { background: var(--panel-2); color: var(--ink); }
 .cat-node .cat-name { flex: 1; font-weight: 600; }
-.cat-node .cat-count { font-family: var(--mono); font-size: 11px; color: var(--faint); background: var(--ground-2); border: 1px solid var(--line-soft); border-radius: 999px; padding: 1px 8px; }
+.cat-node .cat-count { font-family: var(--mono); font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .cat-node .cat-chevron { color: var(--muted); font-size: 15px; line-height: 1; transition: transform .18s; display: inline-block; }
 .cat-node[aria-expanded="true"] .cat-chevron { transform: rotate(90deg); }
 .cat-sublist { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 .cat-sublist[hidden] { display: none; }
-.cat-sub { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 7px 14px 7px 34px; background: transparent; border: 0; border-top: 1px solid var(--line-soft); cursor: pointer; text-align: left; font-family: inherit; color: var(--ink-2); font-size: 12.5px; transition: background .14s, color .14s; }
+.cat-sub { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 8px 16px 8px 36px; background: transparent; border: 0; border-top: 1px solid var(--line-soft); cursor: pointer; text-align: left; font-family: inherit; color: var(--ink-2); font-size: 13px; transition: background .14s, color .14s; }
 .cat-sub:first-child { border-top: 0; }
 .cat-sub:hover { background: var(--panel-2); color: var(--ink); }
 .cat-sub .cat-sub-term { font-weight: 500; }
-.cat-sub .cat-sub-en { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.cat-sub .cat-sub-en { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 
 /* ==========================================================================
    SECTIONS
    ========================================================================== */
 .c-section { margin: 40px 0 8px; scroll-margin-top: 96px; }
 .c-section.hide { display: none; }
-.c-sec-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 18px; }
-.c-sec-head h2 { font-family: var(--mono); font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
-.c-sec-count { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.c-sec-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 16px; }
+.c-sec-head h2 { font-family: var(--sans); font-size: 18px; font-weight: 600; margin: 0; }
+.c-sec-count { font-family: var(--sans); font-size: 12px; color: var(--faint); }
 
 /* ==========================================================================
    CARD GRID
@@ -42,7 +42,7 @@
 .c-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); gap: 16px; align-items: start; }
 .c-card {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 15px 16px 14px; box-shadow: var(--shadow);
+  padding: 16px; box-shadow: var(--shadow);
   content-visibility: auto; contain-intrinsic-size: auto 320px;
 }
 .c-card.hide { display: none; }
@@ -54,33 +54,33 @@
    CARD INTERNALS
    ========================================================================== */
 .c-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.c-head h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.25; }
-.c-en { font-family: var(--mono); font-size: 11.5px; color: var(--defense); }
-.c-aka { font-family: var(--mono); font-size: 11px; color: var(--faint); margin: 5px 0 0; line-height: 1.45; word-break: break-word; }
+.c-head h3 { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.25; }
+.c-en { font-family: var(--mono); font-size: 12px; color: var(--defense); }
+.c-aka { font-family: var(--mono); font-size: 11px; color: var(--faint); margin: 4px 0 0; line-height: 1.45; word-break: break-word; }
 
-.c-body { font-size: 13.5px; color: var(--ink-2); margin: 11px 0 0; line-height: 1.65; }
+.c-body { font-size: 14px; color: var(--ink-2); margin: 12px 0 0; line-height: 1.65; }
 /* Attribute names and registry paths run long and unbroken (348 runs of 30+ chars
    in the data, longest 97). .c-card has no overflow:hidden, so without this they
    spill outside the card border instead of being clipped. */
 .c-body, .c-points li, .c-aka { overflow-wrap: anywhere; }
 
-.c-points { margin: 11px 0 0; }
-.c-points .pl, .c-related .rl { display: block; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); margin-bottom: 5px; }
-.c-points ul { margin: 0; padding-left: 17px; }
-.c-points li { font-size: 12.5px; color: var(--ink-2); margin: 2px 0; line-height: 1.5; }
+.c-points { margin: 12px 0 0; }
+.c-points .pl, .c-related .rl { display: block; font-family: var(--sans); font-size: 11px; color: var(--faint); margin-bottom: 4px; }
+.c-points ul { margin: 0; padding-left: 16px; }
+.c-points li { font-size: 13px; color: var(--ink-2); margin: 2px 0; line-height: 1.5; }
 
-.c-related { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line-soft); }
-.rel-chip { font-family: var(--sans); font-size: 11.5px; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 999px; padding: 2px 10px; margin: 0 5px 5px 0; cursor: pointer; transition: color .15s, border-color .15s; }
+.c-related { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.rel-chip { font-family: var(--sans); font-size: 12px; color: var(--ink-2); background: var(--panel-2); border: 1px solid transparent; border-radius: 4px; padding: 3px 8px; margin: 0 4px 4px 0; cursor: pointer; transition: color .15s, border-color .15s; }
 .rel-chip:hover { color: var(--defense); border-color: var(--defense-line); }
 
 /* ==========================================================================
    FIGURES
    ========================================================================== */
-.c-fig { margin: 12px 0 2px; padding: 10px; background: var(--ground-2); border: 1px solid var(--line-soft); border-radius: var(--radius); cursor: zoom-in; transition: border-color .16s; }
-.c-fig:hover, .c-fig:focus-visible { border-color: var(--defense-line); outline: none; }
+.c-fig { margin: 12px 0 4px; padding: 12px; background: var(--ground-2); border-radius: var(--radius); cursor: zoom-in; transition: background-color .16s; }
+.c-fig:hover { background: var(--panel-2); }
 .c-fig[data-figlazy] { min-height: 120px; }
 .fig { display: block; width: 100%; height: auto; }
-.m-fig { margin: 8px 0 4px; padding: 16px; background: var(--ground-2); border: 1px solid var(--line-soft); border-radius: var(--radius); }
+.m-fig { margin: 8px 0 4px; padding: 16px; background: var(--ground-2); border-radius: var(--radius); }
 .m-fig .fig { max-height: 70vh; }
 
 /* figure primitives (colours follow the theme via tokens) */

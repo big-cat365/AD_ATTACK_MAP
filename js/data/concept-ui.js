@@ -12,25 +12,25 @@ AD.CONCEPT_CATS = [
   { id: "objects",  ja: "オブジェクトとグループ" },
   { id: "auth",     ja: "認証プロトコル" },
   { id: "pki",      ja: "証明書・PKI" },
-  { id: "cloud",    ja: "クラウド / ハイブリッド" },
+  { id: "cloud",    ja: "クラウド・ハイブリッド" },
   { id: "logging",  ja: "ログと監視" },
   { id: "prim",     ja: "攻撃プリミティブ・手口" },
-  { id: "soc",      ja: "検知・防御 / SOC運用" }
+  { id: "soc",      ja: "検知・防御とSOC運用" }
 ];
 
 AD.CONCEPTS_UI = {
   ja: {
-    title: "AD / Windows 用語・概念リファレンス",
-    searchPh: "用語 / 英語名 / 別名…",
+    title: "AD・Windows の用語と概念",
+    searchPh: "用語・英語名で検索",
     searchAl: "用語・英語名・別名で検索",
     themeAl: "配色テーマを切替（ダーク／ライト）",
-    backMap: "🗺 攻撃マップ",
-    tocTitle: "▸ カテゴリ — クリックで展開",
+    backMap: "攻撃マップ",
+    tocTitle: "カテゴリ",
     related: "関連",
     keyPoints: "要点",
     figHint: "図をクリックで拡大",
-    count: "収録用語",
-    noresult: '// 一致する用語がありません — <button class="clearbtn" id="clearFilters2">検索をクリア</button>',
+    count: "語",
+    noresult: '一致する用語はありません <button class="clearbtn" id="clearFilters2">検索をクリア</button>',
     disclaimer: "教育・防御・認可されたセキュリティ検証を目的とした参考資料です。正確性には努めていますが、実装・製品バージョンにより挙動が異なる場合があります。一次情報での確認を推奨します。",
     footNote: "用語は Microsoft の公式呼称に準拠。イベントID・RID・OID・ポート等は代表的な値で、環境設定により異なる場合があります。"
   }

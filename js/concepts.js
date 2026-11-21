@@ -102,7 +102,7 @@ window.AD = window.AD || {};
   }
 
   function render() {
-    AD.applyI18n(UI, { title: UI.title + " — AD Attack Map" });
+    AD.applyI18n(UI, { title: UI.title + " | AD Attack Map" });
     renderNav();
     renderMain();
     if (figLazyHandle) figLazyHandle.destroy();

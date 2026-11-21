@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<title>AD / Windows Concepts — AD Attack Map</title>
+<title>AD・Windows の用語と概念 | AD Attack Map</title>
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/concepts.css">
 <!-- See the matching note in index.html — restores the saved theme before first paint. -->
@@ -16,15 +16,15 @@
     <div class="brand">
       <span class="dot" aria-hidden="true"></span>
       <b>AD ATTACK MAP</b>
-      <span>Concepts</span>
+      <span>用語集</span>
     </div>
     <div class="spacer"></div>
     <span class="search">
       <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="q" type="search" aria-label="用語・英語名・別名で検索" placeholder="用語 / 英語名 / 別名…" data-t-al="searchAl" data-t-ph="searchPh" autocomplete="off" />
+      <input id="q" type="search" aria-label="用語・英語名・別名で検索" placeholder="用語・英語名で検索" data-t-al="searchAl" data-t-ph="searchPh" autocomplete="off" />
     </span>
-    <a class="iconbtn" href="index.html" data-t="backMap">← 攻撃マップ</a>
-    <button class="iconbtn" id="themeBtn" aria-label="配色テーマを切替（ダーク／ライト）" data-t-al="themeAl">◐ theme</button>
+    <a class="iconbtn" href="index.html"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg><span data-t="backMap">攻撃マップ</span></a>
+    <button class="iconbtn" id="themeBtn" aria-label="配色テーマを切替（ダーク／ライト）" data-t-al="themeAl"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>テーマ</span></button>
   </div>
   <div class="topbar-filters">
     <!-- Placeholder reserves the line so the topbar does not grow one when
@@ -35,12 +35,11 @@
 
 <div class="wrap">
   <section class="hero" aria-label="概要">
-    <p class="eyebrow">Active Directory · Windows · <span class="bt">Fundamentals</span></p>
-    <h1 class="title" data-t="title">AD / Windows 用語・概念リファレンス</h1>
+    <h1 class="title" data-t="title">AD・Windows の用語と概念</h1>
   </section>
 
   <nav class="spine-sec" aria-label="カテゴリ">
-    <p class="spine-title" data-t="tocTitle">▸ カテゴリ — クリックで展開</p>
+    <p class="spine-title" data-t="tocTitle">カテゴリ</p>
     <div class="cat-nav" id="catnav"></div>
   </nav>
 
@@ -55,9 +54,10 @@
       </div>
       <div>
         <h4>主要リファレンス</h4>
-        <a href="https://learn.microsoft.com/windows-server/identity/identity-and-access" target="_blank" rel="noopener">Microsoft Learn — Identity</a><br>
-        <a href="https://attack.mitre.org/" target="_blank" rel="noopener">MITRE ATT&amp;CK</a> · <a href="https://www.thehacker.recipes/" target="_blank" rel="noopener">The Hacker Recipes</a><br>
-        <a href="index.html">→ 攻撃マップ</a>
+        <a href="https://learn.microsoft.com/windows-server/identity/identity-and-access" target="_blank" rel="noopener">Microsoft Learn（Identity）</a><br>
+        <a href="https://attack.mitre.org/" target="_blank" rel="noopener">MITRE ATT&amp;CK</a><br>
+        <a href="https://www.thehacker.recipes/" target="_blank" rel="noopener">The Hacker Recipes</a><br>
+        <a href="index.html">攻撃マップ</a>
       </div>
     </div>
     <p class="disc" data-t="disclaimer"></p>
